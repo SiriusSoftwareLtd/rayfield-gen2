@@ -1,52 +1,54 @@
-# Nearly copy and pasted from
-# https://github.com/ActualMasterOogway/Fluent-Renewed/tree/main
-# (Thanks oogway <3)
-
 name: Pushed
 permissions:
-    contents: write
+  contents: write
 on:
-    push:
-        paths:
-            - '**.luau'
-            - '**.lua'
-            - '**.rbxm'
-            - '**.json'
-            - '**.yml'
-    pull_request:
-        paths:
-            - '**.luau'
-            - '**.lua'
-            - '**.rbxm'
-            - '**.json'
-            - '**.yml'
+  push:
+    paths:
+      - '**.luau'
+      - '**.lua'
+      - '**.rbxm'
+      - '**.json'
+      - '**.yml'
+  pull_request:
+    paths:
+      - '**.luau'
+      - '**.lua'
+      - '**.rbxm'
+      - '**.json'
+      - '**.yml'
 
 jobs:
-    build_and_bundle:
-        name: Generate UI release
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v4
-              with:
-                  submodules: true
+  build_and_bundle:
+    name: Generate UI release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
 
-            - name: Setup RoKit
-              uses: CompeyDev/setup-rokit@v0.1.2
+      - name: Setup RoKit
+        uses: CompeyDev/setup-rokit@v0.1.2
 
-            - name: Install RoKit packages
-              run: |
-                  rokit trust rojo-rbx/rojo
-                  rokit trust lune-org/lune
-                  rokit trust seaofvoices/darklua
-                  rokit install
-    
-            - name: Build and bundle project
-              run: lune run wax bundle output="build/bundled.luau" input="wax.project.json" minify=true
+      - name: Install RoKit packages
+        run: |
+          rokit trust rojo-rbx/rojo
+          rokit trust lune-org/lune
+          rokit trust seaofvoices/darklua
+          rokit install
 
-            - name: Upload Bundled File to Release
-              uses: ncipollo/release-action@v1
-              with:
-                  artifacts: build/bundled.luau
-                  token: ${{ secrets.GITHUB_TOKEN }}
-                  tag: ${{ github.run_id }}
-                  name: Rayfield Interface Suite
+      - name: Build and bundle project
+        run: lune run wax bundle output="build/bundled.luau" input="wax.project.json" minify=true
+
+      - name: Read Version
+        id: version
+        run: |
+          VERSION=$(cat version.txt)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Upload Bundled File to Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: build/bundled.luau
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.run_id }}
+          name: Rayfield v${{ env.VERSION }}
