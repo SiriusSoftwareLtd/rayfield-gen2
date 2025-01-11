@@ -46,7 +46,7 @@ jobs:
             - name: Upload Bundled File to Release
               uses: ncipollo/release-action@v1
               with:
-                  artifacts: bundled.luau
+                  artifacts: build/bundled.luau
                   token: ${{ secrets.GITHUB_TOKEN }}
                   tag: ${{ github.run_id }}
-                  name: Automatic Release
+                  name: Rayfield Interface Suite
