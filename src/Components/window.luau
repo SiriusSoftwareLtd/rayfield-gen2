@@ -1,5 +1,5 @@
 -- Variables
-local variables = require(script.Parent.Parent.Utils.Variables)
+local variables = require(script.Parent.Parent.Utility.variables)
 
 -- Module
 local Window = {}
