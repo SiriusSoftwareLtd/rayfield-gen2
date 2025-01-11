@@ -51,4 +51,4 @@ jobs:
           artifacts: build/bundled.luau
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.run_id }}
-          name: Rayfield v${{ env.VERSION }}
+          name: Rayfield ${{ env.VERSION }}
