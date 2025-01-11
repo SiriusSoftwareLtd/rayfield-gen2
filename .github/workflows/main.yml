@@ -45,16 +45,17 @@ jobs:
           VERSION=$(cat version.txt)
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-      - name: Delete Existing Tag
+      - name: Generate Unique Tag
+        id: unique_tag
         run: |
-          git fetch --tags
-          git tag -d ${{ env.VERSION }} || true  # Ignore error if the tag doesn't exist locally
-          git push --delete origin ${{ env.VERSION }} || true  # Ignore error if the tag doesn't exist remotely
+          TAG="${{ env.VERSION }}"
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          echo "Generated tag: $TAG"
 
       - name: Upload Bundled File to Release
         uses: ncipollo/release-action@v1
         with:
           artifacts: build/bundled.luau
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ env.VERSION }}
+          tag: ${{ env.TAG }}
           name: Rayfield ${{ env.VERSION }}
