@@ -45,6 +45,12 @@ jobs:
           VERSION=$(cat version.txt)
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
+      - name: Delete Existing Tag
+        run: |
+          git fetch --tags
+          git tag -d ${{ env.VERSION }} || true  # Ignore error if the tag doesn't exist locally
+          git push --delete origin ${{ env.VERSION }} || true  # Ignore error if the tag doesn't exist remotely
+
       - name: Upload Bundled File to Release
         uses: ncipollo/release-action@v1
         with:
