@@ -1,0 +1,6 @@
+{
+    "robloxLsp.diagnostics.globals": [
+        "gethui",
+        "cloneref"
+    ]
+}
