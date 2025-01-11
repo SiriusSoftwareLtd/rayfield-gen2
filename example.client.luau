@@ -3,4 +3,6 @@ local window = WindowComponent.new("Window Name")
 
 task.wait(5)
 
+print('unloading')
+
 window:Unload()
