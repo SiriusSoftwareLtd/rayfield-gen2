@@ -48,7 +48,7 @@ jobs:
       - name: Generate Unique Tag
         id: unique_tag
         run: |
-          TAG="${{ env.VERSION }}"
+          TAG="${{ env.VERSION }}-${{ github.run_id }}"
           echo "TAG=$TAG" >> $GITHUB_ENV
           echo "Generated tag: $TAG"
 
