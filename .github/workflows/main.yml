@@ -41,7 +41,7 @@ jobs:
                   rokit install
     
             - name: Build and bundle project
-              run: lune run wax bundle output="build/bundled.luau" input="wax.project.json" minify=true darklua-config-path=".lune/DarkLua.json"
+              run: lune run wax bundle output="build/bundled.luau" input="wax.project.json" minify=true
 
             - name: Upload Bundled File to Release
               uses: ncipollo/release-action@v1
