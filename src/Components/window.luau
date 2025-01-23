@@ -1,3 +1,5 @@
+--!nocheck
+
 -- Variables
 local variables = require(script.Parent.Parent.Utility.variables)
 
@@ -8,7 +10,7 @@ Window.__index = Window
 function Window.new(name, size)
     local self = setmetatable({
         name = name or "Window",
-        size = size or UDim2.fromOffset(500, 600),
+        size = size or UDim2.fromOffset(475, 500),
         instances = {},
         connections = {},
     }, Window)
@@ -18,7 +20,13 @@ function Window.new(name, size)
     })
 
     self.main = self:Create("Frame", {
+        Size = self.size,
+        Name = self.name,
         Parent = self.screenGui,
+    })
+
+    self.top = self:Create("Frame", {
+        Parent = self.main,
     })
 
     return self
