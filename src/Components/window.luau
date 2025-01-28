@@ -102,6 +102,7 @@ function Window.new(name, size)
         Parent = self.topbar,
         Position = UDim2.new(0, 0, 1, 0),
         Size = UDim2.new(1, 0, 0, 1),
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         BackgroundTransparency = 0.85
     })
 
@@ -111,6 +112,7 @@ function Window.new(name, size)
         Parent = self.main,
         Position = UDim2.new(0, 0, 0, 105),
         Size = UDim2.new(1, 0, 0, 1),
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         BackgroundTransparency = 0.85
     })
 
@@ -174,7 +176,7 @@ function Window.new(name, size)
 
     self.subtitle = self:Create("TextLabel", {
         -- Configurables
-        Text = 'Script Description Example', -- window name
+        Text = 'Content', -- window name
 
         -- Theming
         TextColor3 = Color3.fromRGB(255, 255, 255),
@@ -191,7 +193,36 @@ function Window.new(name, size)
         Parent = self.titleContainer
     })
 
+
+    -- Tabs Preparation
+    self.tabList = self:Create("ScrollingFrame", {
+        Size = UDim2.new(1, 0, 0, 36),
+        Position = UDim2.new(0.5, 0, 0, 68),
+        AnchorPoint = Vector2.new(0.5, 0),
+        BorderSizePixel = 0,
+        BackgroundTransparency = 1,
+        AutomaticCanvasSize = Enum.AutomaticSize.X,
+        CanvasSize = UDim2.new(0, 0, 0, 0),
+        ScrollBarThickness = 0,
+        ScrollingDirection = Enum.ScrollingDirection.X,
+
+        Parent = self.main
+    })
+
+    self.tabListLayout = self:Create('UIListLayout', {
+        Padding = UDim.new(0, 15),
+        FillDirection = Enum.FillDirection.Horizontal,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        HorizontalAlignment = Enum.HorizontalAlignment.Left,
+
+        Parent = self.tabList
+    })
+
     return self
+end
+
+function Window:CreateTab()
+    local newTab = require(script.Parent.tab).new(self)
 end
 
 function Window:Create(className, properties)
