@@ -191,6 +191,44 @@ function Window.new(name, size)
         Parent = self.titleContainer
     })
 
+    -- Shadow
+    self.shadowContainer = self:Create("Frame", {
+        BorderSizePixel = 0,
+
+        Size = UDim2.new(1, 35, 1, 35),
+        Position = UDim2.fromScale(0.5, 0.5),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        BackgroundTransparency = 1,
+        ZIndex = 0,
+
+        Parent = self.main,
+    })
+
+    self.shadowImage = self:Create("ImageLabel", {
+        Image = 'rbxassetid://5587865193',
+        ImageColor3 = Color3.fromRGB(255, 255, 255),
+        Size = UDim2.fromScale(1.6, 1.3),
+        BorderSizePixel = 0,
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromScale(0.5, 0.5),
+        BackgroundTransparency = 1,
+        ImageTransparency = 0.6,
+        ZIndex = 0,
+       
+        Parent = self.shadowContainer
+    })
+
+    self.shadowGradient = self:Create("UIGradient", {
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.new(0.0784313725, 0.0784313725, 0.0784313725)),
+            ColorSequenceKeypoint.new(1, Color3.new(0.0784313725, 0.0784313725, 0.0784313725))
+        }),
+        Rotation = 250,
+        Offset = Vector2.new(0, 0.2),
+        Parent = self.shadowImage,
+    })
+
+
     -- Elements Preparation
     
     self.elements = self:Create("Frame", {
@@ -255,7 +293,7 @@ function Window.new(name, size)
 
         Size = UDim2.new(0, 10, 0, 0),
         BackgroundTransparency = 1,
-        LayoutOrder = 100,
+        LayoutOrder = 999999,
 
         Parent = self.tabList
     })
@@ -285,6 +323,15 @@ function Window.new(name, size)
         Parent = self.actionContainer
     })
 
+    self.rfSettings = self:CreateTab({
+        name = 'Rayfield Settings',
+        customOrder = 1000,
+
+        neglectSelector = true,
+    })
+
+    -- add require(script.Parent.action) as a variable idk where.
+
     require(script.Parent.action).new(self, {
         name = 'Close',
         icon = 83277910885129,
@@ -311,7 +358,8 @@ function Window.new(name, size)
         order = 3,
 
         callback = function()
-            print('settings!')
+            print('navigating to settings')
+            self:Navigate(self.rfSettings.tabPage)
         end
     })
 
@@ -329,7 +377,19 @@ function Window.new(name, size)
 end
 
 function Window:CreateTab(properties)
-    local newTab = require(script.Parent.tab).new(self, properties)
+    return require(script.Parent.tab).new(self, properties)
+end
+
+function Window:Navigate(tab)
+    if typeof(tab) == "string" then
+        if self.elements[tab] then
+            tab = self.elements[tab]
+        end
+    elseif tab:IsA("ScrollingFrame") then
+        tab = tab
+    end
+
+    self.elementsLayout:JumpTo(tab)
 end
 
 function Window:Create(className, properties)
