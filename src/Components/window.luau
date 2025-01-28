@@ -214,15 +214,101 @@ function Window.new(name, size)
         FillDirection = Enum.FillDirection.Horizontal,
         VerticalAlignment = Enum.VerticalAlignment.Center,
         HorizontalAlignment = Enum.HorizontalAlignment.Left,
+        SortOrder = Enum.SortOrder.LayoutOrder,
 
         Parent = self.tabList
+    })
+
+    self:Create("Frame", {
+        BorderSizePixel = 0,
+
+        Size = UDim2.new(0, 10, 0, 0),
+        BackgroundTransparency = 1,
+        LayoutOrder = -1,
+
+        Parent = self.tabList
+    })
+
+    self:Create("Frame", {
+        BorderSizePixel = 0,
+
+        Size = UDim2.new(0, 10, 0, 0),
+        BackgroundTransparency = 1,
+        LayoutOrder = 100,
+
+        Parent = self.tabList
+    })
+
+
+    -- Actions
+
+    self.actionContainer = self:Create("Frame", {
+        BorderSizePixel = 0,
+
+        AnchorPoint = Vector2.new(1, 0.5),
+        AutomaticSize = Enum.AutomaticSize.X,
+        Size = UDim2.fromOffset(0, 24),
+        Position = UDim2.new(1, -20, 0.5, 0),
+        BackgroundTransparency = 1,
+
+        Parent = self.topbar
+    })
+
+    self.actionsListLayout = self:Create('UIListLayout', {
+        Padding = UDim.new(0, 5),
+        FillDirection = Enum.FillDirection.Horizontal,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        HorizontalAlignment = Enum.HorizontalAlignment.Right,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+
+        Parent = self.actionContainer
+    })
+
+    require(script.Parent.action).new(self, {
+        name = 'Close',
+        icon = 83277910885129,
+        order = 1,
+
+        callback = function()
+            print('close!')
+        end
+    })
+
+    require(script.Parent.action).new(self, {
+        name = 'Minimise',
+        icon = 108115485663409,
+        order = 2,
+
+        callback = function()
+            print('minimise!')
+        end
+    })
+
+    require(script.Parent.action).new(self, {
+        name = 'Settings',
+        icon = 129180860773723,
+        order = 3,
+
+        callback = function()
+            print('settings!')
+        end
+    })
+
+    require(script.Parent.action).new(self, {
+        name = 'Search',
+        icon = 100604009889706,
+        order = 4,
+
+        callback = function()
+            print('search!')
+        end
     })
 
     return self
 end
 
-function Window:CreateTab()
-    local newTab = require(script.Parent.tab).new(self)
+function Window:CreateTab(properties)
+    local newTab = require(script.Parent.tab).new(self, properties)
 end
 
 function Window:Create(className, properties)
