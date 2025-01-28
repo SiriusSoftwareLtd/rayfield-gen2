@@ -1,5 +1,5 @@
 local WindowComponent = require(game:GetService("ReplicatedStorage").Rayfield)
-local window = WindowComponent.new("Window Name")
+local window = WindowComponent.new("Rayfield Gen2")
 
 warn('init rayfield')
 window:CreateTab({

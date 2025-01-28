@@ -84,8 +84,6 @@ function Window.new(name, size)
         Parent = self.main,
     })
 
-    
-
 
     -- Topbar
     self.topbar = self:Create("Frame", {
@@ -158,7 +156,7 @@ function Window.new(name, size)
 
     self.title = self:Create("TextLabel", {
         -- Configurables
-        Text = 'Title', -- window name
+        Text = self.name, -- window name
 
         -- Theming
         TextColor3 = Color3.fromRGB(255, 255, 255),
@@ -191,6 +189,29 @@ function Window.new(name, size)
         TextWrapped = true,
        
         Parent = self.titleContainer
+    })
+
+    -- Elements Preparation
+    
+    self.elements = self:Create("Frame", {
+        BorderSizePixel = 0,
+
+        Size = UDim2.new(1, 0, 1, -106),
+        Position = UDim2.fromScale(0.5, 1),
+        AnchorPoint = Vector2.new(0.5, 1),
+        BackgroundTransparency = 1,
+
+        Parent = self.main,
+    })
+
+    self.elementsLayout = self:Create('UIPageLayout', {
+        Padding = UDim.new(0, 0),
+        FillDirection = Enum.FillDirection.Horizontal,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        HorizontalAlignment = Enum.HorizontalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+
+        Parent = self.elements
     })
 
 
