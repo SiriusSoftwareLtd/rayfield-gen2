@@ -79,6 +79,42 @@ function Tab.new(window, properties)
         Parent = self.topbarItemContainer
     })
 
+    self.topbarItemInteract = self.window:Create("TextButton", {
+        BackgroundTransparency = 1,
+        Size = UDim2.fromScale(1, 1),
+        BorderSizePixel = 0,
+        Position = UDim2.fromScale(0.5, 0.5),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        TextTransparency = 1,
+
+        Parent = self.topbarItem,
+    })
+
+    -- Tab Page
+    self.tabPage = self.window:Create("ScrollingFrame", {
+        Name = self.name,
+        Size = UDim2.new(1, -20, 1, 0),
+        Position = UDim2.new(0.5, 0, 0, 68),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        BorderSizePixel = 0,
+        BackgroundTransparency = 1,
+        AutomaticCanvasSize = Enum.AutomaticSize.Y,
+        CanvasSize = UDim2.new(0, 0, 0, 0),
+        ScrollBarThickness = 0,
+        ScrollingDirection = Enum.ScrollingDirection.Y,
+
+        Parent = self.window.elements
+    })
+
+    self.tabPageLayout = self.window:Create('UIListLayout', {
+        Padding = UDim.new(0, 7),
+        FillDirection = Enum.FillDirection.Vertical,
+        VerticalAlignment = Enum.VerticalAlignment.Top,
+        HorizontalAlignment = Enum.HorizontalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+
+        Parent = self.tabPage
+    })
 
     return self
 end
