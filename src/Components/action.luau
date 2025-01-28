@@ -11,6 +11,7 @@ function Action.new(window, properties)
     }, Action)
 
     assert(properties.icon, "Missing argument (Icon expected)")
+    assert(properties.callback, "Missing argument (Function expected)")
 
     self.action = self.window:Create("Frame", {
         Name = self.name,
@@ -50,6 +51,10 @@ function Action.new(window, properties)
 
         Parent = self.action,
     })
+
+    
+
+    self.window:Connect(self.interact.MouseButton1Click, properties.callback)
 
     return self
 end
