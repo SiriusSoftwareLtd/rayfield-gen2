@@ -7,4 +7,4 @@ task.wait(5)
 
 print('unloading')
 
-window:Unload()
+--window:Unload()
