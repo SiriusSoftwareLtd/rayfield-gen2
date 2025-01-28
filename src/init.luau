@@ -1,4 +1,4 @@
 --!nocheck
-return require(script.Components.window)
+return require(script.components.window)
 
 -- hello
