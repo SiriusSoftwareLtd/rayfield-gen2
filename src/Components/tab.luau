@@ -123,11 +123,15 @@ function Tab.new(window, properties)
         Parent = self.tabPage
     })
 
+    if not properties.neglectSelector then
+        self.window:Connect(self.topbarItemInteract.MouseButton1Click, function() self.window:Navigate(self.tabPage) end)
+    end
+
     return self
 end
 
 function Tab:CreateButton(properties)
-
+    return require(script.Parent.button).new(self, properties)
 end
 
 return Tab
