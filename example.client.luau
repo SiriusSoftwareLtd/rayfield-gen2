@@ -6,10 +6,21 @@ window:CreateTab({
     name = 'Tab Example 1',
     icon = 91452555903853,
 })
-window:CreateTab({
+local tab = window:CreateTab({
     name = 'Tab Example 2',
     icon = 129180860773723,
 })
+
+tab:CreateButton({
+    name = 'Button!',
+    -- other stuff
+    
+    callback = function()
+
+    end
+})
+
+
 
 task.wait(5)
 

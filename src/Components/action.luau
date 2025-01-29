@@ -55,7 +55,7 @@ function Action.new(window, properties)
     
 
     self.window:Connect(self.interact.MouseButton1Click, properties.callback)
-
+    
     return self
 end
 
