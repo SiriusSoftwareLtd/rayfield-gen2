@@ -238,6 +238,7 @@ function Window.new(name, size)
         Position = UDim2.fromScale(0.5, 1),
         AnchorPoint = Vector2.new(0.5, 1),
         BackgroundTransparency = 1,
+        ClipsDescendants = true,
 
         Parent = self.main,
     })
@@ -248,6 +249,9 @@ function Window.new(name, size)
         VerticalAlignment = Enum.VerticalAlignment.Center,
         HorizontalAlignment = Enum.HorizontalAlignment.Center,
         SortOrder = Enum.SortOrder.LayoutOrder,
+
+        EasingStyle = Enum.EasingStyle.Exponential,
+        TweenTime = 0.4,
 
         Parent = self.elements
     })
@@ -298,9 +302,7 @@ function Window.new(name, size)
         Parent = self.tabList
     })
 
-
     -- Actions
-
     self.actionContainer = self:Create("Frame", {
         BorderSizePixel = 0,
 
