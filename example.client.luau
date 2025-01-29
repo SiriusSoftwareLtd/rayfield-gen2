@@ -12,7 +12,7 @@ local tab = window:CreateTab({
 })
 
 tab:CreateButton({
-    name = 'Button!',
+    name = 'Button',
     -- other stuff
     
     callback = function()

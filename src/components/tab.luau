@@ -123,6 +123,26 @@ function Tab.new(window, properties)
         Parent = self.tabPage
     })
 
+    self.window:Create("Frame", {
+        BorderSizePixel = 0,
+
+        Size = UDim2.fromOffset(0, 3),
+        BackgroundTransparency = 1,
+        LayoutOrder = -1,
+
+        Parent = self.tabPage
+    })
+
+    self.window:Create("Frame", {
+        BorderSizePixel = 0,
+
+        Size = UDim2.fromOffset(0, 12),
+        BackgroundTransparency = 1,
+        LayoutOrder = 999999,
+
+        Parent = self.tabPage
+    })
+
     if not properties.neglectSelector then
         self.window:Connect(self.topbarItemInteract.MouseButton1Click, function() self.window:Navigate(self.tabPage) end)
     end
