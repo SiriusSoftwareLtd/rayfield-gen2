@@ -7,20 +7,23 @@ local variables = require(script.Parent.Parent.utility.variables)
 local Window = {}
 Window.__index = Window
 
-function Window.new(name, size)
+function Window.new(properties)
     local self = setmetatable({
-        name = name or "Window",
-        size = size or UDim2.fromOffset(475, 500),
+        name = properties.name or properties.Name or "Rayfield Window",
+        size = UDim2.fromOffset(475, 500), -- calculate sizing for mobile. use formula based on viewport?
         instances = {},
         connections = {},
+
+        theme = properties.theme or properties.Theme or 'unselected'
     }, Window)
 
     -- Rayfield Gen2 Screen
     self.screenGui = self:Create("ScreenGui", {
-        Parent = variables.guiContainer,
         IgnoreGuiInset = true,
         ResetOnSpawn = false,
         DisplayOrder = 100000,
+
+        Parent = variables.guiContainer,
     })
 
     -- Drag Point
@@ -29,6 +32,7 @@ function Window.new(name, size)
         Size = UDim2.fromOffset(150, 20),
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.new(0.5, 0, 0.5, 265),
+
         Parent = self.screenGui,
     })
 
@@ -38,19 +42,22 @@ function Window.new(name, size)
         Size = UDim2.fromOffset(100, 4),
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.fromScale(0.5, 0.3),
+
         Parent = self.drag,
     })
 
     self:Create("UICorner", {
         CornerRadius = UDim.new(0, 20),
+
         Parent = self.dragCosmetic,
     })
 
     self.dragInteract = self:Create("TextButton", {
         BackgroundTransparency = 1,
-        Parent = self.drag,
         Size = UDim2.fromScale(1, 1),
         TextTransparency = 1,
+
+        Parent = self.drag,
     })
 
     -- Window
@@ -60,18 +67,21 @@ function Window.new(name, size)
         Name = self.name,
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.new(0.5, 0, 0.5, 0),
-        Parent = self.screenGui,
+
+        Parent = self.screenGui
     })
 
     self:Create("UICorner", {
         CornerRadius = UDim.new(0, 20),
-        Parent = self.main,
+
+        Parent = self.main
     })
 
     self.windowStroke = self:Create("UIStroke", {
         Color = Color3.fromRGB(255, 255, 255),
         Transparency = 0.95,
-        Parent = self.main,
+
+        Parent = self.main
     })
 
     self.windowGradient = self:Create("UIGradient", {
@@ -81,31 +91,33 @@ function Window.new(name, size)
         }),
         Rotation = 250,
         Offset = Vector2.new(0, 0.2),
-        Parent = self.main,
+
+        Parent = self.main
     })
 
 
     -- Topbar
     self.topbar = self:Create("Frame", {
-        BorderSizePixel = 0,
-
-        Parent = self.main,
+        
         BackgroundTransparency = 1,
         Size = UDim2.new(1, 0, 0, 66),
+
+        Parent = self.main
     })
 
     self.dividerTop = self:Create("Frame", {
-        BorderSizePixel = 0,
+        
 
-        Parent = self.topbar,
         Position = UDim2.new(0, 0, 1, 0),
         Size = UDim2.new(1, 0, 0, 1),
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-        BackgroundTransparency = 0.85
+        BackgroundTransparency = 0.85,
+
+        Parent = self.topbar
     })
 
     self.dividerBottom = self:Create("Frame", {
-        BorderSizePixel = 0,
+        
         
         Parent = self.main,
         Position = UDim2.new(0, 0, 0, 105),
@@ -137,7 +149,7 @@ function Window.new(name, size)
     })
 
     self.titleContainer = self:Create("Frame", {
-        BorderSizePixel = 0,
+        
 
         Parent = self.topbar,
         Size = UDim2.new(0, 300, 0, 24),
@@ -163,7 +175,7 @@ function Window.new(name, size)
         FontFace = Font.new("rbxassetid://12187365364", Enum.FontWeight.SemiBold),
 
         Size = UDim2.new(1, 0, 0, 20),
-        BorderSizePixel = 0,
+        
         BackgroundTransparency = 1,
         TextSize = 20,
         TextXAlignment = Enum.TextXAlignment.Left,
@@ -181,7 +193,7 @@ function Window.new(name, size)
         FontFace = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium),
 
         Size = UDim2.new(1, 0, 0, 12),
-        BorderSizePixel = 0,
+        
         BackgroundTransparency = 1,
         TextSize = 12,
         TextTransparency = 0.7,
@@ -193,7 +205,7 @@ function Window.new(name, size)
 
     -- Shadow
     self.shadowContainer = self:Create("Frame", {
-        BorderSizePixel = 0,
+        
 
         Size = UDim2.new(1, 35, 1, 35),
         Position = UDim2.fromScale(0.5, 0.5),
@@ -208,7 +220,7 @@ function Window.new(name, size)
         Image = 'rbxassetid://5587865193',
         ImageColor3 = Color3.fromRGB(255, 255, 255),
         Size = UDim2.fromScale(1.6, 1.3),
-        BorderSizePixel = 0,
+        
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.fromScale(0.5, 0.5),
         BackgroundTransparency = 1,
@@ -232,7 +244,7 @@ function Window.new(name, size)
     -- Elements Preparation
     
     self.elements = self:Create("Frame", {
-        BorderSizePixel = 0,
+        
 
         Size = UDim2.new(1, 0, 1, -106),
         Position = UDim2.fromScale(0.5, 1),
@@ -262,7 +274,7 @@ function Window.new(name, size)
         Size = UDim2.new(1, 0, 0, 36),
         Position = UDim2.new(0.5, 0, 0, 68),
         AnchorPoint = Vector2.new(0.5, 0),
-        BorderSizePixel = 0,
+        
         BackgroundTransparency = 1,
         AutomaticCanvasSize = Enum.AutomaticSize.X,
         CanvasSize = UDim2.new(0, 0, 0, 0),
@@ -283,7 +295,7 @@ function Window.new(name, size)
     })
 
     self:Create("Frame", {
-        BorderSizePixel = 0,
+        
 
         Size = UDim2.new(0, 10, 0, 0),
         BackgroundTransparency = 1,
@@ -293,7 +305,7 @@ function Window.new(name, size)
     })
 
     self:Create("Frame", {
-        BorderSizePixel = 0,
+        
 
         Size = UDim2.new(0, 10, 0, 0),
         BackgroundTransparency = 1,
@@ -304,7 +316,7 @@ function Window.new(name, size)
 
     -- Actions
     self.actionContainer = self:Create("Frame", {
-        BorderSizePixel = 0,
+        
 
         AnchorPoint = Vector2.new(1, 0.5),
         AutomaticSize = Enum.AutomaticSize.X,
@@ -378,6 +390,23 @@ function Window.new(name, size)
     return self
 end
 
+function Window:ChangeTheme(theme)
+    --assert(typeof(theme) == "table", "Invalid argument #1 (theme table expected)")
+    -- ^ accepting strings and checking with a theme dict
+
+    for name, value in theme do
+        self.theme[name] = value
+    end
+
+    for instance, properties in self.themeProperties do
+        for property, value in properties do
+            instance[property] = if typeof(value) == "table"
+                then value[2](self.theme[value[1]])
+                else self.theme[value]
+        end
+    end
+end
+
 function Window:CreateTab(properties)
     return require(script.Parent.tab).new(self, properties)
 end
@@ -395,12 +424,23 @@ function Window:Navigate(tab)
 end
 
 function Window:Create(className, properties)
+    local function hasProperty(object, prop)
+        local _t = object[prop]
+    end
+
     local instance = Instance.new(className)
+    if pcall(function() hasProperty(instance, 'BorderSizePixel') end) then instance.BorderSizePixel = 0 end -- BorderSizePixel is :(
+
     if properties then
         for property, value in properties do
             instance[property] = value
         end
     end
+
+    if properties.theme then
+        self.properties.theme[instance] = properties.theme
+    end
+
     table.insert(self.instances, instance)
     return instance
 end
