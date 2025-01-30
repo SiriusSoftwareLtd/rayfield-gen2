@@ -425,7 +425,7 @@ end
 
 function Window:Create(className, properties)
     local function hasProperty(object, prop)
-        local _t = object[prop]
+        local _ins = object[prop]
     end
 
     local instance = Instance.new(className)
