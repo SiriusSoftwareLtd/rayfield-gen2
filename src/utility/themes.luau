@@ -1,8 +1,0 @@
-themes = {
-    default = {
-
-    }
-}
-
-
-return themes
