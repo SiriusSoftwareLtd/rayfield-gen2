@@ -1,1 +1,1 @@
--- This file is NOT Rayfield. Use bundled.luau from the Releases page instead. (https://github.com/SiriusSoftwareLtd/rayfield-gen2/releases)
+-- This file is NOT Rayfield. Use bundled.luau from the Releases page instead. (https://github.com/SiriusSoftwareLtd/rayfield-gen2/releases/latest)
