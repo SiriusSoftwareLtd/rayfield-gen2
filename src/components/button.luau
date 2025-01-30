@@ -8,6 +8,8 @@ function Button.new(tab, properties)
     local self = setmetatable({
         tab = assert(tab, "Missing argument #1 (Tab expected)"),
         name = properties.name or properties.Name or "Button",
+        icon = properties.icon or properties.Icon,
+        customOrder = properties.customOrder or properties.CustomOrder
     }, Button)
 
     self.main = self.tab.window:Create("Frame", {
@@ -20,7 +22,7 @@ function Button.new(tab, properties)
         BorderSizePixel = 0,
         Name = self.name,
 
-        LayoutOrder = properties.customOrder or 0,
+        LayoutOrder = self.customOrder or 0,
 
         Parent = self.tab.tabPage,
     })
@@ -55,10 +57,10 @@ function Button.new(tab, properties)
         Parent = self.container
     })
 
-    if properties.icon then
-        self.icon = self.tab.window:Create("ImageLabel", {
+    if self.icon then
+        self.iconLabel = self.tab.window:Create("ImageLabel", {
             -- Configurables
-            Image = 'rbxassetid://'..tostring(properties.icon),
+            Image = 'rbxassetid://'..tostring(self.icon),
             
             -- Theming
             ImageColor3 = Color3.fromRGB(255, 255, 255),

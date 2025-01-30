@@ -8,9 +8,12 @@ function Tab.new(window, properties)
     local self = setmetatable({
         window = assert(window, "Missing argument #1 (Window expected)"),
         name = properties.name or properties.Name or "Tab",
+        icon = properties.icon or properties.Icon or 0,
+        neglectSelector = properties.neglectSelector or properties.NeglectSelector or false,
+        customOrder = properties.customOrder or properties.CustomOrder or 0 -- make this maybe not 0.
     }, Tab)
 
-    if not properties.neglectSelector then -- Allow for tabs to be hidden from the tab selector, for Rayfield Settings.
+    if not self.neglectSelector then -- Allow for tabs to be hidden from the tab selector, for Rayfield Settings.
         -- Topbar Item
         self.topbarItem = self.window:Create("Frame", {
 
@@ -20,7 +23,7 @@ function Tab.new(window, properties)
             AutomaticSize = Enum.AutomaticSize.XY,
             Name = self.name,
 
-            LayoutOrder = properties.customOrder or 0,
+            LayoutOrder = self.customOrder or 0,
 
             Parent = self.window.tabList,
         })
@@ -45,10 +48,10 @@ function Tab.new(window, properties)
             Parent = self.topbarItemContainer
         })
 
-        if properties.icon then
+        if self.icon then
             self.topbarItemIcon = self.window:Create("ImageLabel", {
                 -- Configurables
-                Image = 'rbxassetid://'..tostring(properties.icon),
+                Image = 'rbxassetid://'..tostring(self.icon),
                 
                 -- Theming
                 ImageColor3 = Color3.fromRGB(255, 255, 255),
@@ -108,7 +111,7 @@ function Tab.new(window, properties)
         ScrollBarThickness = 0,
         ScrollingDirection = Enum.ScrollingDirection.Y,
 
-        LayoutOrder = properties.customOrder or 0,
+        LayoutOrder = self.customOrder or 0,
 
         Parent = self.window.elements
     })
@@ -143,7 +146,7 @@ function Tab.new(window, properties)
         Parent = self.tabPage
     })
 
-    if not properties.neglectSelector then
+    if not self.neglectSelector then
         self.window:Connect(self.topbarItemInteract.MouseButton1Click, function() self.window:Navigate(self.tabPage) end)
     end
 

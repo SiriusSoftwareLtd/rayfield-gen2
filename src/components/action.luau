@@ -8,10 +8,12 @@ function Action.new(window, properties)
     local self = setmetatable({
         window = assert(window, "Missing argument #1 (Window expected)"),
         name = properties.name or properties.Name or "Action",
+        icon = assert(properties.icon or properties.Icon, "Missing argument (Icon expected)"),
+        callback = assert(properties.callback or properties.Callback, "Missing argument (Function expected)")
     }, Action)
 
-    assert(properties.icon, "Missing argument (Icon expected)")
-    assert(properties.callback, "Missing argument (Function expected)")
+    
+    
 
     self.action = self.window:Create("Frame", {
         Name = self.name,
@@ -24,9 +26,9 @@ function Action.new(window, properties)
         Parent = self.window.actionContainer
     })
 
-    self.icon = self.window:Create("ImageLabel", {
+    self.iconLabel = self.window:Create("ImageLabel", {
         -- Configurables
-        Image = 'rbxassetid://'..tostring(properties.icon),
+        Image = 'rbxassetid://'..tostring(self.icon),
 
         -- Theming
         ImageColor3 = Color3.fromRGB(255, 255, 255),
