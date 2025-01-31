@@ -9,7 +9,8 @@ function Button.new(tab, properties)
         tab = assert(tab, "Missing argument #1 (Tab expected)"),
         name = properties.name or properties.Name or "Button",
         icon = properties.icon or properties.Icon,
-        customOrder = properties.customOrder or properties.CustomOrder
+        customOrder = properties.customOrder or properties.CustomOrder,
+        forgetState = properties.forgetState or properties.ForgetState, -- dont save config for this element if true.
     }, Button)
 
     self.main = self.tab.window:Create("Frame", {

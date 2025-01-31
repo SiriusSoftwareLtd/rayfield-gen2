@@ -1,7 +1,10 @@
 --!nocheck
 
+-- Utility
+local utility = script.Parent.Parent.utility
+
 -- Variables
-local variables = require(script.Parent.Parent.utility.variables)
+local variables = require(utility.variables)
 
 -- Module
 local Window = {}
@@ -14,7 +17,13 @@ function Window.new(properties)
         instances = {},
         connections = {},
 
-        theme = properties.theme or properties.Theme or 'unselected'
+        theme = properties.theme or properties.Theme or 'unselected',
+        
+        configuration = {
+            -- fix this being so long lma
+            fileName = properties.Configuration.fileName or properties.configuration.fileName or properties.Configuration.FileName or properties.configuration.FileName,
+            customFolder = properties.configuration.customFolder or properties.Configuration.CustomFolder or properties.Configuration.customFolder or properties.configuration.CustomFolder
+        }
     }, Window)
 
     -- Rayfield Gen2 Screen
@@ -392,7 +401,7 @@ end
 
 function Window:ChangeTheme(theme)
     --assert(typeof(theme) == "table", "Invalid argument #1 (theme table expected)")
-    -- ^ accepting strings and checking with a theme dict
+    -- ^ gonna be accepting strings and checking with a theme dict
 
     for name, value in theme do
         self.theme[name] = value
@@ -409,6 +418,69 @@ end
 
 function Window:CreateTab(properties)
     return require(script.Parent.tab).new(self, properties)
+end
+
+function getPath()
+    local path = 'Rayfield Gen2/Script Configurations/'
+    
+    if Window.customFolder then
+        path = path..tostring(Window.configuration.customFolder)..'/'
+    end
+
+    path = path..tostring((Window.configuration.fileName or Window.name))..'.rfld'
+
+    return path
+end
+
+function Window:Save()
+    local path = getPath()
+
+    assert(typeof(path) == "string", "Invalid argument #1 (string expected)")
+    -- make custom assert func in utils !! to allow this
+    assert(writefile ~= nil, "Failed to save configuration. No writing capabilities.")
+
+    local flags = {}
+    for flag, control in self.controls do
+        local value = control.value
+        if control.__type == "ColorPicker" then
+            value = value:ToHex()
+        elseif control.__type == "Keybind" then
+            value = { tostring(value.EnumType), value.Value }
+        end
+        flags[flag] = value
+    end
+
+    local success, parsed = pcall(variables.httpService.JSONEncode, variables.httpService, flags)
+    assert(success, "Failed to save configuration: failed to parse flags")
+    utils.createDirectories(path) -- Create folders e.g Rayfield Gen2/ Script Configs blah blah etc/ etc
+    writefile(path, parsed)
+end
+
+function Window:Load()
+    local path = 'Rayfield Gen2/Script Configurations/CUSTOMFOLDER/'
+
+    assert(typeof(path) == "string", "Invalid argument #1 (string expected)")
+    assert(not isfile or isfile(path), "Can't load configuration, file doesn't exist.") -- no message is likely to be for production
+
+    local config = assert(readfile and readfile(path), "Failed to load config: couldn't read config")
+    local success, parsed = pcall(variables.httpService.JSONDecode, variables.httpService, config)
+
+    assert(success, "Can't load configuration, the file has an issue decoding.")
+    -- make new file with old data and call it CONFIGNAME (Incorrect Format).rfld
+    -- then delete old file
+
+    for flag, control in self.controls do
+        local value = parsed[flag]
+        if value ~= nil or control._canBeNil then
+            if control.__type == "ColorPicker" then
+                value = Color3.fromHex(value)
+            end
+            if control.__type == "Keybind" and value ~= nil then
+                value = Enum[value[1]]:FromValue(value[2])
+            end
+            control:Set(value)
+        end
+    end
 end
 
 function Window:Navigate(tab)
