@@ -21,6 +21,7 @@ function Window.new(properties)
         
         configuration = {
             -- fix this being so long lma
+            autoSave = properties.configuration.autoSave, -- blah blah
             fileName = properties.Configuration.fileName or properties.configuration.fileName or properties.Configuration.FileName or properties.configuration.FileName,
             customFolder = properties.configuration.customFolder or properties.Configuration.CustomFolder or properties.Configuration.customFolder or properties.configuration.CustomFolder
         }

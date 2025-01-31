@@ -1,5 +1,5 @@
 # Rayfield
-Rayfield 'Gen2' Generation 2
+Rayfield Generation 2
 
 **Documentation** for Rayfield Gen2
 
