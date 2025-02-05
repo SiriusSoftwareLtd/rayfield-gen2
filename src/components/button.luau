@@ -11,6 +11,8 @@ function Button.new(tab, properties)
         icon = properties.icon or properties.Icon,
         customOrder = properties.customOrder or properties.CustomOrder,
         forgetState = properties.forgetState or properties.ForgetState, -- dont save config for this element if true.
+
+        callback = properties.callback or properties.Callback or function() end
     }, Button)
 
     self.main = self.tab.window:Create("Frame", {
@@ -95,6 +97,24 @@ function Button.new(tab, properties)
     
         Parent = self.container
     })
+
+    self.interact = self.tab.window:Create("TextButton", {
+        BackgroundTransparency = 1,
+        Size = UDim2.fromScale(1, 1),
+        BorderSizePixel = 0,
+        Position = UDim2.fromScale(0.5, 0.5),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        TextTransparency = 1,
+
+        Parent = self.main,
+    })
+
+
+
+    -- Function
+    self.interact.MouseButton1Click:Connect(function()
+        pcall(self.callback)
+    end)
 
     return self
 end

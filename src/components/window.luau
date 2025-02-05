@@ -20,13 +20,13 @@ function Window.new(properties)
         instances = {},
         connections = {},
 
-        theme = properties.theme or properties.Theme or 'unselected',
+        theme = properties.theme or properties.Theme,
         
         configuration = {
             -- fix this being so long lma
-            autoSave = properties.configuration.autoSave, -- blah blah
-            fileName = properties.Configuration.fileName or properties.configuration.fileName or properties.Configuration.FileName or properties.configuration.FileName,
-            customFolder = properties.configuration.customFolder or properties.Configuration.CustomFolder or properties.Configuration.customFolder or properties.configuration.CustomFolder
+            autoSave = (properties.configruation or properties.Configuration) and properties.configuration.autoSave, -- blah blah
+            fileName = (properties.configruation or properties.Configuration) and (properties.Configuration.fileName or properties.configuration.fileName or properties.Configuration.FileName or properties.configuration.FileName),
+            customFolder = (properties.configruation or properties.Configuration) and (properties.configuration.customFolder or properties.Configuration.CustomFolder or properties.Configuration.customFolder or properties.configuration.CustomFolder)
         }
     }, Window)
 
@@ -127,7 +127,7 @@ function Window.new(properties)
         BackgroundTransparency = 0.85,
 
         Parent = self.topbar
-    })
+    }, {BackgroundColor3 = 'SecondaryColor'})
 
     self.dividerBottom = self:Create("Frame", {
         
@@ -137,7 +137,7 @@ function Window.new(properties)
         Size = UDim2.new(1, 0, 0, 1),
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         BackgroundTransparency = 0.85
-    })
+    }, {BackgroundColor3 = 'SecondaryColor'})
 
     self.dividerTopGradient = self:Create("UIGradient", {
         Parent = self.dividerTop,
@@ -530,11 +530,11 @@ function Window:Create(className, properties, themeProperties)
         end
     end
 
-    if themeProperties then
+    if themeProperties and self.theme then
         for property, value in themeProperties do
-            instance[property] = if typeof(value) == "table"
+            instance[property] = (if typeof(value) == "table"
                 then value[2](self.theme[value[1]])
-                else self.theme[value]
+                else self.theme[value])
         end
 
         self.themeProperties[instance] = themeProperties
