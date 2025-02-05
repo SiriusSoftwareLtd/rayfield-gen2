@@ -20,7 +20,9 @@ function Window.new(properties)
         instances = {},
         connections = {},
 
-        theme = properties.theme or properties.Theme,
+        theme = if typeof(properties.theme or properties.Theme) == "string"
+        then (properties.theme or properties.Theme)
+        else themes[(properties.theme or properties.Theme)],
         
         configuration = {
             -- fix this being so long lma
