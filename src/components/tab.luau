@@ -62,7 +62,7 @@ function Tab.new(window, properties)
                 ImageTransparency = 0.65,
            
                 Parent = self.topbarItemContainer
-            })
+            }, {ImageColor3 = 'PrimaryColor'})
         end
 
         self.topbarItemTitle = self.window:Create("TextLabel", {

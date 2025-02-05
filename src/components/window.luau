@@ -6,6 +6,9 @@ local utility = script.Parent.Parent.utility
 -- Variables
 local variables = require(utility.variables)
 
+-- Themes
+local themes = script.Parent.Parent.themes
+
 -- Module
 local Window = {}
 Window.__index = Window
@@ -499,7 +502,7 @@ function Window:Navigate(tab)
     self.elementsLayout:JumpTo(tab)
 end
 
-function Window:Create(className, properties)
+--[[ function Window:Create(className, properties, themeProperties)
     local function hasProperty(object, prop)
         local _ins = object[prop]
     end
@@ -513,8 +516,28 @@ function Window:Create(className, properties)
         end
     end
 
-    if properties.theme then
-        self.properties.theme[instance] = properties.theme
+    table.insert(self.instances, instance)
+    return instance
+end ]]
+
+function Window:Create(className, properties, themeProperties)
+    assert(typeof(className) == "string", "Invalid argument #1 (string expected)")
+    local instance = Instance.new(className)
+
+    if properties then
+        for property, value in properties do
+            instance[property] = value
+        end
+    end
+
+    if themeProperties then
+        for property, value in themeProperties do
+            instance[property] = if typeof(value) == "table"
+                then value[2](self.theme[value[1]])
+                else self.theme[value]
+        end
+
+        self.themeProperties[instance] = themeProperties
     end
 
     table.insert(self.instances, instance)
