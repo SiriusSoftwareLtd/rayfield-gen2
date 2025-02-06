@@ -32,10 +32,9 @@ function Button.new(tab, properties)
     })
 
     self.stroke = self.tab.window:Create("UIStroke", {
-        Color = Color3.fromRGB(35, 35, 35),
         Transparency = 0,
         Parent = self.main,
-    })
+    }, {Color = 'ElementStroke'})
     
     self.container = self.tab.window:Create("Frame", {
         BorderSizePixel = 0,
