@@ -1,7 +1,8 @@
 return {
-    CornerRoundness = Vector2.new(0, 15),
+    CornerRoundness = UDim.new(0, 0),
+    WindowColor = Color3.fromRGB(10, 80, 255),
 
-    WindowColor = Color3.fromRGB(0, 130, 190),
-    TextColor = Color3.fromRGB(255, 255, 255),
-    SecondaryColor = Color3.fromRGB(100, 100, 100)
+    DividerColor = Color3.fromRGB(255, 255, 255),
+
+    TabColor = Color3.fromRGB(255, 255, 255)
 }

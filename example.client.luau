@@ -2,7 +2,7 @@ local WindowComponent = require(game:GetService("ReplicatedStorage").Rayfield)
 local window = WindowComponent.new({
     name = 'Window name ye',
 
-    theme = 'default'
+    theme = 'pacific'
 })
 
 warn('init rayfield')
