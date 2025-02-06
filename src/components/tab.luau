@@ -23,7 +23,7 @@ function Tab.new(window, properties)
         -- Topbar Item
         self.topbarItem = self.window:Create("Frame", {
 
-            Size = UDim2.fromOffset(0, 17),
+            Size = UDim2.fromScale(0, 1),
             BackgroundTransparency = 1,
             BorderSizePixel = 0,
             AutomaticSize = Enum.AutomaticSize.XY,
@@ -36,6 +36,8 @@ function Tab.new(window, properties)
 
         self.topbarItemContainer = self.window:Create("Frame", {
 
+            AnchorPoint = Vector2.new(0, 0.5),
+            Position = UDim2.fromScale(0, 0.5),
             Size = UDim2.fromOffset(0, 0),
             BackgroundTransparency = 1,
             BorderSizePixel = 0,
@@ -148,12 +150,20 @@ function Tab.new(window, properties)
     if not self.neglectSelector then
         self.window:Connect(self.topbarItemInteract.MouseButton1Click, function() 
            self:Select()
+        end)
 
-            for _, tab in self.window.tabs do
-                if tab ~= self.window.selectedTab then
-                    tab:Deselect()
-                end
-            end 
+        self.window:Connect(self.topbarItemInteract.MouseEnter, function() 
+            if self.window.selectedTab ~= self then
+                variables.tweenService:Create(self.topbarItemIcon, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.45}):Play()
+                variables.tweenService:Create(self.topbarItemTitle, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.45}):Play()
+            end
+        end)
+
+        self.window:Connect(self.topbarItemInteract.MouseLeave, function() 
+            if self.window.selectedTab ~= self then
+                variables.tweenService:Create(self.topbarItemIcon, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.65}):Play()
+                variables.tweenService:Create(self.topbarItemTitle, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.65}):Play()
+            end
         end)
     end
 
@@ -165,11 +175,19 @@ function Tab.new(window, properties)
 end
 
 function Tab:Select()
-    self.window:Navigate(self.tabPage)
     self.window.selectedTab = self
+    self.window:Navigate(self.tabPage)
 
-    variables.tweenService:Create(self.topbarItemIcon, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.1}):Play()
-    variables.tweenService:Create(self.topbarItemTitle, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.1}):Play()
+    if not self.neglectSelector then
+        variables.tweenService:Create(self.topbarItemIcon, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.1}):Play()
+        variables.tweenService:Create(self.topbarItemTitle, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.1}):Play()
+    end
+
+    for _, tab in self.window.tabs do
+        if tab ~= self.window.selectedTab then
+            tab:Deselect()
+        end
+    end 
 end
 
 function Tab:Deselect()
