@@ -67,7 +67,7 @@ function Window.new(properties)
     self:Create("UICorner", {
         CornerRadius = UDim.new(0, 20),
 
-        Parent = self.dragCosmetic,
+        Parent = self.dragCosmetic
     })
 
     self.dragInteract = self:Create("TextButton", {
@@ -90,10 +90,9 @@ function Window.new(properties)
     })
 
     self:Create("UICorner", {
-        CornerRadius = UDim.new(0, 20),
 
         Parent = self.main
-    })
+    }, {CornerRadius = 'CornerRoundness'})
 
     self.windowStroke = self:Create("UIStroke", {
         Color = Color3.fromRGB(255, 255, 255),
@@ -128,6 +127,7 @@ function Window.new(properties)
     })
 
     self.dividerTop = self:Create("Frame", {
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         Position = UDim2.new(0, 0, 1, 0),
         Size = UDim2.new(1, 0, 0, 1),
         BackgroundTransparency = 0.85,
@@ -136,12 +136,13 @@ function Window.new(properties)
     }, {BackgroundColor3 = 'DividerColor'})
 
     self.dividerBottom = self:Create("Frame", {
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         Parent = self.main,
         Position = UDim2.new(0, 0, 0, 105),
         Size = UDim2.new(1, 0, 0, 1),
         BackgroundTransparency = 0.85
 
-    }, {BackgroundColor3 = 'DividerColor'})
+    })
 
     self.dividerTopGradient = self:Create("UIGradient", {
         Parent = self.dividerTop,
@@ -152,7 +153,17 @@ function Window.new(properties)
             NumberSequenceKeypoint.new(0.5, 0.75, 0),
             NumberSequenceKeypoint.new(1, 1, 0)
         })
-    })
+    }, 
+        {
+            Color = {'DividerColor', function(color)
+                if typeof(color) == 'ColorSequence' then
+                    return color
+                else
+                    return ColorSequence.new(color)
+                end
+            
+            end 
+    }})
 
     self.dividerBottomGradient = self:Create("UIGradient", {
         Parent = self.dividerBottom,
@@ -165,9 +176,15 @@ function Window.new(properties)
         })
     },
         {
-           Color = '' -- if color3.fromRGB then convert to numbersequence, if numbersequence then use as is.
-        }
-    )
+            Color = {'DividerColor', function(color)
+                if typeof(color) == 'ColorSequence' then
+                    return color
+                else
+                    return ColorSequence.new(color)
+                end
+            
+            end 
+    }})
 
     self.titleContainer = self:Create("Frame", {
         
