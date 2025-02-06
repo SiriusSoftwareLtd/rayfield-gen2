@@ -1,3 +1,5 @@
+--!nocheck
+
 local function getService(name)
     local service = game:GetService(name)
     return if cloneref then cloneref(service) else service
