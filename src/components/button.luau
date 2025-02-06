@@ -16,10 +16,6 @@ function Button.new(tab, properties)
     }, Button)
 
     self.main = self.tab.window:Create("Frame", {
-
-        -- Theming
-        BackgroundColor3 = Color3.fromRGB(30, 30, 30),
-
         Size = UDim2.new(1, -20, 0, 43),
         BackgroundTransparency = 0,
         BorderSizePixel = 0,
@@ -28,7 +24,7 @@ function Button.new(tab, properties)
         LayoutOrder = self.customOrder or 0,
 
         Parent = self.tab.tabPage,
-    })
+    }, {BackgroundColor3 = 'ElementColor'})
 
     self.tab.window:Create("UICorner", {
         CornerRadius = UDim.new(0, 12),
@@ -113,7 +109,7 @@ function Button.new(tab, properties)
 
     -- Function
     -- add callback errors and task spawn blah blah
-    self.tab.window:Connect(self.interact.MouseButton1Click, pcall(self.callback))
+    self.tab.window:Connect(self.interact.MouseButton1Click, function() pcall(self.callback) end)
 
     return self
 end

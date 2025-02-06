@@ -2,6 +2,12 @@ local Action = {}
 Action.__index = Action
 Action.__type = "Action"
 
+-- Utility
+local utility = script.Parent.Parent.utility
+
+-- Variables
+local variables = require(utility.variables)
+
 function Action.new(window, properties)
     properties = if typeof(properties) == "table" then properties else {}
 
@@ -51,10 +57,16 @@ function Action.new(window, properties)
         Parent = self.action,
     })
 
-    
-
     self.window:Connect(self.interact.MouseButton1Click, properties.callback)
+
+    self.window:Connect(self.interact.MouseEnter, function() 
+        variables.tweenService:Create(self.iconLabel, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.2}):Play()
+    end)
     
+    self.window:Connect(self.interact.MouseLeave, function() 
+        variables.tweenService:Create(self.iconLabel, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.6}):Play()
+    end)
+
     return self
 end
 

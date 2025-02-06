@@ -1,10 +1,8 @@
 return {
     CornerRoundness = UDim.new(0, 20),
-    WindowColor = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.new(0.0784313725, 0.0784313725, 0.0784313725)),
-        ColorSequenceKeypoint.new(1, Color3.new(0.0784313725, 0.0784313725, 0.0784313725))
-    }),
+    WindowColor = Color3.fromRGB(20, 20, 20),
 
+    ElementColor = Color3.fromRGB(30, 30, 30),
     DividerColor = Color3.fromRGB(255, 255, 255),
     TabColor = Color3.fromRGB(255, 255, 255),
     ActionColor = Color3.fromRGB(255, 255, 255),

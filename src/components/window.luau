@@ -413,7 +413,7 @@ function Window.new(properties)
 
         callback = function()
             print('navigating to settings')
-            self:Navigate(self.rfSettings.tabPage)
+            self.rfSettings:Select()
         end
     })
 
