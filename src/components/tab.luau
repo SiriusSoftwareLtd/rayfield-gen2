@@ -2,6 +2,12 @@ local Tab = {}
 Tab.__index = Tab
 Tab.__type = "Tab"
 
+-- Utility
+local utility = script.Parent.Parent.utility
+
+-- Variables
+local variables = require(utility.variables)
+
 function Tab.new(window, properties)
     properties = if typeof(properties) == "table" then properties else {}
 
@@ -53,9 +59,6 @@ function Tab.new(window, properties)
                 -- Configurables
                 Image = 'rbxassetid://'..tostring(self.icon),
                 
-                -- Theming
-                ImageColor3 = Color3.fromRGB(255, 255, 255),
-    
                 Size = UDim2.fromOffset(16, 16),
                 BorderSizePixel = 0,
                 BackgroundTransparency = 1,
@@ -69,10 +72,6 @@ function Tab.new(window, properties)
             -- Configurables
             Text = self.name, -- tab name
 
-            -- Theming
-            TextColor3 = Color3.fromRGB(255, 255, 255),
-            FontFace = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium),
-
             Size = UDim2.fromOffset(0, 16),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
@@ -83,7 +82,7 @@ function Tab.new(window, properties)
             TextWrapped = true,
         
             Parent = self.topbarItemContainer
-        })
+        }, {TextColor3 = 'TabColor', FontFace = 'Font'})
 
         self.topbarItemInteract = self.window:Create("TextButton", {
             BackgroundTransparency = 1,
@@ -147,14 +146,45 @@ function Tab.new(window, properties)
     })
 
     if not self.neglectSelector then
-        self.window:Connect(self.topbarItemInteract.MouseButton1Click, function() self.window:Navigate(self.tabPage) end)
+        self.window:Connect(self.topbarItemInteract.MouseButton1Click, function() 
+           self:Select()
+
+            for _, tab in self.window.tabs do
+                if tab ~= self.window.selectedTab then
+                    tab:Deselect()
+                end
+            end 
+        end)
+    end
+
+    if #self.window.tabs == 1 then
+        self:Select()
     end
 
     return self
 end
 
+function Tab:Select()
+    self.window:Navigate(self.tabPage)
+    self.window.selectedTab = self
+
+    variables.tweenService:Create(self.topbarItemIcon, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.1}):Play()
+    variables.tweenService:Create(self.topbarItemTitle, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.1}):Play()
+end
+
+function Tab:Deselect()
+    if not self.neglectSelector then
+        variables.tweenService:Create(self.topbarItemIcon, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.65}):Play()
+        variables.tweenService:Create(self.topbarItemTitle, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.65}):Play()
+    end
+end
+
 function Tab:CreateButton(properties)
     return require(script.Parent.button).new(self, properties)
+end
+
+function Tab:Remove()
+    -- remove tab
 end
 
 return Tab

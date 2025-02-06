@@ -21,6 +21,8 @@ function Window.new(properties)
         connections = {},
 
         themeProperties = {},
+        tabs = {},
+        selectedTab = nil,
         theme = if typeof(properties.theme or properties.Theme) == 'table'
         then (properties.theme or properties.Theme)
         elseif typeof(properties.theme or properties.Theme) == 'string' 
@@ -446,7 +448,10 @@ function Window:ChangeTheme(theme)
 end
 
 function Window:CreateTab(properties)
-    return require(script.Parent.tab).new(self, properties)
+    local newTab = require(script.Parent.tab).new(self, properties)
+
+    table.insert(self.tabs, newTab)
+    return newTab
 end
 
 function getPath()

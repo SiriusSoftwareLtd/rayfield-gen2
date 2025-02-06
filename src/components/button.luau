@@ -112,9 +112,8 @@ function Button.new(tab, properties)
 
 
     -- Function
-    self.interact.MouseButton1Click:Connect(function()
-        pcall(self.callback)
-    end)
+    -- add callback errors and task spawn blah blah
+    self.tab.window:Connect(self.interact.MouseButton1Click, pcall(self.callback))
 
     return self
 end
