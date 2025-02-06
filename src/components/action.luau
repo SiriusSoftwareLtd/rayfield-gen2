@@ -30,9 +30,6 @@ function Action.new(window, properties)
         -- Configurables
         Image = 'rbxassetid://'..tostring(self.icon),
 
-        -- Theming
-        ImageColor3 = Color3.fromRGB(255, 255, 255),
-
         Size = UDim2.fromOffset(20, 20),
         BorderSizePixel = 0,
         AnchorPoint = Vector2.new(0.5, 0.5),
@@ -41,7 +38,7 @@ function Action.new(window, properties)
         ImageTransparency = 0.6,
        
         Parent = self.action
-    })
+    }, {ImageColor3 = 'ActionColor'})
 
     self.interact = self.window:Create("TextButton", {
         BackgroundTransparency = 1,
