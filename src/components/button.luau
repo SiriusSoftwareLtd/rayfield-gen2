@@ -76,10 +76,6 @@ function Button.new(tab, properties)
         -- Configurables
         Text = self.name, -- tab name
 
-        -- Theming
-        TextColor3 = Color3.fromRGB(255, 255, 255),
-        FontFace = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium),
-
         Size = UDim2.fromOffset(170, 16),
         BorderSizePixel = 0,
         BackgroundTransparency = 1,
@@ -91,7 +87,7 @@ function Button.new(tab, properties)
         LayoutOrder = 1,
     
         Parent = self.container
-    })
+    }, {TextColor3 = 'TextColor', FontFace = 'Font'})
 
     self.interact = self.tab.window:Create("TextButton", {
         BackgroundTransparency = 1,

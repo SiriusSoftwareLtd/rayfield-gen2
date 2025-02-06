@@ -222,7 +222,7 @@ function Window.new(properties)
         TextWrapped = true,
        
         Parent = self.titleContainer
-    })
+    }) -- THEMING FOR FONT WILL HAVE ISSUE AS THIS IS SEMIBOLD WHILE FONT IS SELECTED AS MEDIUM IN THEME.
 
     self.subtitle = self:Create("TextLabel", {
         -- Configurables
@@ -554,12 +554,6 @@ function Window:Create(className, properties, themeProperties)
     assert(typeof(className) == "string", "Invalid argument #1 (string expected)")
     local instance = Instance.new(className)
 
-    if properties then
-        for property, value in properties do
-            instance[property] = value
-        end
-    end
-
     if themeProperties and self.theme then
         for property, value in themeProperties do
             instance[property] = (if typeof(value) == "table"
@@ -568,6 +562,12 @@ function Window:Create(className, properties, themeProperties)
         end
 
         self.themeProperties[instance] = themeProperties
+    end
+
+    if properties then
+        for property, value in properties do
+            instance[property] = value
+        end
     end
 
     table.insert(self.instances, instance)
