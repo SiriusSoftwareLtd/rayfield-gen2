@@ -20,9 +20,12 @@ function Window.new(properties)
         instances = {},
         connections = {},
 
-        theme = if typeof(properties.theme or properties.Theme) == "table"
+        themeProperties = {},
+        theme = if typeof(properties.theme or properties.Theme) == 'table'
         then (properties.theme or properties.Theme)
-        else require(themes[(properties.theme or properties.Theme)]),
+        elseif typeof(properties.theme or properties.Theme) == 'string' 
+        then require(themes[string.lower((properties.theme or properties.Theme))]) -- check if theme exists first too...
+        else require(themes['default']),
         
         configuration = {
             -- fix this being so long lma
@@ -84,7 +87,7 @@ function Window.new(properties)
         Position = UDim2.new(0.5, 0, 0.5, 0),
 
         Parent = self.screenGui
-    }, {BackgroundColor3 = 'PrimaryColor'})
+    })
 
     self:Create("UICorner", {
         CornerRadius = UDim.new(0, 20),
@@ -100,15 +103,19 @@ function Window.new(properties)
     })
 
     self.windowGradient = self:Create("UIGradient", {
-        Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.new(0.0784313725, 0.0784313725, 0.0784313725)),
-            ColorSequenceKeypoint.new(1, Color3.new(0.0784313725, 0.0784313725, 0.0784313725))
-        }),
         Rotation = 250,
         Offset = Vector2.new(0, 0.2),
 
         Parent = self.main
-    })
+    }, {Color = {'WindowColor', function(color)
+        
+        if typeof(color) == 'ColorSequence' then
+            return color
+        else
+            return ColorSequence.new(color)
+        end
+    
+    end }})
 
 
     -- Topbar
@@ -121,25 +128,20 @@ function Window.new(properties)
     })
 
     self.dividerTop = self:Create("Frame", {
-        
-
         Position = UDim2.new(0, 0, 1, 0),
         Size = UDim2.new(1, 0, 0, 1),
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         BackgroundTransparency = 0.85,
 
         Parent = self.topbar
-    }, {BackgroundColor3 = 'SecondaryColor'})
+    }, {BackgroundColor3 = 'DividerColor'})
 
     self.dividerBottom = self:Create("Frame", {
-        
-        
         Parent = self.main,
         Position = UDim2.new(0, 0, 0, 105),
         Size = UDim2.new(1, 0, 0, 1),
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         BackgroundTransparency = 0.85
-    }, {BackgroundColor3 = 'SecondaryColor'})
+
+    }, {BackgroundColor3 = 'DividerColor'})
 
     self.dividerTopGradient = self:Create("UIGradient", {
         Parent = self.dividerTop,
@@ -161,7 +163,11 @@ function Window.new(properties)
             NumberSequenceKeypoint.new(0.5, 0.75, 0),
             NumberSequenceKeypoint.new(1, 1, 0)
         })
-    })
+    },
+        {
+           Color = '' -- if color3.fromRGB then convert to numbersequence, if numbersequence then use as is.
+        }
+    )
 
     self.titleContainer = self:Create("Frame", {
         
@@ -539,8 +545,7 @@ function Window:Create(className, properties, themeProperties)
                 else self.theme[value])
         end
 
-        -- is this needed?
-        --self.themeProperties[instance.Name] = themeProperties
+        self.themeProperties[instance] = themeProperties
     end
 
     table.insert(self.instances, instance)
