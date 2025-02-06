@@ -1,5 +1,9 @@
 local WindowComponent = require(game:GetService("ReplicatedStorage").Rayfield)
-local window = WindowComponent.new("Rayfield Gen2")
+local window = WindowComponent.new({
+    name = 'Window name ye',
+
+    theme = 'pacific'
+})
 
 warn('init rayfield')
 window:CreateTab({
