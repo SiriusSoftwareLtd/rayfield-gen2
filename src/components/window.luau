@@ -20,9 +20,9 @@ function Window.new(properties)
         instances = {},
         connections = {},
 
-        theme = if typeof(properties.theme or properties.Theme) == "string"
+        theme = if typeof(properties.theme or properties.Theme) == "table"
         then (properties.theme or properties.Theme)
-        else themes[(properties.theme or properties.Theme)],
+        else require(themes[(properties.theme or properties.Theme)]),
         
         configuration = {
             -- fix this being so long lma
@@ -84,7 +84,7 @@ function Window.new(properties)
         Position = UDim2.new(0.5, 0, 0.5, 0),
 
         Parent = self.screenGui
-    })
+    }, {BackgroundColor3 = 'PrimaryColor'})
 
     self:Create("UICorner", {
         CornerRadius = UDim.new(0, 20),
@@ -539,7 +539,8 @@ function Window:Create(className, properties, themeProperties)
                 else self.theme[value])
         end
 
-        self.themeProperties[instance] = themeProperties
+        -- is this needed?
+        --self.themeProperties[instance.Name] = themeProperties
     end
 
     table.insert(self.instances, instance)
