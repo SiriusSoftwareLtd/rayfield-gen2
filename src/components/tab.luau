@@ -13,11 +13,15 @@ function Tab.new(window, properties)
 
     local self = setmetatable({
         window = assert(window, "Missing argument #1 (Window expected)"),
-        name = properties.name or properties.Name or "Tab",
-        icon = properties.icon or properties.Icon or 0,
+        name = properties.name or properties.Name,
+        icon = properties.icon or properties.Icon,
         neglectSelector = properties.neglectSelector or properties.NeglectSelector or false,
         customOrder = properties.customOrder or properties.CustomOrder or 0 -- make this maybe not 0.
     }, Tab)
+
+    -- fix this message.
+    -- this adds support for nameless/iconless tabs
+    assert(self.name or self.icon, 'Missing Icon or Name.')
 
     if not self.neglectSelector then -- Allow for tabs to be hidden from the tab selector, for Rayfield Settings.
         -- Topbar Item
@@ -70,21 +74,23 @@ function Tab.new(window, properties)
             }, {ImageColor3 = 'TabColor'})
         end
 
-        self.topbarItemTitle = self.window:Create("TextLabel", {
-            -- Configurables
-            Text = self.name, -- tab name
+        if self.name then
+            self.topbarItemTitle = self.window:Create("TextLabel", {
+                -- Configurables
+                Text = self.name, -- tab name
 
-            Size = UDim2.fromOffset(0, 16),
-            BorderSizePixel = 0,
-            BackgroundTransparency = 1,
-            TextSize = 16,
-            TextTransparency = 0.65,
-            AutomaticSize = Enum.AutomaticSize.X,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            TextWrapped = true,
-        
-            Parent = self.topbarItemContainer
-        }, {TextColor3 = 'TabColor', FontFace = 'Font'})
+                Size = UDim2.fromOffset(0, 16),
+                BorderSizePixel = 0,
+                BackgroundTransparency = 1,
+                TextSize = 16,
+                TextTransparency = 0.65,
+                AutomaticSize = Enum.AutomaticSize.X,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                TextWrapped = true,
+            
+                Parent = self.topbarItemContainer
+            }, {TextColor3 = 'TabColor', FontFace = 'Font'})
+        end
 
         self.topbarItemInteract = self.window:Create("TextButton", {
             BackgroundTransparency = 1,
@@ -154,15 +160,25 @@ function Tab.new(window, properties)
 
         self.window:Connect(self.topbarItemInteract.MouseEnter, function() 
             if self.window.selectedTab ~= self then
-                variables.tweenService:Create(self.topbarItemIcon, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.45}):Play()
-                variables.tweenService:Create(self.topbarItemTitle, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.45}):Play()
+                if self.icon then
+                    variables.tweenService:Create(self.topbarItemIcon, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.45}):Play()
+                end
+
+                if self.name then
+                    variables.tweenService:Create(self.topbarItemTitle, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.45}):Play()
+                end
             end
         end)
 
         self.window:Connect(self.topbarItemInteract.MouseLeave, function() 
             if self.window.selectedTab ~= self then
-                variables.tweenService:Create(self.topbarItemIcon, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.65}):Play()
-                variables.tweenService:Create(self.topbarItemTitle, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.65}):Play()
+                if self.icon then
+                    variables.tweenService:Create(self.topbarItemIcon, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.65}):Play()
+                end
+                
+                if self.name then
+                    variables.tweenService:Create(self.topbarItemTitle, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.65}):Play()
+                end
             end
         end)
     end
@@ -179,8 +195,13 @@ function Tab:Select()
     self.window:Navigate(self.tabPage)
 
     if not self.neglectSelector then
-        variables.tweenService:Create(self.topbarItemIcon, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.1}):Play()
-        variables.tweenService:Create(self.topbarItemTitle, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.1}):Play()
+        if self.icon then
+            variables.tweenService:Create(self.topbarItemIcon, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.1}):Play()
+        end
+
+        if self.name then
+            variables.tweenService:Create(self.topbarItemTitle, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.1}):Play()
+        end
     end
 
     for _, tab in self.window.tabs do
@@ -192,8 +213,13 @@ end
 
 function Tab:Deselect()
     if not self.neglectSelector then
-        variables.tweenService:Create(self.topbarItemIcon, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.65}):Play()
-        variables.tweenService:Create(self.topbarItemTitle, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.65}):Play()
+        if self.icon then
+            variables.tweenService:Create(self.topbarItemIcon, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.65}):Play()
+        end
+        
+        if self.name then
+            variables.tweenService:Create(self.topbarItemTitle, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.65}):Play()
+        end
     end
 end
 
