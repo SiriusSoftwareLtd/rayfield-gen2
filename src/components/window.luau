@@ -222,7 +222,7 @@ function Window.new(properties)
         TextWrapped = true,
        
         Parent = self.titleContainer
-    }) -- THEMING FOR FONT WILL HAVE ISSUE AS THIS IS SEMIBOLD WHILE FONT IS SELECTED AS MEDIUM IN THEME.
+    }, {FontFace = 'TitleFont'})
 
     self.subtitle = self:Create("TextLabel", {
         -- Configurables
