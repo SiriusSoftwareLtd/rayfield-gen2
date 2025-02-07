@@ -46,40 +46,6 @@ function Window.new(properties)
         Parent = variables.guiContainer,
     })
 
-    -- Drag Point
-    self.drag = self:Create("Frame", {
-        BackgroundTransparency = 1,
-        Size = UDim2.fromOffset(150, 20),
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.new(0.5, 0, 0.5, 265),
-
-        Parent = self.screenGui,
-    })
-
-    self.dragCosmetic = self:Create("Frame", {
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-        BackgroundTransparency = 0.7,
-        Size = UDim2.fromOffset(100, 4),
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.fromScale(0.5, 0.3),
-
-        Parent = self.drag,
-    })
-
-    self:Create("UICorner", {
-        CornerRadius = UDim.new(0, 20),
-
-        Parent = self.dragCosmetic
-    })
-
-    self.dragInteract = self:Create("TextButton", {
-        BackgroundTransparency = 1,
-        Size = UDim2.fromScale(1, 1),
-        TextTransparency = 1,
-
-        Parent = self.drag,
-    })
-
     -- Window
     self.main = self:Create("Frame", {
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
@@ -90,6 +56,8 @@ function Window.new(properties)
 
         Parent = self.screenGui
     })
+
+    require(script.Parent.drag).new(self)
 
     self:Create("UICorner", {
 
