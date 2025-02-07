@@ -7,8 +7,12 @@ end
 
 local variables = {}
 
+variables.rayfieldHidden = false -- update if hidden.. blah
+
 variables.coreGui = getService("CoreGui")
 variables.runService = getService("RunService")
+variables.userInputService = getService("UserInputService")
+variables.guiService = getService("GuiService")
 variables.localPlayer = getService("Players").LocalPlayer
 variables.tweenService = getService('TweenService')
 variables.guiContainer =
