@@ -2,6 +2,12 @@ local Button = {}
 Button.__index = Button
 Button.__type = "Button"
 
+-- Utility
+local utility = script.Parent.Parent.utility
+
+-- Variables
+local variables = require(utility.variables)
+
 function Button.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
 
@@ -76,7 +82,7 @@ function Button.new(tab, properties)
         -- Configurables
         Text = self.name, -- tab name
 
-        Size = UDim2.fromOffset(170, 16),
+        Size = UDim2.fromOffset(250, 16),
         BorderSizePixel = 0,
         BackgroundTransparency = 1,
         TextSize = 16,
@@ -100,11 +106,49 @@ function Button.new(tab, properties)
         Parent = self.main,
     })
 
-
-
     -- Function
     -- add callback errors and task spawn blah blah
-    self.tab.window:Connect(self.interact.MouseButton1Click, function() pcall(self.callback) end)
+    self.tab.window:Connect(self.interact.MouseButton1Click, function() 
+
+        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = 1}):Play()
+        variables.tweenService:Create(self.main, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(1, -26, 0, 43)}):Play()
+  
+        task.spawn(function() 
+            local success, result = pcall(function()
+                self.callback()
+            end) 
+
+            if not success then
+                -- LOG ERROR IN WORKSPACE FILE. e.g logs.rfld 
+
+                variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = self.tab.window.theme.ErrorColor}):Play()
+                variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = self.tab.window.theme.ErrorStrokeColor}):Play()
+                self.title.Text = 'Error, log recorded in console.'
+
+                warn(`Rayfield encountered an error, with the callback for a {self.__type} component named '{self.name}':`)
+                print(result)
+
+                task.wait(1)
+
+                self.title.Text = self.name
+                variables.tweenService:Create(self.main, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {BackgroundColor3 = self.tab.window.theme.ElementColor}):Play()
+                variables.tweenService:Create(self.stroke, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = self.tab.window.theme.ElementStroke}):Play()
+            end
+        end)
+
+        task.wait(0.08)
+
+        variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(1, -20, 0, 43)}):Play()
+        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = 0}):Play()
+    end)
+
+    self.tab.window:Connect(self.main.MouseEnter, function()
+        variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.1}):Play()
+    end)
+
+    self.tab.window:Connect(self.main.MouseLeave, function()
+        variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
+    end)
 
     return self
 end

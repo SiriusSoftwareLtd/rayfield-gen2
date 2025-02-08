@@ -16,6 +16,7 @@ Window.__index = Window
 function Window.new(properties)
     local self = setmetatable({
         name = properties.name or properties.Name or "Rayfield Window",
+        subheading = properties.subtitle or properties.Subtitle,
         size = UDim2.fromOffset(475, 500), -- calculate sizing for mobile. use formula based on viewport?
         instances = {},
         connections = {},
@@ -97,6 +98,7 @@ function Window.new(properties)
     })
 
     self.dividerTop = self:Create("Frame", {
+        BorderSizePixel = 0,
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         Position = UDim2.new(0, 0, 1, 0),
         Size = UDim2.new(1, 0, 0, 1),
@@ -106,6 +108,7 @@ function Window.new(properties)
     }, {BackgroundColor3 = 'DividerColor'})
 
     self.dividerBottom = self:Create("Frame", {
+        BorderSizePixel = 0,
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         Parent = self.main,
         Position = UDim2.new(0, 0, 0, 105),
@@ -192,24 +195,26 @@ function Window.new(properties)
         Parent = self.titleContainer
     }, {FontFace = 'TitleFont'})
 
-    self.subtitle = self:Create("TextLabel", {
-        -- Configurables
-        Text = 'Content', -- window name
+    if self.subheading then
+        self.subtitle = self:Create("TextLabel", {
+            -- Configurables
+            Text = self.subheading, -- window name
 
-        -- Theming
-        TextColor3 = Color3.fromRGB(255, 255, 255),
-        FontFace = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium),
+            -- Theming
+            TextColor3 = Color3.fromRGB(255, 255, 255),
+            FontFace = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium),
 
-        Size = UDim2.new(1, 0, 0, 12),
+            Size = UDim2.new(1, 0, 0, 12),
+            
+            BackgroundTransparency = 1,
+            TextSize = 12,
+            TextTransparency = 0.7,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextWrapped = true,
         
-        BackgroundTransparency = 1,
-        TextSize = 12,
-        TextTransparency = 0.7,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        TextWrapped = true,
-       
-        Parent = self.titleContainer
-    })
+            Parent = self.titleContainer
+        })
+    end
 
     -- Shadow
     self.shadowContainer = self:Create("Frame", {
@@ -239,14 +244,17 @@ function Window.new(properties)
     })
 
     self.shadowGradient = self:Create("UIGradient", {
-        Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.new(0.0784313725, 0.0784313725, 0.0784313725)),
-            ColorSequenceKeypoint.new(1, Color3.new(0.0784313725, 0.0784313725, 0.0784313725))
-        }),
         Rotation = 250,
         Offset = Vector2.new(0, 0.2),
         Parent = self.shadowImage,
-    })
+    }, { 
+        Color = {'ShadowColor', function(color)
+        if typeof(color) == 'ColorSequence' then
+            return color
+        else
+            return ColorSequence.new(color)
+        end
+    end }})
 
 
     -- Elements Preparation
@@ -499,24 +507,6 @@ function Window:Navigate(tab)
 
     self.elementsLayout:JumpTo(tab)
 end
-
---[[ function Window:Create(className, properties, themeProperties)
-    local function hasProperty(object, prop)
-        local _ins = object[prop]
-    end
-
-    local instance = Instance.new(className)
-    if pcall(function() hasProperty(instance, 'BorderSizePixel') end) then instance.BorderSizePixel = 0 end -- BorderSizePixel is :(
-
-    if properties then
-        for property, value in properties do
-            instance[property] = value
-        end
-    end
-
-    table.insert(self.instances, instance)
-    return instance
-end ]]
 
 function Window:Create(className, properties, themeProperties)
     assert(typeof(className) == "string", "Invalid argument #1 (string expected)")

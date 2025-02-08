@@ -2,6 +2,7 @@ local WindowComponent = require(game:GetService("ReplicatedStorage").Rayfield)
 
 local window = WindowComponent.new({
     name = 'Window name ye',
+    subtitle = 'subtitle',
 
     theme = 'default'
 })
@@ -21,7 +22,7 @@ tab:CreateButton({
     -- other stuff
     
     callback = function()
-        print('yo')
+        print(5)
     end
 })
 

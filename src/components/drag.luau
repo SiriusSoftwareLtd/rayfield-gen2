@@ -62,26 +62,19 @@ function Drag.new(window, properties)
 		offset = variables.guiService:GetGuiInset()
 	end
 
-	-- add to window:connect
-	local function connectFunctions()
-		if self.drag then
-			self.drag.MouseEnter:Connect(function()
-				if not dragging and not variables.rayfieldHidden then
-					variables.tweenService:Create(self.dragCosmetic, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {BackgroundTransparency = 0.5, Size = UDim2.new(0, 120, 0, 4)}):Play()
-				end
-			end)
-
-			self.drag.MouseLeave:Connect(function()
-				if not dragging and not variables.rayfieldHidden then
-					variables.tweenService:Create(self.dragCosmetic, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {BackgroundTransparency = 0.7, Size = UDim2.new(0, 100, 0, 4)}):Play()
-				end
-			end)
+	self.window:Connect(self.drag.MouseEnter, function()
+		if not dragging and not variables.rayfieldHidden then
+			variables.tweenService:Create(self.dragCosmetic, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {BackgroundTransparency = 0.5, Size = UDim2.new(0, 120, 0, 4)}):Play()
 		end
-	end
+	end)
 
-	connectFunctions()
+	self.window:Connect(self.drag.MouseLeave, function()
+		if not dragging and not variables.rayfieldHidden then
+			variables.tweenService:Create(self.dragCosmetic, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {BackgroundTransparency = 0.7, Size = UDim2.new(0, 100, 0, 4)}):Play()
+		end
+	end)
 
-	self.dragInteract.InputBegan:Connect(function(input, processed)
+	self.window:Connect(self.dragInteract.InputBegan, function(input, processed)
 		if processed then return end
 
 		local inputType = input.UserInputType.Name
@@ -99,14 +92,12 @@ function Drag.new(window, properties)
 		end
 	end)
 
-	local inputEnded = variables.userInputService.InputEnded:Connect(function(input)
+	self.window:Connect(variables.userInputService.InputEnded, function(input)
 		if not dragging then return end
 
 		local inputType = input.UserInputType.Name
 		if inputType == "MouseButton1" or inputType == "Touch" then
 			dragging = false
-
-			connectFunctions()
 
 			if not variables.rayfieldHidden then
 				variables.tweenService:Create(self.dragCosmetic, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 100, 0, 4), BackgroundTransparency = 0.7}):Play()
@@ -114,18 +105,13 @@ function Drag.new(window, properties)
 		end
 	end)
 
-	local renderStepped = variables.runService.RenderStepped:Connect(function()
+	self.window:Connect(variables.runService.RenderStepped, function()
 		if dragging and not variables.rayfieldHidden then
 			local position = variables.userInputService:GetMouseLocation() + relative + offset
 			variables.tweenService:Create(self.window.main, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Position = UDim2.fromOffset(position.X, position.Y)}):Play()
 			variables.tweenService:Create(self.drag, TweenInfo.new(0.05, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Position = UDim2.fromOffset(position.X, position.Y + (window.main.Size.Y.Offset / 2 + 15))}):Play()
 		end
 	end)
-
-	--self.window.main.Destroying:Connect(function()
-	--	if inputEnded then inputEnded:Disconnect() end
-	--	if renderStepped then renderStepped:Disconnect() end
-	--end)
 end
 
 return Drag
