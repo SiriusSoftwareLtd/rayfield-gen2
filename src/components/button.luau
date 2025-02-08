@@ -75,7 +75,7 @@ function Button.new(tab, properties)
             ImageTransparency = 0,
        
             Parent = self.container
-        })
+        }, {ImageColor3 = 'ContentColor'})
     end
 
     self.title = self.tab.window:Create("TextLabel", {
@@ -93,7 +93,7 @@ function Button.new(tab, properties)
         LayoutOrder = 1,
     
         Parent = self.container
-    }, {TextColor3 = 'TextColor', FontFace = 'Font'})
+    }, {TextColor3 = 'ContentColor', FontFace = 'Font'})
 
     self.interact = self.tab.window:Create("TextButton", {
         BackgroundTransparency = 1,

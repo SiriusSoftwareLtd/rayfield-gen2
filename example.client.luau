@@ -1,8 +1,9 @@
 local WindowComponent = require(game:GetService("ReplicatedStorage").Rayfield)
 
 local window = WindowComponent.new({
-    name = 'Window name ye',
-    subtitle = 'subtitle',
+    name = 'Window',
+    subtitle = 'Rayfield Gen2',
+    --icon = 118726904892537,
 
     theme = 'default'
 })

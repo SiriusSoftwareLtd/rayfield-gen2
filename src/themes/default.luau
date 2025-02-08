@@ -10,7 +10,7 @@ return {
     ActionColor = Color3.fromRGB(255, 255, 255),
     TitleFont = Font.new("rbxassetid://12187365364", Enum.FontWeight.SemiBold),
     Font = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium),
-    TextColor = Color3.fromRGB(255, 255, 255),
+    ContentColor = Color3.fromRGB(255, 255, 255),
 
     ErrorColor = Color3.fromRGB(110, 0, 0),
     ErrorStrokeColor = Color3.fromRGB(140, 0, 0)
