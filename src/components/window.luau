@@ -21,6 +21,8 @@ function Window.new(properties)
         instances = {},
         connections = {},
 
+        icon = properties.icon or properties.Icon,
+
         themeProperties = {},
         tabs = {},
         selectedTab = nil,
@@ -159,41 +161,77 @@ function Window.new(properties)
             end 
     }})
 
-    self.titleContainer = self:Create("Frame", {
-        
-
-        Parent = self.topbar,
+    self.topContainer = self:Create("Frame", {
         Size = UDim2.new(0, 300, 0, 24),
         Position = UDim2.new(0, 25, 0.5, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
         AnchorPoint = Vector2.new(0, 0.5),
-        BackgroundTransparency = 1
+        BackgroundTransparency = 1,
+        
+
+        Parent = self.topbar
+    })
+
+    self.topContainerLayout = self:Create("UIListLayout", {
+        Padding = UDim.new(0, 8),
+        FillDirection = Enum.FillDirection.Horizontal,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        HorizontalAlignment = Enum.HorizontalAlignment.Left,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+
+        Parent = self.topContainer
+    })
+
+    self.titleContainer = self:Create("Frame", {
+        Size = UDim2.new(1, -42, 0, 24),
+        Position = UDim2.new(0, 25, 0.5, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        AnchorPoint = Vector2.new(0, 0.5),
+        BackgroundTransparency = 1,
+        LayoutOrder = 1,
+
+        Parent = self.topContainer
     })
 
     self.titleContainerLayout = self:Create("UIListLayout", {
-        Parent = self.titleContainer,
         Padding = UDim.new(0, 3),
         FillDirection = Enum.FillDirection.Vertical,
-        VerticalAlignment = Enum.VerticalAlignment.Center
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+
+        Parent = self.titleContainer
     })
 
-    self.title = self:Create("TextLabel", {
-        -- Configurables
-        Text = self.name, -- window name
+    if self.name then
+        self.title = self:Create("TextLabel", {
+            -- Configurables
+            Text = self.name, -- window name
 
-        -- Theming
-        TextColor3 = Color3.fromRGB(255, 255, 255),
-        FontFace = Font.new("rbxassetid://12187365364", Enum.FontWeight.SemiBold),
+            -- Theming
+            TextColor3 = Color3.fromRGB(255, 255, 255),
+            FontFace = Font.new("rbxassetid://12187365364", Enum.FontWeight.SemiBold),
 
-        Size = UDim2.new(1, 0, 0, 20),
+            Size = UDim2.new(1, 0, 0, 20),
+            
+            BackgroundTransparency = 1,
+            TextSize = 20,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextWrapped = true,
         
-        BackgroundTransparency = 1,
-        TextSize = 20,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        TextWrapped = true,
-       
-        Parent = self.titleContainer
-    }, {FontFace = 'TitleFont'})
+            Parent = self.titleContainer
+        }, {FontFace = 'TitleFont'})
+    end
+
+    if self.icon then
+        self.topbarIcon = self:Create('ImageLabel', {
+            Image = 'rbxassetid://'..tostring(self.icon),
+
+            BackgroundTransparency = 1,
+            Size = UDim2.fromOffset(32, 32),
+
+            Parent = self.topContainer
+        }, {ImageColor3 = 'ContentColor'})
+    end
 
     if self.subheading then
         self.subtitle = self:Create("TextLabel", {
