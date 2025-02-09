@@ -5,17 +5,17 @@ local window = WindowComponent.new({
     subtitle = 'Rayfield Gen2',
     --icon = 118726904892537,
 
-    theme = 'default'
+    theme = 'pacific'
 })
 
 warn('init rayfield')
-window:CreateTab({
+local tab = window:CreateTab({
     name = 'Tab Example 1',
     icon = 91452555903853,
 })
-local tab = window:CreateTab({
+window:CreateTab({
     name = 'Tab Example 2',
-    icon = 129180860773723,
+    icon = 91452555903853,
 })
 
 tab:CreateButton({
