@@ -466,6 +466,11 @@ function Window:ChangeTheme(theme)
     --assert(typeof(theme) == "table", "Invalid argument #1 (theme table expected)")
     -- ^ gonna be accepting strings and checking with a theme dict
 
+    theme = if typeof(theme) == 'table' then theme
+        elseif typeof(theme) == 'string' 
+        then require(themes[string.lower((theme))]) -- check if theme exists first too...
+        else require(themes['default'])
+
     for name, value in theme do
         self.theme[name] = value
     end
