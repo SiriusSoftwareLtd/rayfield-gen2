@@ -1,4 +1,6 @@
-local WindowComponent = require(game:GetService("ReplicatedStorage").Rayfield)
+local rep = game:GetService("ReplicatedStorage")
+
+local WindowComponent = require(rep.Rayfield)
 
 local window = WindowComponent.new({
     name = 'Window',
@@ -23,7 +25,7 @@ tab:CreateButton({
     -- other stuff
     
     callback = function()
-        print(5)
+        window:ChangeTheme('default')
     end
 })
 

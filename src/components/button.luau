@@ -13,6 +13,7 @@ function Button.new(tab, properties)
 
     local self = setmetatable({
         tab = assert(tab, "Missing argument #1 (Tab expected)"),
+        window = tab.window,
         name = properties.name or properties.Name or "Button",
         icon = properties.icon or properties.Icon,
         customOrder = properties.customOrder or properties.CustomOrder,
@@ -21,7 +22,7 @@ function Button.new(tab, properties)
         callback = properties.callback or properties.Callback or function() end
     }, Button)
 
-    self.main = self.tab.window:Create("Frame", {
+    self.main = self.window:Create("Frame", {
         Size = UDim2.new(1, -20, 0, 43),
         BorderSizePixel = 0,
         Name = self.name,
@@ -31,15 +32,15 @@ function Button.new(tab, properties)
         Parent = self.tab.tabPage,
     }, {BackgroundColor3 = 'ElementColor', BackgroundTransparency = 'ElementTransparency'})
 
-    self.tab.window:Create("UICorner", {
+    self.window:Create("UICorner", {
         Parent = self.main,
     }, {CornerRadius = 'ElementCornerRadius'})
 
-    self.stroke = self.tab.window:Create("UIStroke", {
+    self.stroke = self.window:Create("UIStroke", {
         Parent = self.main,
     }, {Color = 'ElementStroke', Transparency = 'ElementStrokeTransparency'})
     
-    self.container = self.tab.window:Create("Frame", {
+    self.container = self.window:Create("Frame", {
         BorderSizePixel = 0,
 
         Parent = self.main,
@@ -49,7 +50,7 @@ function Button.new(tab, properties)
         BackgroundTransparency = 1
     })
 
-    self.containerLayout = self.tab.window:Create("UIListLayout", {
+    self.containerLayout = self.window:Create("UIListLayout", {
         Padding = UDim.new(0, 5),
         FillDirection = Enum.FillDirection.Horizontal,
         VerticalAlignment = Enum.VerticalAlignment.Center,
@@ -59,7 +60,7 @@ function Button.new(tab, properties)
     })
 
     if self.icon then
-        self.iconLabel = self.tab.window:Create("ImageLabel", {
+        self.iconLabel = self.window:Create("ImageLabel", {
             -- Configurables
             Image = 'rbxassetid://'..tostring(self.icon),
             
@@ -75,7 +76,7 @@ function Button.new(tab, properties)
         }, {ImageColor3 = 'ContentColor'})
     end
 
-    self.title = self.tab.window:Create("TextLabel", {
+    self.title = self.window:Create("TextLabel", {
         -- Configurables
         Text = self.name, -- tab name
 
@@ -92,7 +93,7 @@ function Button.new(tab, properties)
         Parent = self.container
     }, {TextColor3 = 'ContentColor', FontFace = 'Font'})
 
-    self.interact = self.tab.window:Create("TextButton", {
+    self.interact = self.window:Create("TextButton", {
         BackgroundTransparency = 1,
         Size = UDim2.fromScale(1, 1),
         BorderSizePixel = 0,
@@ -105,7 +106,7 @@ function Button.new(tab, properties)
 
     -- Function
     -- add callback errors and task spawn blah blah
-    self.tab.window:Connect(self.interact.MouseButton1Click, function() 
+    self.window:Connect(self.interact.MouseButton1Click, function() 
 
         variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = 1}):Play()
         variables.tweenService:Create(self.main, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(1, -26, 0, 43)}):Play()
@@ -118,8 +119,8 @@ function Button.new(tab, properties)
             if not success then
                 -- LOG ERROR IN WORKSPACE FILE. e.g logs.rfld 
 
-                variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = self.tab.window.theme.ErrorColor}):Play()
-                variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = self.tab.window.theme.ErrorStrokeColor}):Play()
+                variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = self.window.theme.ErrorColor}):Play()
+                variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = self.window.theme.ErrorStrokeColor}):Play()
                 self.title.Text = 'Error, log recorded in console.'
 
                 warn(`Rayfield encountered an error, with the callback for a {self.__type} component named '{self.name}':`)
@@ -128,25 +129,25 @@ function Button.new(tab, properties)
                 task.wait(1)
 
                 self.title.Text = self.name
-                variables.tweenService:Create(self.main, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {BackgroundColor3 = self.tab.window.theme.ElementColor}):Play()
-                variables.tweenService:Create(self.stroke, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = self.tab.window.theme.ElementStroke}):Play()
+                variables.tweenService:Create(self.main, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {BackgroundColor3 = self.window.theme.ElementColor}):Play()
+                variables.tweenService:Create(self.stroke, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = self.window.theme.ElementStroke}):Play()
             end
         end)
 
         task.wait(0.08)
 
         variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(1, -20, 0, 43)}):Play()
-        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.tab.window.theme.ElementStrokeTransparency}):Play()
+        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeTransparency}):Play()
     end)
 
-    self.tab.window:Connect(self.main.MouseEnter, function()
-        variables.tweenService:Create(self.title, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextColor3 = self.tab.window.theme.ElementTextHoverColor}):Play()
-        variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = self.tab.window.theme.ElementHoverTransparency}):Play()
+    self.window:Connect(self.main.MouseEnter, function()
+        variables.tweenService:Create(self.title, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextColor3 = self.window.theme.ElementTextHoverColor}):Play()
+        variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = self.window.theme.ElementHoverTransparency}):Play()
     end)
 
-    self.tab.window:Connect(self.main.MouseLeave, function()
-        variables.tweenService:Create(self.title, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextColor3 = self.tab.window.theme.ContentColor}):Play()
-        variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = self.tab.window.theme.ElementTransparency}):Play()
+    self.window:Connect(self.main.MouseLeave, function()
+        variables.tweenService:Create(self.title, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextColor3 = self.window.theme.ContentColor}):Play()
+        variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = self.window.theme.ElementTransparency}):Play()
     end)
 
     return self
