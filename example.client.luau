@@ -10,7 +10,6 @@ local window = WindowComponent.new({
     theme = 'pacific'
 })
 
-warn('init rayfield')
 local tab = window:CreateTab({
     name = 'Tab Example 1',
     icon = 91452555903853,
@@ -32,7 +31,5 @@ tab:CreateButton({
 
 
 task.wait(5)
-
---print('unloading')
 
 --window:Unload()
