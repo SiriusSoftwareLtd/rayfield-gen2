@@ -23,24 +23,21 @@ function Button.new(tab, properties)
 
     self.main = self.tab.window:Create("Frame", {
         Size = UDim2.new(1, -20, 0, 43),
-        BackgroundTransparency = 0,
         BorderSizePixel = 0,
         Name = self.name,
 
         LayoutOrder = self.customOrder or 0,
 
         Parent = self.tab.tabPage,
-    }, {BackgroundColor3 = 'ElementColor'})
+    }, {BackgroundColor3 = 'ElementColor', BackgroundTransparency = 'ElementTransparency'})
 
     self.tab.window:Create("UICorner", {
-        CornerRadius = UDim.new(0, 12),
         Parent = self.main,
-    })
+    }, {CornerRadius = 'ElementCornerRadius'})
 
     self.stroke = self.tab.window:Create("UIStroke", {
-        Transparency = 0,
         Parent = self.main,
-    }, {Color = 'ElementStroke'})
+    }, {Color = 'ElementStroke', Transparency = 'ElementStrokeTransparency'})
     
     self.container = self.tab.window:Create("Frame", {
         BorderSizePixel = 0,
@@ -139,15 +136,17 @@ function Button.new(tab, properties)
         task.wait(0.08)
 
         variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(1, -20, 0, 43)}):Play()
-        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = 0}):Play()
+        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.tab.window.theme.ElementStrokeTransparency}):Play()
     end)
 
     self.tab.window:Connect(self.main.MouseEnter, function()
-        variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.1}):Play()
+        variables.tweenService:Create(self.title, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextColor3 = self.tab.window.theme.ElementTextHoverColor}):Play()
+        variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = self.tab.window.theme.ElementHoverTransparency}):Play()
     end)
 
     self.tab.window:Connect(self.main.MouseLeave, function()
-        variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
+        variables.tweenService:Create(self.title, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextColor3 = self.tab.window.theme.ContentColor}):Play()
+        variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = self.tab.window.theme.ElementTransparency}):Play()
     end)
 
     return self

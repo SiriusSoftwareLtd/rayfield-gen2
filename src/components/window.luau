@@ -219,7 +219,7 @@ function Window.new(properties)
             TextWrapped = true,
         
             Parent = self.titleContainer
-        }, {FontFace = 'TitleFont'})
+        }, {FontFace = 'TitleFont', TextColor3 = 'TitlingColor'})
     end
 
     if self.icon then
@@ -230,7 +230,7 @@ function Window.new(properties)
             Size = UDim2.fromOffset(32, 32),
 
             Parent = self.topContainer
-        }, {ImageColor3 = 'ContentColor'})
+        }, {ImageColor3 = 'TitlingColor'})
     end
 
     if self.subheading then
@@ -238,12 +238,7 @@ function Window.new(properties)
             -- Configurables
             Text = self.subheading, -- window name
 
-            -- Theming
-            TextColor3 = Color3.fromRGB(255, 255, 255),
-            FontFace = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium),
-
             Size = UDim2.new(1, 0, 0, 12),
-            
             BackgroundTransparency = 1,
             TextSize = 12,
             TextTransparency = 0.7,
@@ -251,7 +246,7 @@ function Window.new(properties)
             TextWrapped = true,
         
             Parent = self.titleContainer
-        })
+        }, {TextColor3 = 'TitlingColor', FontFace = 'Font'})
     end
 
     -- Shadow
@@ -440,6 +435,29 @@ function Window.new(properties)
             print('search!')
         end
     })
+
+    if self.theme.LiveAnimation then
+        task.spawn(function()
+            local out = true
+            local tweenInfo = TweenInfo.new(10, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+        
+            while true do
+                local tweenS = variables.tweenService:Create(self.shadowGradient, tweenInfo, {
+                    Offset = Vector2.new(if out then 0.4 else -0.2, 0), Rotation = (if out then 220 else 280)
+                })
+    
+                local tweenW = variables.tweenService:Create(self.windowGradient, tweenInfo, {
+                    Offset = Vector2.new(if out then 0.4 else -0.2, 0), Rotation = (if out then 220 else 280)
+                })
+                
+                tweenW:Play()
+                tweenS:Play()
+                tweenS.Completed:Wait()
+                out = not out
+            end
+        end)
+    end
+
 
     return self
 end
