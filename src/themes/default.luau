@@ -12,6 +12,18 @@ return {
     Font = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium),
     ContentColor = Color3.fromRGB(255, 255, 255),
 
+    LiveAnimation = false, -- Subtly changes window gradient and shadow offset to make Rayfield feel more natural.
+
+    ElementTransparency = 0,
+    ElementStrokeTransparency = 0,
+    ElementHoverTransparency = 0,
+    ElementStrokeHoverTransparency = 0,
+    ElementHoverColor = Color3.fromRGB(35, 35, 35),
+    ElementStrokeHover = Color3.fromRGB(50, 50, 50),
+    ElementCornerRadius = UDim.new(0, 12),
+    ElementTextHoverColor = Color3.fromRGB(255, 255, 255),
+    TitlingColor = Color3.fromRGB(255, 255, 255),
+
     ErrorColor = Color3.fromRGB(110, 0, 0),
     ErrorStrokeColor = Color3.fromRGB(140, 0, 0)
 }

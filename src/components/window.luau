@@ -467,19 +467,25 @@ function Window:ChangeTheme(theme)
     -- ^ gonna be accepting strings and checking with a theme dict
 
     theme = if typeof(theme) == 'table' then theme
-        elseif typeof(theme) == 'string' 
-        then require(themes[string.lower((theme))]) -- check if theme exists first too...
+        elseif typeof(theme) == 'string' and themes[string.lower(theme)]
+        then require(themes[string.lower(theme)])
         else require(themes['default'])
 
     for name, value in theme do
         self.theme[name] = value
     end
-
+    
     for instance, properties in self.themeProperties do
         for property, value in properties do
-            instance[property] = if typeof(value) == "table"
+            local targetValue = if typeof(value) == "table"
                 then value[2](self.theme[value[1]])
                 else self.theme[value]
+
+            if typeof(targetValue) == "Color3" or typeof(targetValue) == "number" then
+                variables.tweenService:Create(instance, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {[property] = targetValue}):Play()
+            else
+                instance[property] = targetValue
+            end
         end
     end
 end
