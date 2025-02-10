@@ -9,7 +9,7 @@ return {
         ColorSequenceKeypoint.new(1, Color3.fromRGB(38, 148, 117)),
     }),
 
-    LiveAnimation = false, -- Subtly changes window gradient and shadow offset to make Rayfield feel more natural.
+    LiveAnimation = true, -- Subtly changes window gradient and shadow offset to make Rayfield feel more natural.
 
     ElementColor = Color3.fromRGB(255, 255, 255),
     ElementTransparency = 0.8,
