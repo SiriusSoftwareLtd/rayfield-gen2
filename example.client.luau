@@ -28,6 +28,15 @@ tab:CreateButton({
     end
 })
 
+tab:CreateToggle({
+    name = 'Switch',
+    -- other stuff
+    
+    callback = function(value)
+        print(value)
+    end
+})
+
 
 
 task.wait(5)

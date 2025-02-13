@@ -1,6 +1,6 @@
-local Button = {}
-Button.__index = Button
-Button.__type = "Button"
+local Toggle = {}
+Toggle.__index = Toggle
+Toggle.__type = "Toggle"
 
 -- Utility
 local utility = script.Parent.Parent.utility
@@ -8,18 +8,21 @@ local utility = script.Parent.Parent.utility
 -- Variables
 local variables = require(utility.variables)
 
-function Button.new(tab, properties)
+function Toggle.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
 
     local self = setmetatable({
         tab = assert(tab, "Missing argument #1 (Tab expected)"),
         window = tab.window,
-        name = properties.name or properties.Name or "Button",
+        name = properties.name or properties.Name or "Switch",
         icon = properties.icon or properties.Icon,
         customOrder = properties.customOrder or properties.CustomOrder,
+        forgetState = properties.forgetState or properties.ForgetState, -- dont save config for this element if true.
 
-        callback = properties.callback or properties.Callback or function() end
-    }, Button)
+        callback = properties.callback or properties.Callback or function() end,
+
+        value = if (properties.value or properties.Value) ~= nil then (properties.value or properties.Value) else false,
+    }, Toggle)
 
     self.main = self.window:Create("Frame", {
         Size = UDim2.new(1, -20, 0, 43),
@@ -94,25 +97,106 @@ function Button.new(tab, properties)
 
     self.interact = self.window:Create("TextButton", {
         BackgroundTransparency = 1,
-        Size = UDim2.fromScale(1, 1),
+        Size = UDim2.new(0, 200, 1, 0),
         BorderSizePixel = 0,
-        Position = UDim2.fromScale(0.5, 0.5),
-        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromScale(1, 0.5),
+        AnchorPoint = Vector2.new(1, 0.5),
         TextTransparency = 1,
 
         Parent = self.main,
     })
 
+    self.functionContainer = self.window:Create("Frame", {
+        BorderSizePixel = 0,
+
+        Size = UDim2.fromOffset(43, 21),
+        Position = UDim2.new(1, -15, 0, 20),
+        AnchorPoint = Vector2.new(1, 0.5),
+        BackgroundTransparency = 1,
+
+        Parent = self.main
+    })
+
+    self.window:Create("UICorner", {
+        CornerRadius = UDim.new(0, 15),
+
+        Parent = self.functionContainer,
+    })
+
+    self.containerStroke = self.window:Create("UIStroke", {
+        Color = Color3.fromRGB(255, 255, 255),
+        Transparency = 0.85,
+
+        Parent = self.functionContainer,
+    })
+
+    self.indicator = self.window:Create("Frame", {
+        BorderSizePixel = 0,
+
+        Size = UDim2.fromOffset(17, 17),
+        Position = UDim2.new(1, -40, 0.5, 0),
+        AnchorPoint = Vector2.new(0, 0.5),
+        BackgroundTransparency = 0.8,
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+
+        Parent = self.functionContainer
+    })
+
+    self.window:Create("UICorner", {
+        CornerRadius = UDim.new(1, 0),
+
+        Parent = self.indicator,
+    })
+
+    self.indicatorStroke = self.window:Create("UIStroke", {
+        Color = Color3.fromRGB(255, 255, 255),
+        Transparency = 0.7,
+
+        Parent = self.indicator,
+    })
+
+    self.overlay = self.window:Create("Frame", {
+        BorderSizePixel = 0,
+
+        Size = UDim2.fromScale(1, 1),
+        Position = UDim2.fromScale(0, 0),
+        AnchorPoint = Vector2.new(0, 0),
+        BackgroundTransparency = 0,
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+
+        Parent = self.functionContainer
+    }, {Visible = 'DarkToggleOverlay'})
+
+    self.window:Create("UICorner", {
+        CornerRadius = UDim.new(0, 15),
+
+        Parent = self.overlay,
+    })
+
+    self.overlayGradient = self.window:Create("UIGradient", {
+        Rotation = 90,
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 1),
+            NumberSequenceKeypoint.new(1, 0.35),
+        }),
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 30)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 30, 30)),
+        }),
+        Parent = self.overlay,
+    })
+
     -- Function
-    -- add callback errors and task spawn blah blah
     self.window:Connect(self.interact.MouseButton1Click, function() 
 
         variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = 1}):Play()
         variables.tweenService:Create(self.main, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(1, -26, 0, 43)}):Play()
   
+        self.value = not self.value
+
         task.spawn(function() 
             local success, result = pcall(function()
-                self.callback()
+                self.callback(self.value)
             end) 
 
             if not success then
@@ -140,6 +224,8 @@ function Button.new(tab, properties)
     end)
 
     self.window:Connect(self.main.MouseEnter, function()
+        variables.tweenService:Create(self.indicatorStroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = self.window.theme.ElementContentHoverColor}):Play()
+        variables.tweenService:Create(self.containerStroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = self.window.theme.ElementContentHoverColor}):Play()
         variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeHoverTransparencyColor, Color = self.window.theme.ElementStrokeHover}):Play()
         variables.tweenService:Create(self.title, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextColor3 = self.window.theme.ElementTextHoverColor}):Play()
         variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = self.window.theme.ElementHoverTransparency, BackgroundColor3 = self.window.theme.ElementHoverColor}):Play()
@@ -154,4 +240,4 @@ function Button.new(tab, properties)
     return self
 end
 
-return Button
+return Toggle

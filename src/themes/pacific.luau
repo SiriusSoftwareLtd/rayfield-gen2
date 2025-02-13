@@ -16,11 +16,12 @@ return {
     ElementStroke = Color3.fromRGB(255, 255, 255),
     ElementStrokeTransparency = 0.65,
     ElementHoverTransparency = 0.3,
+    DarkToggleOverlay = false,
     ElementStrokeHoverTransparency = 0,
     ElementHoverColor = Color3.fromRGB(255, 255, 255),
     ElementStrokeHoverColor = Color3.fromRGB(255, 255, 255),
     ElementCornerRadius = UDim.new(0, 12),
-    ElementTextHoverColor = Color3.fromRGB(0, 0, 0),
+    ElementContentHoverColor = Color3.fromRGB(8, 132, 248),
     DividerColor = Color3.fromRGB(255, 255, 255),
     TabColor = Color3.fromRGB(255, 255, 255),
     ActionColor = Color3.fromRGB(255, 255, 255),
@@ -28,6 +29,7 @@ return {
     TitleFont = Font.new("rbxassetid://12187365364", Enum.FontWeight.SemiBold),
     Font = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium),
     ContentColor = Color3.fromRGB(255, 255, 255),
+    ElementTextHoverColor = Color3.fromRGB(255, 255, 255),
 
     ErrorColor = Color3.fromRGB(110, 0, 0),
     ErrorStrokeColor = Color3.fromRGB(140, 0, 0)

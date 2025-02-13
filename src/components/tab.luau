@@ -227,6 +227,15 @@ function Tab:CreateButton(properties)
     return require(script.Parent.button).new(self, properties)
 end
 
+function Tab:CreateToggle(properties)
+    return require(script.Parent.toggle).new(self, properties)
+end
+
+function Tab:CreateSwitch(properties)
+    return require(script.Parent.toggle).new(self, properties)
+end
+
+
 function Tab:Remove()
     -- remove tab
 end
