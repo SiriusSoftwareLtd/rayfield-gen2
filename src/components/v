@@ -1,0 +1,11 @@
+local uIGradient = Instance.new("UIGradient")
+uIGradient.Name = "UIGradient"
+uIGradient.Color = ColorSequence.new({
+  ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 30)),
+  ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 30, 30)),
+})
+uIGradient.Rotation = 90
+uIGradient.Transparency = NumberSequence.new({
+  NumberSequenceKeypoint.new(0, 1),
+  NumberSequenceKeypoint.new(1, 0.35),
+})
