@@ -112,7 +112,8 @@ function Toggle.new(tab, properties)
         Size = UDim2.fromOffset(43, 21),
         Position = UDim2.new(1, -15, 0, 20),
         AnchorPoint = Vector2.new(1, 0.5),
-        BackgroundTransparency = 1,
+        BackgroundTransparency = 0.9,
+        BackgroundColor3 = Color3.fromRGB(0, 0, 0),
 
         Parent = self.main
     })
@@ -194,6 +195,20 @@ function Toggle.new(tab, properties)
   
         self.value = not self.value
 
+        if self.value then
+            variables.tweenService:Create(self.indicator, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Position = UDim2.new(1, -20, 0.5, 0)}):Play()
+            variables.tweenService:Create(self.indicator, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(23, 153, 110)}):Play()
+            variables.tweenService:Create(self.indicator, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
+            variables.tweenService:Create(self.indicatorStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Color = Color3.fromRGB(32, 201, 144)}):Play()
+            variables.tweenService:Create(self.indicatorStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = 0}):Play()
+        else
+            variables.tweenService:Create(self.indicator, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Position = UDim2.new(1, -40, 0.5, 0)}):Play()
+            variables.tweenService:Create(self.indicator, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+            variables.tweenService:Create(self.indicator, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.8}):Play()
+            variables.tweenService:Create(self.indicatorStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Color = Color3.fromRGB(255, 255, 255)}):Play()
+            variables.tweenService:Create(self.indicatorStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = 0.7}):Play()
+        end
+
         task.spawn(function() 
             local success, result = pcall(function()
                 self.callback(self.value)
@@ -224,8 +239,6 @@ function Toggle.new(tab, properties)
     end)
 
     self.window:Connect(self.main.MouseEnter, function()
-        variables.tweenService:Create(self.indicatorStroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = self.window.theme.ElementContentHoverColor}):Play()
-        variables.tweenService:Create(self.containerStroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = self.window.theme.ElementContentHoverColor}):Play()
         variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeHoverTransparencyColor, Color = self.window.theme.ElementStrokeHover}):Play()
         variables.tweenService:Create(self.title, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextColor3 = self.window.theme.ElementTextHoverColor}):Play()
         variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = self.window.theme.ElementHoverTransparency, BackgroundColor3 = self.window.theme.ElementHoverColor}):Play()

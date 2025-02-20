@@ -2,6 +2,7 @@
 
 -- Utility
 local utility = script.Parent.Parent.utility
+local SignalEngine = require(utility.SignalEngine)
 
 -- Variables
 local variables = require(utility.variables)
@@ -31,6 +32,8 @@ function Window.new(properties)
         elseif typeof(properties.theme or properties.Theme) == 'string' 
         then require(themes[string.lower((properties.theme or properties.Theme))]) -- check if theme exists first too...
         else require(themes['default']),
+
+        signal = SignalEngine.new(),
         
         configuration = {
             -- fix this being so long lma
@@ -44,7 +47,8 @@ function Window.new(properties)
     self.screenGui = self:Create("ScreenGui", {
         IgnoreGuiInset = true,
         ResetOnSpawn = false,
-        DisplayOrder = 100000,
+        Enabled = true,
+        DisplayOrder = 99999,
 
         Parent = variables.guiContainer,
     })
@@ -52,10 +56,13 @@ function Window.new(properties)
     -- Window
     self.main = self:Create("Frame", {
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-        Size = self.size,
         Name = self.name,
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.new(0.5, 0, 0.5, 0),
+
+        -- Animations
+        Size = UDim2.fromOffset((self.size.X.Offset - 50), 0),
+        BackgroundTransparency = 1, -- In = 0
 
         Parent = self.screenGui
     })
@@ -69,7 +76,9 @@ function Window.new(properties)
 
     self.windowStroke = self:Create("UIStroke", {
         Color = Color3.fromRGB(255, 255, 255),
-        Transparency = 0.95,
+        
+        -- Animations
+        Transparency = 1, -- In = 0.95
 
         Parent = self.main
     })
@@ -103,8 +112,11 @@ function Window.new(properties)
         BorderSizePixel = 0,
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         Position = UDim2.new(0, 0, 1, 0),
-        Size = UDim2.new(1, 0, 0, 1),
-        BackgroundTransparency = 0.85,
+        
+        
+        -- Animations
+        BackgroundTransparency = 1, -- In = 0.85
+        Size = UDim2.fromOffset(0, 1), -- In = 1, 0, 0, 1
 
         Parent = self.topbar
     }, {BackgroundColor3 = 'DividerColor'})
@@ -112,11 +124,13 @@ function Window.new(properties)
     self.dividerBottom = self:Create("Frame", {
         BorderSizePixel = 0,
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-        Parent = self.main,
         Position = UDim2.new(0, 0, 0, 105),
-        Size = UDim2.new(1, 0, 0, 1),
-        BackgroundTransparency = 0.85
 
+        -- Animations
+        BackgroundTransparency = 1, -- In = 0.85
+        Size = UDim2.fromOffset(0, 1), -- In = 1, 0, 0, 1
+
+        Parent = self.main,
     })
 
     self.dividerTopGradient = self:Create("UIGradient", {
@@ -217,6 +231,9 @@ function Window.new(properties)
             TextSize = 20,
             TextXAlignment = Enum.TextXAlignment.Left,
             TextWrapped = true,
+
+            -- Animations
+            TextTransparency = 1, -- In = 0
         
             Parent = self.titleContainer
         }, {FontFace = 'TitleFont', TextColor3 = 'TitlingColor'})
@@ -241,9 +258,11 @@ function Window.new(properties)
             Size = UDim2.new(1, 0, 0, 12),
             BackgroundTransparency = 1,
             TextSize = 12,
-            TextTransparency = 0.7,
             TextXAlignment = Enum.TextXAlignment.Left,
             TextWrapped = true,
+
+            -- Animations
+            TextTransparency = 1, -- In = 0.7
         
             Parent = self.titleContainer
         }, {TextColor3 = 'TitlingColor', FontFace = 'Font'})
@@ -270,8 +289,10 @@ function Window.new(properties)
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.fromScale(0.5, 0.5),
         BackgroundTransparency = 1,
-        ImageTransparency = 0.6,
         ZIndex = 0,
+
+        -- Animations
+        ImageTransparency = 1, -- In = 0.6
        
         Parent = self.shadowContainer
     })
@@ -293,8 +314,6 @@ function Window.new(properties)
     -- Elements Preparation
     
     self.elements = self:Create("Frame", {
-        
-
         Size = UDim2.new(1, 0, 1, -106),
         Position = UDim2.fromScale(0.5, 1),
         AnchorPoint = Vector2.new(0.5, 1),
@@ -393,8 +412,6 @@ function Window.new(properties)
         neglectSelector = true,
     })
 
-    -- add require(script.Parent.action) as a variable idk where.
-
     require(script.Parent.action).new(self, {
         name = 'Close',
         icon = 83277910885129,
@@ -436,6 +453,7 @@ function Window.new(properties)
         end
     })
 
+
     if self.theme.LiveAnimation then
         task.spawn(function()
             local out = true
@@ -458,6 +476,8 @@ function Window.new(properties)
         end)
     end
 
+    
+    self:Hide()
 
     return self
 end
@@ -497,6 +517,24 @@ function Window:CreateTab(properties)
     return newTab
 end
 
+function Window:Hide()
+    self.signal:Fire('hide')
+end
+
+function Window:Show()
+    self.signal:Fire('show')
+
+    variables.tweenService:Create(self.main, TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut), {BackgroundTransparency = 0, Size = self.size}):Play()
+    task.wait(0.5)
+    variables.tweenService:Create(self.shadowImage, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.6}):Play()
+    variables.tweenService:Create(self.dividerTop, TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.85, Size = UDim2.new(1, 0, 0, 1)}):Play()
+    task.wait(0.2)
+    variables.tweenService:Create(self.dividerBottom, TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.85, Size = UDim2.new(1, 0, 0, 1)}):Play()
+
+    variables.tweenService:Create(self.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
+    variables.tweenService:Create(self.subtitle, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0.7}):Play()
+end
+
 function getPath()
     local path = 'Rayfield Gen2/Script Configurations/'
     
@@ -509,6 +547,9 @@ function getPath()
     return path
 end
 
+function Window:Modify(element, newValue)
+    -- e.g change title or subtitle text
+end
 
 -- save/load not done
 -- add studio saving i.e save to datastore for testing w/out execs
