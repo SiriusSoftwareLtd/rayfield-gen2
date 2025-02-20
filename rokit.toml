@@ -5,5 +5,5 @@
 
 [tools]
 lune = "lune-org/lune@0.8.9"
+darklua = "seaofvoices/darklua@0.16.0"
 rojo = "rojo-rbx/rojo@7.4.4"
-darklua = "seaofvoices/darklua@0.15.0"

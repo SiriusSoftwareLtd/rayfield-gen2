@@ -4,6 +4,7 @@ Tab.__type = "Tab"
 
 -- Utility
 local utility = script.Parent.Parent.utility
+local SignalEngine = require(utility.SignalEngine)
 
 -- Variables
 local variables = require(utility.variables)
@@ -68,7 +69,9 @@ function Tab.new(window, properties)
                 Size = UDim2.fromOffset(16, 16),
                 BorderSizePixel = 0,
                 BackgroundTransparency = 1,
-                ImageTransparency = 0.65,
+
+                -- Animation
+                ImageTransparency = 1, -- In = 0.65
            
                 Parent = self.topbarItemContainer
             }, {ImageColor3 = 'TabColor'})
@@ -83,10 +86,12 @@ function Tab.new(window, properties)
                 BorderSizePixel = 0,
                 BackgroundTransparency = 1,
                 TextSize = 16,
-                TextTransparency = 0.65,
                 AutomaticSize = Enum.AutomaticSize.X,
                 TextXAlignment = Enum.TextXAlignment.Left,
                 TextWrapped = true,
+
+                -- Animation
+                TextTransparency = 1, -- In = 0.65
             
                 Parent = self.topbarItemContainer
             }, {TextColor3 = 'TabColor', FontFace = 'Font'})
@@ -184,17 +189,40 @@ function Tab.new(window, properties)
     end
 
     if #self.window.tabs == 1 then
-        self:Select()
+        self:Select(true)
     end
+
+    self.window:Connect(self.window.signal, function(command)
+        if command == 'hide' then
+            if not self.neglectSelector then
+                self.topbarItem.Visible = false
+            end
+        elseif command == 'show' then
+            task.wait(0.75)
+            if not self.neglectSelector then
+                self.topbarItem.Visible = true
+
+                if self.icon then
+                    variables.tweenService:Create(self.topbarItemIcon, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = if self.window.selectedTab == self then 0.1 else 0.65}):Play()
+                end
+                
+                if self.name then
+                    variables.tweenService:Create(self.topbarItemTitle, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = if self.window.selectedTab == self then 0.1 else 0.65}):Play()
+                end
+            end
+        end
+    end)
 
     return self
 end
 
-function Tab:Select()
+
+
+function Tab:Select(noAnimation)
     self.window.selectedTab = self
     self.window:Navigate(self.tabPage)
 
-    if not self.neglectSelector then
+    if not self.neglectSelector and not noAnimation then
         if self.icon then
             variables.tweenService:Create(self.topbarItemIcon, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.1}):Play()
         end

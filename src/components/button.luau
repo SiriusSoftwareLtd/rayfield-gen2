@@ -28,6 +28,9 @@ function Button.new(tab, properties)
 
         LayoutOrder = self.customOrder or 0,
 
+        -- Animation
+        BackgroundTransparency = 1, -- In = 0
+
         Parent = self.tab.tabPage,
     }, {BackgroundColor3 = 'ElementColor', BackgroundTransparency = 'ElementTransparency'})
 
@@ -36,6 +39,8 @@ function Button.new(tab, properties)
     }, {CornerRadius = 'ElementCornerRadius'})
 
     self.stroke = self.window:Create("UIStroke", {
+        Transparency = 1,
+
         Parent = self.main,
     }, {Color = 'ElementStroke', Transparency = 'ElementStrokeTransparency'})
     
@@ -69,7 +74,9 @@ function Button.new(tab, properties)
             Size = UDim2.fromOffset(16, 16),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
-            ImageTransparency = 0,
+
+            -- Animations
+            ImageTransparency = 1, -- In = 0
        
             Parent = self.container
         }, {ImageColor3 = 'ContentColor'})
@@ -83,11 +90,13 @@ function Button.new(tab, properties)
         BorderSizePixel = 0,
         BackgroundTransparency = 1,
         TextSize = 16,
-        TextTransparency = 0,
         AutomaticSize = Enum.AutomaticSize.X,
         TextXAlignment = Enum.TextXAlignment.Left,
         TextWrapped = true,
         LayoutOrder = 1,
+
+        -- Animation
+        TextTransparency = 1, -- In = 0
     
         Parent = self.container
     }, {TextColor3 = 'ContentColor', FontFace = 'Font'})
@@ -151,7 +160,22 @@ function Button.new(tab, properties)
         variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = self.window.theme.ElementTransparency, BackgroundColor3 = self.window.theme.ElementColor}):Play()
     end)
 
+    self.window:Connect(self.window.signal, function(command)
+        if command == 'hide' then
+            if not self.neglectSelector then
+                self.topbarItem.Visible = false
+            end
+        elseif command == 'show' then
+            task.wait(0.7)
+            variables.tweenService:Create(self.stroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeTransparency}):Play()
+            variables.tweenService:Create(self.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
+            variables.tweenService:Create(self.main, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
+            if self.icon then variables.tweenService:Create(self.icon, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play() end
+        end
+    end)
+
     return self
 end
+
 
 return Button

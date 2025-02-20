@@ -1,13 +1,13 @@
 local rep = game:GetService("ReplicatedStorage")
 
-local WindowComponent = require(rep.Rayfield)
+local Rayfield = require(rep.Rayfield)
 
-local window = WindowComponent.new({
+local window = Rayfield:CreateWindow({
     name = 'Window',
     subtitle = 'Rayfield Gen2',
     --icon = 118726904892537,
 
-    theme = 'pacific'
+    theme = 'default'
 })
 
 local tab = window:CreateTab({
@@ -24,7 +24,7 @@ tab:CreateButton({
     -- other stuff
     
     callback = function()
-        window:ChangeTheme('default')
+        --window:ChangeTheme('default')
     end
 })
 
@@ -36,9 +36,3 @@ tab:CreateToggle({
         print(value)
     end
 })
-
-
-
-task.wait(5)
-
---window:Unload()
