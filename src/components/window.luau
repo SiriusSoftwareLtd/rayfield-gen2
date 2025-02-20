@@ -40,11 +40,31 @@ function Window.new(properties)
         }
     }, Window)
 
+    self.rayfieldBannerContainer = self:Create("ScreenGui", {
+        ClipToDeviceSafeArea = false,
+        DisplayOrder = 100000,
+        IgnoreGuiInset = true,
+        ResetOnSpawn = false,
+
+        Parent = variables.guiContainer,
+    })
+
+    self.rayfieldBanner = self:Create('ImageLabel', {
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        BackgroundTransparency = 1,
+        Image = "rbxassetid://111263549366178",
+        Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.fromOffset(262, 60),
+
+        Parent = self.rayfieldBannerContainer
+    })
+
     -- Rayfield Gen2 Screen
     self.screenGui = self:Create("ScreenGui", {
         IgnoreGuiInset = true,
         ResetOnSpawn = false,
-        DisplayOrder = 100000,
+        Enabled = false,
+        DisplayOrder = 99999,
 
         Parent = variables.guiContainer,
     })
@@ -435,6 +455,13 @@ function Window.new(properties)
             print('search!')
         end
     })
+
+    task.spawn(function() 
+        task.wait(2)
+        self.rayfieldBannerContainer:Destroy()
+        self.screenGui.Enabled = true
+    end)
+
 
     if self.theme.LiveAnimation then
         task.spawn(function()

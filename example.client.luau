@@ -7,7 +7,7 @@ local window = WindowComponent.new({
     subtitle = 'Rayfield Gen2',
     --icon = 118726904892537,
 
-    theme = 'pacific'
+    theme = 'default'
 })
 
 local tab = window:CreateTab({
@@ -24,7 +24,7 @@ tab:CreateButton({
     -- other stuff
     
     callback = function()
-        window:ChangeTheme('default')
+        --window:ChangeTheme('default')
     end
 })
 
