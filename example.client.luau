@@ -30,7 +30,7 @@ tab:CreateButton({
 
 tab:CreateToggle({
     name = 'Switch',
-    -- other stuffs
+    -- other stuffss
     
     callback = function(value)
         print(value)
