@@ -1,4 +1,3 @@
---!nocheck
 local rayfield = {}
 local variables = require(script.utility.variables)
 

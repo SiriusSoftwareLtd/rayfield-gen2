@@ -63,6 +63,7 @@ function Window.new(properties)
         -- Animations
         Size = UDim2.fromOffset((self.size.X.Offset - 50), 0),
         BackgroundTransparency = 1, -- In = 0
+        Visible = false, -- In == true
 
         Parent = self.screenGui
     })
@@ -524,6 +525,7 @@ end
 function Window:Show()
     self.signal:Fire('show')
 
+    self.main.Visible = true
     variables.tweenService:Create(self.main, TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut), {BackgroundTransparency = 0, Size = self.size}):Play()
     task.wait(0.5)
     variables.tweenService:Create(self.shadowImage, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.6}):Play()

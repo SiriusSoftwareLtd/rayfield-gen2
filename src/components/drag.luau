@@ -28,11 +28,13 @@ function Drag.new(window, properties)
 
     self.dragCosmetic = self.window:Create("Frame", {
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-        BackgroundTransparency = 0.7,
-        Size = UDim2.fromOffset(100, 4),
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.fromScale(0.5, 0.3),
 		ZIndex = 1000,
+
+		-- Animation
+		BackgroundTransparency = 1, -- In = 0.7
+        Size = UDim2.fromOffset(0, 4), -- In = 100, 4
 
         Parent = self.drag,
     })
@@ -112,6 +114,17 @@ function Drag.new(window, properties)
 			variables.tweenService:Create(self.drag, TweenInfo.new(0.05, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Position = UDim2.fromOffset(position.X, position.Y + (window.main.Size.Y.Offset / 2 + 15))}):Play()
 		end
 	end)
+
+	self.window:Connect(self.window.signal, function(command)
+        if command == 'hide' then
+           
+        elseif command == 'show' then
+            task.wait(0.7)
+			variables.tweenService:Create(self.dragCosmetic, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.7}):Play()
+            variables.tweenService:Create(self.dragCosmetic, TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(100, 4)}):Play()
+            
+        end
+    end)
 end
 
 return Drag
