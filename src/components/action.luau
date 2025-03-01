@@ -70,7 +70,7 @@ function Action.new(window, properties)
         if command == 'hide' then
 
         elseif command == 'show' then
-            task.wait(0.5)
+            task.wait(0.6)
             variables.tweenService:Create(self.iconLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.6}):Play()
         end
     end)
