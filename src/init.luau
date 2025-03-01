@@ -35,9 +35,11 @@ function rayfield:CreateWindow(properties)
     local window = require(script.components.window).new(properties)
 
     task.spawn(function()
-        task.wait(2)
+        task.wait(1.5)
 
         banner:Destroy()
+
+        task.wait(0.5)
         window:Show()
     end)
 
