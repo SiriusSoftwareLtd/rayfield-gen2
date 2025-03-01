@@ -18,9 +18,6 @@ function Action.new(window, properties)
         callback = assert(properties.callback or properties.Callback, "Missing argument (Function expected)")
     }, Action)
 
-    
-    
-
     self.action = self.window:Create("Frame", {
         Name = self.name,
         BorderSizePixel = 0,
@@ -41,7 +38,9 @@ function Action.new(window, properties)
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.fromScale(0.5, 0.5),
         BackgroundTransparency = 1,
-        ImageTransparency = 0.6,
+
+        -- Animation
+        ImageTransparency = 1, -- In = 0.6
        
         Parent = self.action
     }, {ImageColor3 = 'ActionColor'})
@@ -65,6 +64,15 @@ function Action.new(window, properties)
     
     self.window:Connect(self.interact.MouseLeave, function() 
         variables.tweenService:Create(self.iconLabel, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.6}):Play()
+    end)
+
+    self.window:Connect(self.window.signal, function(command)
+        if command == 'hide' then
+
+        elseif command == 'show' then
+            task.wait(0.5)
+            variables.tweenService:Create(self.iconLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.6}):Play()
+        end
     end)
 
     return self

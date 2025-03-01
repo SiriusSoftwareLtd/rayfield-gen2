@@ -2,6 +2,7 @@ local rep = game:GetService("ReplicatedStorage")
 
 local Rayfield = require(rep.Rayfield)
 
+task.wait(2)
 local window = Rayfield:CreateWindow({
     name = 'Window',
     subtitle = 'Rayfield Gen2',
