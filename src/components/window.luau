@@ -68,7 +68,7 @@ function Window.new(properties)
         Parent = self.screenGui
     })
 
-    require(script.Parent.drag).new(self)
+    self.drag = require(script.Parent.drag).new(self)
 
     self:Create("UICorner", {
 
@@ -113,10 +113,10 @@ function Window.new(properties)
         BorderSizePixel = 0,
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         Position = UDim2.new(0, 0, 1, 0),
+        BackgroundTransparency = 0.85,
         
         
         -- Animations
-        BackgroundTransparency = 1, -- In = 0.85
         Size = UDim2.fromOffset(0, 1), -- In = 1, 0, 0, 1
 
         Parent = self.topbar
@@ -126,9 +126,9 @@ function Window.new(properties)
         BorderSizePixel = 0,
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         Position = UDim2.new(0, 0, 0, 105),
+        BackgroundTransparency = 0.85,
 
         -- Animations
-        BackgroundTransparency = 1, -- In = 0.85
         Size = UDim2.fromOffset(0, 1), -- In = 1, 0, 0, 1
 
         Parent = self.main,
@@ -246,6 +246,9 @@ function Window.new(properties)
 
             BackgroundTransparency = 1,
             Size = UDim2.fromOffset(32, 32),
+
+            -- Animation
+            ImageTransparency = 1, -- In = 0
 
             Parent = self.topContainer
         }, {ImageColor3 = 'TitlingColor'})
@@ -525,16 +528,45 @@ end
 function Window:Show()
     --self.signal:Fire('show')
 
+    self.drag.drag.Visible = false
     self.main.Visible = true
     variables.tweenService:Create(self.main, TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut), {BackgroundTransparency = 0, Size = self.size}):Play()
     task.wait(0.5)
     variables.tweenService:Create(self.shadowImage, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.6}):Play()
+    task.wait(0.2)
     variables.tweenService:Create(self.dividerTop, TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.85, Size = UDim2.new(1, 0, 0, 1)}):Play()
+    task.wait(0.1)
+
+    if self.icon then variables.tweenService:Create(self.topbarIcon, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play() end
+    variables.tweenService:Create(self.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
+    task.wait(0.1)
+    variables.tweenService:Create(self.subtitle, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0.7}):Play()
+
+
+
     task.wait(0.2)
     variables.tweenService:Create(self.dividerBottom, TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.85, Size = UDim2.new(1, 0, 0, 1)}):Play()
 
-    variables.tweenService:Create(self.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
-    variables.tweenService:Create(self.subtitle, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0.7}):Play()
+
+    task.spawn(function()
+        for _, tab in pairs(self.tabs) do
+            if not tab.neglectSelector then
+                tab.topbarItem.Visible = true
+
+                if tab.icon then
+                    variables.tweenService:Create(tab.topbarItemIcon, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = if self.selectedTab == tab then 0.1 else 0.65}):Play()
+                end
+
+                task.wait(0.04)
+            
+                if tab.name then
+                    variables.tweenService:Create(tab.topbarItemTitle, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = if self.selectedTab == tab then 0.1 else 0.65}):Play()
+                end
+
+                task.wait(0.15)
+            end
+        end
+    end)
 
     for _, tab in pairs(self.tabs) do
         if self.selectedTab == tab then
@@ -548,11 +580,18 @@ function Window:Show()
                 if element.icon then variables.tweenService:Create(elementValue.icon, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play() end
         
                 if elementType == 'toggle' then
-        
+                    variables.tweenService:Create(elementValue.indicator, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.8}):Play()
+                    variables.tweenService:Create(elementValue.indicatorStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = 0.7}):Play()
+                    variables.tweenService:Create(elementValue.overlay, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
+                    variables.tweenService:Create(elementValue.containerStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = 0.85}):Play()
+                    variables.tweenService:Create(elementValue.functionContainer, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.9}):Play()
+                    -- this will be changed when :Set is ran after config is loaded.
                 elseif elementType == 'button' then
         
                 end
-                task.wait(0.015)
+
+                --max out the wait at a certain amount of elements as to not have too long anims.
+                task.wait(0.03)
             end
         else
             for _, element in ipairs(tab.elements) do
@@ -569,6 +608,13 @@ function Window:Show()
             end
         end
     end
+
+    task.wait(1)
+
+    self.drag.drag.Visible = true
+    variables.tweenService:Create(self.drag.dragCosmetic, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.7}):Play()
+    variables.tweenService:Create(self.drag.dragCosmetic, TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(100, 4)}):Play()
+            
 end
 
 function getPath()

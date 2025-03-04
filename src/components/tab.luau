@@ -36,6 +36,9 @@ function Tab.new(window, properties)
             AutomaticSize = Enum.AutomaticSize.XY,
             Name = self.name,
 
+            -- Animation
+            Visible = false, -- In = true
+
             LayoutOrder = self.customOrder or 0,
 
             Parent = self.window.tabList,

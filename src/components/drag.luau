@@ -23,6 +23,9 @@ function Drag.new(window, properties)
         Position = UDim2.new(0.5, 0, 0.5, 265),
 		ZIndex = 1000,
 
+		-- Animation
+		Visible = false, -- In = true
+
         Parent = self.window.screenGui
     })
 
@@ -107,9 +110,18 @@ function Drag.new(window, properties)
 		end
 	end)
 
+	local function getPosition()
+		local mouseLocation = variables.userInputService and variables.userInputService:GetMouseLocation() or Vector2.new(0, 0)
+		local validRelative = relative or Vector2.new(0, 0)
+		local validOffset = offset or Vector2.new(0, 0)
+	
+		return mouseLocation + validRelative + validOffset
+	end
+	
+
 	self.window:Connect(variables.runService.RenderStepped, function()
 		if dragging and not variables.rayfieldHidden then
-			local position = variables.userInputService:GetMouseLocation() + relative + offset
+			local position = getPosition()
 			variables.tweenService:Create(self.window.main, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Position = UDim2.fromOffset(position.X, position.Y)}):Play()
 			variables.tweenService:Create(self.drag, TweenInfo.new(0.05, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Position = UDim2.fromOffset(position.X, position.Y + (window.main.Size.Y.Offset / 2 + 15))}):Play()
 		end
@@ -119,12 +131,11 @@ function Drag.new(window, properties)
         if command == 'hide' then
            
         elseif command == 'show' then
-            task.wait(0.7)
-			variables.tweenService:Create(self.dragCosmetic, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.7}):Play()
-            variables.tweenService:Create(self.dragCosmetic, TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(100, 4)}):Play()
-            
+
         end
     end)
+
+	return self
 end
 
 return Drag

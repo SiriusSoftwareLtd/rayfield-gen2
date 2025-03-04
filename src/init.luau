@@ -31,11 +31,10 @@ end
 
 function rayfield:CreateWindow(properties)
     local banner = createBanner()
-
     local window = require(script.components.window).new(properties)
 
     task.spawn(function()
-        task.wait(1.5)
+        task.wait(1.2)
 
         banner:Destroy()
 

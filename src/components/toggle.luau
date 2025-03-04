@@ -119,8 +119,10 @@ function Toggle.new(tab, properties)
         Size = UDim2.fromOffset(43, 21),
         Position = UDim2.new(1, -15, 0, 20),
         AnchorPoint = Vector2.new(1, 0.5),
-        BackgroundTransparency = 0.9,
         BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+
+        -- Animation
+        BackgroundTransparency = 1, -- In = 0.9
 
         Parent = self.main
     })
@@ -133,7 +135,9 @@ function Toggle.new(tab, properties)
 
     self.containerStroke = self.window:Create("UIStroke", {
         Color = Color3.fromRGB(255, 255, 255),
-        Transparency = 0.85,
+
+        -- Animation
+        Transparency = 1, -- In = 0.85
 
         Parent = self.functionContainer,
     })
@@ -144,8 +148,12 @@ function Toggle.new(tab, properties)
         Size = UDim2.fromOffset(17, 17),
         Position = UDim2.new(1, -40, 0.5, 0),
         AnchorPoint = Vector2.new(0, 0.5),
-        BackgroundTransparency = 0.8,
+        
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+
+        -- Animation
+        BackgroundTransparency = 1, -- In = 0.8
+
 
         Parent = self.functionContainer
     })
@@ -158,7 +166,9 @@ function Toggle.new(tab, properties)
 
     self.indicatorStroke = self.window:Create("UIStroke", {
         Color = Color3.fromRGB(255, 255, 255),
-        Transparency = 0.7,
+
+        -- Animation
+        Transparency = 1, -- In = 0.7
 
         Parent = self.indicator,
     })
@@ -169,8 +179,10 @@ function Toggle.new(tab, properties)
         Size = UDim2.fromScale(1, 1),
         Position = UDim2.fromScale(0, 0),
         AnchorPoint = Vector2.new(0, 0),
-        BackgroundTransparency = 0,
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+
+        -- Animation
+        BackgroundTransparency = 1, -- In = 0
 
         Parent = self.functionContainer
     }, {Visible = 'DarkToggleOverlay'})
@@ -183,16 +195,20 @@ function Toggle.new(tab, properties)
 
     self.overlayGradient = self.window:Create("UIGradient", {
         Rotation = 90,
-        Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 1),
-            NumberSequenceKeypoint.new(1, 0.35),
-        }),
+        
         Color = ColorSequence.new({
             ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 30)),
             ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 30, 30)),
         }),
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 1),
+            NumberSequenceKeypoint.new(1, 0.35),
+        }), 
+
         Parent = self.overlay,
     })
+
+
 
     -- Function
     self.window:Connect(self.interact.MouseButton1Click, function() 
@@ -239,7 +255,7 @@ function Toggle.new(tab, properties)
             end
         end)
 
-        task.wait(0.08)
+        task.wait(0.11)
 
         variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(1, -20, 0, 43)}):Play()
         variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeTransparency}):Play()
