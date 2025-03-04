@@ -16,7 +16,6 @@ function Button.new(tab, properties)
         window = tab.window,
         name = properties.name or properties.Name or "Button",
         icon = properties.icon or properties.Icon,
-        customOrder = properties.customOrder or properties.CustomOrder,
 
         callback = properties.callback or properties.Callback or function() end
     }, Button)
@@ -25,8 +24,6 @@ function Button.new(tab, properties)
         Size = UDim2.new(1, -20, 0, 43),
         BorderSizePixel = 0,
         Name = self.name,
-
-        LayoutOrder = self.customOrder or 0,
 
         -- Animation
         BackgroundTransparency = 1, -- In = 0

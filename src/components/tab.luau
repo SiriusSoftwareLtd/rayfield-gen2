@@ -17,7 +17,9 @@ function Tab.new(window, properties)
         name = properties.name or properties.Name,
         icon = properties.icon or properties.Icon,
         neglectSelector = properties.neglectSelector or properties.NeglectSelector or false,
-        customOrder = properties.customOrder or properties.CustomOrder or 0 -- make this maybe not 0.
+        customOrder = properties.customOrder or properties.CustomOrder or 0, -- make this maybe not 0.
+
+        elements = {}
     }, Tab)
 
     -- fix this message.
@@ -251,16 +253,28 @@ function Tab:Deselect()
     end
 end
 
+-- Button
 function Tab:CreateButton(properties)
-    return require(script.Parent.button).new(self, properties)
+    local newElement = require(script.Parent.button).new(self, properties)
+    table.insert(self.elements, {newElement, 'button'})
+
+    return newElement
 end
 
+
+-- Switch/Toggle
 function Tab:CreateToggle(properties)
-    return require(script.Parent.toggle).new(self, properties)
+    local newElement = require(script.Parent.toggle).new(self, properties)
+    table.insert(self.elements, {newElement, 'toggle'})
+
+    return newElement
 end
 
 function Tab:CreateSwitch(properties)
-    return require(script.Parent.toggle).new(self, properties)
+    local newElement = require(script.Parent.toggle).new(self, properties)
+    table.insert(self.elements, {newElement, 'toggle'})
+
+    return newElement
 end
 
 
