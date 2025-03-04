@@ -16,7 +16,6 @@ function Toggle.new(tab, properties)
         window = tab.window,
         name = properties.name or properties.Name or "Switch",
         icon = properties.icon or properties.Icon,
-        customOrder = properties.customOrder or properties.CustomOrder,
         forgetState = properties.forgetState or properties.ForgetState, -- dont save config for this element if true.
 
         callback = properties.callback or properties.Callback or function() end,
@@ -29,7 +28,7 @@ function Toggle.new(tab, properties)
         BorderSizePixel = 0,
         Name = self.name,
 
-        LayoutOrder = self.customOrder or 0,
+        LayoutOrder = 0,
 
         BackgroundTransparency = 1,
 

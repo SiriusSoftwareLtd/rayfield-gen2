@@ -523,7 +523,7 @@ function Window:Hide()
 end
 
 function Window:Show()
-    self.signal:Fire('show')
+    --self.signal:Fire('show')
 
     self.main.Visible = true
     variables.tweenService:Create(self.main, TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut), {BackgroundTransparency = 0, Size = self.size}):Play()
@@ -535,6 +535,40 @@ function Window:Show()
 
     variables.tweenService:Create(self.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
     variables.tweenService:Create(self.subtitle, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0.7}):Play()
+
+    for _, tab in pairs(self.tabs) do
+        if self.selectedTab == tab then
+            for _, element in ipairs(tab.elements) do
+                local elementValue = element[1]
+                local elementType = element[2]
+        
+                variables.tweenService:Create(elementValue.stroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = self.theme.ElementStrokeTransparency}):Play()
+                variables.tweenService:Create(elementValue.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
+                variables.tweenService:Create(elementValue.main, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
+                if element.icon then variables.tweenService:Create(elementValue.icon, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play() end
+        
+                if elementType == 'toggle' then
+        
+                elseif elementType == 'button' then
+        
+                end
+                task.wait(0.015)
+            end
+        else
+            for _, element in ipairs(tab.elements) do
+                local elementValue = element[1]
+                local elementType = element[2]
+    
+                -- instant tween it all..
+    
+                if elementType == 'toggle' then
+        
+                elseif elementType == 'button' then
+    
+                end
+            end
+        end
+    end
 end
 
 function getPath()
