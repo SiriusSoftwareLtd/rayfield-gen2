@@ -29,6 +29,79 @@ tab:CreateButton({
     end
 })
 
+tab:CreateButton({
+    name = 'Button',
+    -- other stuff
+    
+    callback = function()
+        --window:ChangeTheme('default')
+    end
+})
+tab:CreateButton({
+    name = 'Button',
+    -- other stuff
+    
+    callback = function()
+        --window:ChangeTheme('default')
+    end
+})
+
+tab:CreateToggle({
+    name = 'Switch',
+    -- other stuffss
+    
+    callback = function(value)
+        print(value)
+    end
+})
+
+tab:CreateToggle({
+    name = 'Switch',
+    -- other stuffss
+    
+    callback = function(value)
+        print(value)
+    end
+})
+
+
+
+tab:CreateToggle({
+    name = 'Switch',
+    -- other stuffss
+    
+    callback = function(value)
+        print(value)
+    end
+})
+
+tab:CreateButton({
+    name = 'Button',
+    -- other stuff
+    
+    callback = function()
+        --window:ChangeTheme('default')
+    end
+})
+
+tab:CreateToggle({
+    name = 'Switch',
+    -- other stuffss
+    
+    callback = function(value)
+        print(value)
+    end
+})
+
+tab:CreateButton({
+    name = 'Button',
+    -- other stuff
+    
+    callback = function()
+        --window:ChangeTheme('default')
+    end
+})
+
 tab:CreateToggle({
     name = 'Switch',
     -- other stuffss
