@@ -259,7 +259,7 @@ end
 -- Button
 function Tab:CreateButton(properties)
     local newElement = require(script.Parent.button).new(self, properties)
-    table.insert(self.elements, {newElement, 'button'})
+    table.insert(self.elements, newElement)
 
     return newElement
 end
@@ -268,14 +268,22 @@ end
 -- Switch/Toggle
 function Tab:CreateToggle(properties)
     local newElement = require(script.Parent.toggle).new(self, properties)
-    table.insert(self.elements, {newElement, 'toggle'})
+    table.insert(self.elements, newElement)
 
     return newElement
 end
 
 function Tab:CreateSwitch(properties)
     local newElement = require(script.Parent.toggle).new(self, properties)
-    table.insert(self.elements, {newElement, 'toggle'})
+    table.insert(self.elements, newElement)
+
+    return newElement
+end
+
+-- Stat
+function Tab:CreateStat(properties)
+    local newElement = require(script.Parent.stat).new(self, properties)
+    table.insert(self.elements, newElement)
 
     return newElement
 end

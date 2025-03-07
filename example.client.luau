@@ -20,6 +20,15 @@ window:CreateTab({
     icon = 91452555903853,
 })
 
+tab:CreateStat({
+    name = 'Stat',
+    -- other stuff
+    
+    callback = function()
+        --window:ChangeTheme('default')
+    end
+})
+
 tab:CreateButton({
     name = 'Button',
     -- other stuff

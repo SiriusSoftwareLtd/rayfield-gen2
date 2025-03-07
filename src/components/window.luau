@@ -571,22 +571,21 @@ function Window:Show()
     for _, tab in pairs(self.tabs) do
         if self.selectedTab == tab then
             for _, element in ipairs(tab.elements) do
-                local elementValue = element[1]
-                local elementType = element[2]
+                local elementType = element.__type
         
-                variables.tweenService:Create(elementValue.stroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = self.theme.ElementStrokeTransparency}):Play()
-                variables.tweenService:Create(elementValue.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
-                variables.tweenService:Create(elementValue.main, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
-                if element.icon then variables.tweenService:Create(elementValue.icon, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play() end
+                variables.tweenService:Create(element.stroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = self.theme.ElementStrokeTransparency}):Play()
+                variables.tweenService:Create(element.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
+                variables.tweenService:Create(element.main, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
+                if element.icon then variables.tweenService:Create(element.icon, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play() end
         
-                if elementType == 'toggle' then
-                    variables.tweenService:Create(elementValue.indicator, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.8}):Play()
-                    variables.tweenService:Create(elementValue.indicatorStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = 0.7}):Play()
-                    variables.tweenService:Create(elementValue.overlay, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
-                    variables.tweenService:Create(elementValue.containerStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = 0.85}):Play()
-                    variables.tweenService:Create(elementValue.functionContainer, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.9}):Play()
+                if elementType == 'Toggle' then
+                    variables.tweenService:Create(element.indicator, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.8}):Play()
+                    variables.tweenService:Create(element.indicatorStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = 0.7}):Play()
+                    variables.tweenService:Create(element.overlay, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
+                    variables.tweenService:Create(element.containerStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = 0.85}):Play()
+                    variables.tweenService:Create(element.functionContainer, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.9}):Play()
                     -- this will be changed when :Set is ran after config is loaded.
-                elseif elementType == 'button' then
+                elseif elementType == 'Button' then
         
                 end
 
@@ -595,14 +594,13 @@ function Window:Show()
             end
         else
             for _, element in ipairs(tab.elements) do
-                local elementValue = element[1]
-                local elementType = element[2]
+                local elementType = element.__type
     
                 -- instant tween it all..
     
-                if elementType == 'toggle' then
+                if elementType == 'Toggle' then
         
-                elseif elementType == 'button' then
+                elseif elementType == 'Button' then
     
                 end
             end
