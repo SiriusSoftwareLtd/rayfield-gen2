@@ -21,7 +21,7 @@ local function createBanner()
     banner.BackgroundTransparency = 1
     banner.BorderColor3 = Color3.fromRGB(0, 0, 0)
     banner.BorderSizePixel = 0
-    banner.Image = "rbxassetid://111263549366178"
+    banner.Image = "rbxassetid://111263549366178" -- is this going to be detected for calling assets? 
     banner.Position = UDim2.fromScale(0.5, 0.5)
     banner.Size = UDim2.fromOffset(262, 60)
     banner.Parent = ui
