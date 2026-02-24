@@ -29,6 +29,9 @@ local function createBanner()
     return ui
 end
 
+-- maybe add localization options with set languages ? 
+-- add menu to choose language before continuing if there's no built-in service to check region
+
 function rayfield:CreateWindow(properties)
     local banner = createBanner()
     local window = require(script.components.window).new(properties)
