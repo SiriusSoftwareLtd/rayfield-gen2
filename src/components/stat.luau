@@ -14,7 +14,7 @@ function Statistic.new(tab, properties)
     local self = setmetatable({
         tab = assert(tab, "Missing argument #1 (Tab expected)"),
         window = tab.window,
-        name = properties.name or properties.Name or "Stat",
+        name = properties.name or properties.Name or "Statistic",
         icon = properties.icon or properties.Icon,
 
         callback = properties.callback or properties.Callback or function() end,
@@ -74,7 +74,7 @@ function Statistic.new(tab, properties)
         Position = UDim2.fromOffset(0, 0),
         BorderSizePixel = 0,
         LayoutOrder = -1,
-        BackgroundTransparency = 0.7,
+        BackgroundTransparency = 1, -- In 0.7
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 
         Parent = self.main,
@@ -101,7 +101,7 @@ function Statistic.new(tab, properties)
         BackgroundTransparency = 1,
         ZIndex = 0,
 
-        -- Animations
+        -- Animation
         ImageTransparency = 1, -- In = 0.6
        
         Parent = self.glowContainer
@@ -151,7 +151,6 @@ function Statistic.new(tab, properties)
         Parent = self.glowImage
     })
 
-
     self.window:Create("UICorner", {
         Parent = self.gradientContainer,
     }, {CornerRadius = 'ElementCornerRadius'})
@@ -185,6 +184,50 @@ function Statistic.new(tab, properties)
         Parent = self.titleContainer
     })
 
+    self.valueLabel = self.window:Create("TextLabel", {
+        -- Configurables
+        Text = tostring(self.value),
+
+        AnchorPoint = Vector2.new(0, 1),
+        Position = UDim2.new(0, 20, 1, -15),
+        Size = UDim2.fromOffset(200, 20),
+        BorderSizePixel = 0,
+        BackgroundTransparency = 1,
+        TextSize = 20,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextWrapped = true,
+        LayoutOrder = 1,
+        ZIndex = 10,
+
+        -- Animation
+        TextTransparency = 1, -- In = 0
+    
+        Parent = self.main
+    }, {TextColor3 = 'ContentColor', FontFace = 'Font'})
+
+    self.changeLabel = self.window:Create("TextLabel", {
+        -- Configurables
+        Text = '+0%',
+
+        AnchorPoint = Vector2.new(1, 1),
+        Position = UDim2.new(1, -20, 1, -15),
+        Size = UDim2.fromOffset(200, 20),
+        BorderSizePixel = 0,
+        BackgroundTransparency = 1,
+        TextSize = 15,
+        TextXAlignment = Enum.TextXAlignment.Right,
+        TextWrapped = true,
+        LayoutOrder = 1,
+        ZIndex = 10,
+
+        TextColor3 = Color3.fromRGB(29, 220, 115),
+
+        -- Animation
+        TextTransparency = 1, -- In = 0
+    
+        Parent = self.main
+    }, {FontFace = 'Font'})
+
     -- Function
 
     self.window:Connect(self.window.signal, function(command)
@@ -196,7 +239,11 @@ function Statistic.new(tab, properties)
             task.wait(0.7)
             variables.tweenService:Create(self.stroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeTransparency}):Play()
             variables.tweenService:Create(self.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
+            variables.tweenService:Create(self.gradientContainer, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.7}):Play()
+            variables.tweenService:Create(self.glowImage, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.6}):Play()
             variables.tweenService:Create(self.main, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
+            variables.tweenService:Create(self.valueLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
+            variables.tweenService:Create(self.changeLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
             if self.icon then variables.tweenService:Create(self.icon, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play() end
         end
     end)
