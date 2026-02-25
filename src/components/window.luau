@@ -422,7 +422,7 @@ function Window.new(properties)
         order = 1,
 
         callback = function()
-            print('close!')
+            print('close')
         end
     })
 
@@ -432,7 +432,7 @@ function Window.new(properties)
         order = 2,
 
         callback = function()
-            print('minimise!')
+            print('minimise')
         end
     })
 
@@ -453,7 +453,7 @@ function Window.new(properties)
         order = 4,
 
         callback = function()
-            print('search!')
+            print('search')
         end
     })
 
@@ -542,7 +542,13 @@ function Window:Show()
     task.wait(0.1)
     variables.tweenService:Create(self.subtitle, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0.7}):Play()
 
-
+    -- animation for actions, but should be chnged to get actions another way rather than getchildren
+    for _, action in ipairs(self.actionContainer:GetChildren()) do
+        if action:IsA('Frame') then
+            task.wait(0.02)
+            variables.tweenService:Create(action.ImageLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.6}):Play()
+        end
+    end
 
     task.wait(0.2)
     variables.tweenService:Create(self.dividerBottom, TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.85, Size = UDim2.new(1, 0, 0, 1)}):Play()
