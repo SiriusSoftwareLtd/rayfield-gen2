@@ -2,5 +2,6 @@
     "robloxLsp.diagnostics.globals": [
         "gethui",
         "cloneref"
-    ]
+    ],
+    "luau-lsp.plugin.enabled": true
 }
