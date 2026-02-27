@@ -19,6 +19,7 @@ return {
     DarkToggleOverlay = false,
     ElementStrokeHoverTransparency = 0,
     ElementHoverColor = Color3.fromRGB(255, 255, 255),
+    ElementStrokeHover = Color3.fromRGB(255, 255, 255),
     ElementStrokeHoverColor = Color3.fromRGB(255, 255, 255),
     ElementCornerRadius = UDim.new(0, 12),
     ElementContentHoverColor = Color3.fromRGB(8, 132, 248),

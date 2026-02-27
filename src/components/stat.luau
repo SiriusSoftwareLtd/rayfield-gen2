@@ -232,9 +232,7 @@ function Statistic.new(tab, properties)
 
     self.window:Connect(self.window.signal, function(command)
         if command == 'hide' then
-            if not self.neglectSelector then
-                self.topbarItem.Visible = false
-            end
+
         elseif command == 'show' then
             task.wait(0.7)
             variables.tweenService:Create(self.stroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeTransparency}):Play()
@@ -244,7 +242,7 @@ function Statistic.new(tab, properties)
             variables.tweenService:Create(self.main, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
             variables.tweenService:Create(self.valueLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
             variables.tweenService:Create(self.changeLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
-            if self.icon then variables.tweenService:Create(self.icon, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play() end
+            if self.icon then variables.tweenService:Create(self.iconLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play() end
         end
     end)
 

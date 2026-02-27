@@ -35,12 +35,17 @@ function Window.new(properties)
 
         signal = SignalEngine.new(),
         
-        configuration = {
-            -- fix this being so long lma
-            autoSave = (properties.configruation or properties.Configuration) and properties.configuration.autoSave, -- blah blah
-            fileName = (properties.configruation or properties.Configuration) and (properties.Configuration.fileName or properties.configuration.fileName or properties.Configuration.FileName or properties.configuration.FileName),
-            customFolder = (properties.configruation or properties.Configuration) and (properties.configuration.customFolder or properties.Configuration.CustomFolder or properties.Configuration.customFolder or properties.configuration.CustomFolder)
-        }
+        controls = {},
+
+        configuration = (function()
+            local cfg = properties.configuration or properties.Configuration
+            if not cfg then return {} end
+            return {
+                autoSave = cfg.autoSave or cfg.AutoSave,
+                fileName = cfg.fileName or cfg.FileName,
+                customFolder = cfg.customFolder or cfg.CustomFolder,
+            }
+        end)()
     }, Window)
 
     -- Rayfield Gen2 Screen
@@ -458,20 +463,22 @@ function Window.new(properties)
     })
 
 
+    self.unloaded = false
+
     if self.theme.LiveAnimation then
         task.spawn(function()
             local out = true
             local tweenInfo = TweenInfo.new(10, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
-        
-            while true do
+
+            while not self.unloaded do
                 local tweenS = variables.tweenService:Create(self.shadowGradient, tweenInfo, {
                     Offset = Vector2.new(if out then 0.4 else -0.2, 0), Rotation = (if out then 220 else 280)
                 })
-    
+
                 local tweenW = variables.tweenService:Create(self.windowGradient, tweenInfo, {
                     Offset = Vector2.new(if out then 0.4 else -0.2, 0), Rotation = (if out then 220 else 280)
                 })
-                
+
                 tweenW:Play()
                 tweenS:Play()
                 tweenS.Completed:Wait()
@@ -518,6 +525,20 @@ function Window:CreateTab(properties)
     local newTab = require(script.Parent.tab).new(self, properties)
 
     table.insert(self.tabs, newTab)
+
+    if not newTab.neglectSelector then
+        local isFirstVisible = true
+        for _, tab in self.tabs do
+            if tab ~= newTab and not tab.neglectSelector then
+                isFirstVisible = false
+                break
+            end
+        end
+        if isFirstVisible then
+            newTab:Select(true)
+        end
+    end
+
     return newTab
 end
 
@@ -538,9 +559,9 @@ function Window:Show()
     task.wait(0.1)
 
     if self.icon then variables.tweenService:Create(self.topbarIcon, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play() end
-    variables.tweenService:Create(self.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
+    if self.title then variables.tweenService:Create(self.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play() end
     task.wait(0.1)
-    variables.tweenService:Create(self.subtitle, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0.7}):Play()
+    if self.subtitle then variables.tweenService:Create(self.subtitle, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0.7}):Play() end
 
     -- animation for actions, but should be chnged to get actions another way rather than getchildren
     for _, action in ipairs(self.actionContainer:GetChildren()) do
@@ -582,7 +603,7 @@ function Window:Show()
                 variables.tweenService:Create(element.stroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = self.theme.ElementStrokeTransparency}):Play()
                 variables.tweenService:Create(element.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
                 variables.tweenService:Create(element.main, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
-                if element.icon then variables.tweenService:Create(element.icon, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play() end
+                if element.iconLabel then variables.tweenService:Create(element.iconLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play() end
         
                 if elementType == 'Toggle' then
                     variables.tweenService:Create(element.indicator, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.8}):Play()
@@ -626,14 +647,14 @@ function Window:Show()
             
 end
 
-function getPath()
+function Window:GetPath()
     local path = 'Rayfield Gen2/Script Configurations/'
-    
-    if Window.customFolder then
-        path = path..tostring(Window.configuration.customFolder)..'/'
+
+    if self.configuration.customFolder then
+        path = path..tostring(self.configuration.customFolder)..'/'
     end
 
-    path = path..tostring((Window.configuration.fileName or Window.name))..'.rfld'
+    path = path..tostring((self.configuration.fileName or self.name))..'.rfld'
 
     return path
 end
@@ -645,7 +666,7 @@ end
 -- save/load not done
 -- add studio saving i.e save to datastore for testing w/out execs
 function Window:Save()
-    local path = getPath()
+    local path = self:GetPath()
 
     assert(typeof(path) == "string", "Invalid argument #1 (string expected)")
     -- make custom assert func in utils !! to allow this
@@ -664,12 +685,12 @@ function Window:Save()
 
     local success, parsed = pcall(variables.httpService.JSONEncode, variables.httpService, flags)
     assert(success, "Failed to save configuration: failed to parse flags")
-    utils.createDirectories(path) -- Create folders e.g Rayfield Gen2/ Script Configs blah blah etc/ etc
+    -- TODO: create directories for path
     writefile(path, parsed)
 end
 
 function Window:Load()
-    local path = 'Rayfield Gen2/Script Configurations/CUSTOMFOLDER/'
+    local path = self:GetPath()
 
     assert(typeof(path) == "string", "Invalid argument #1 (string expected)")
     assert(not isfile or isfile(path), "Can't load configuration, file doesn't exist.") -- no message is likely to be for production
@@ -697,11 +718,10 @@ end
 
 function Window:Navigate(tab)
     if typeof(tab) == "string" then
-        if self.elements[tab] then
-            tab = self.elements[tab]
+        local found = self.elements:FindFirstChild(tab)
+        if found then
+            tab = found
         end
-    elseif tab:IsA("ScrollingFrame") then
-        tab = tab
     end
 
     self.elementsLayout:JumpTo(tab)
@@ -738,6 +758,7 @@ function Window:Connect(signal, callback)
 end
 
 function Window:Unload()
+    self.unloaded = true
     for i = #self.connections, 1, -1 do
         self.connections[i]:Disconnect()
     end

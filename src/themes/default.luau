@@ -21,6 +21,7 @@ return {
     ElementStrokeHoverTransparency = 0,
     ElementHoverColor = Color3.fromRGB(35, 35, 35),
     ElementStrokeHover = Color3.fromRGB(50, 50, 50),
+    ElementStrokeHoverColor = Color3.fromRGB(50, 50, 50),
     ElementCornerRadius = UDim.new(0, 12),
     ElementTextHoverColor = Color3.fromRGB(255, 255, 255),
     ElementContentHoverColor = Color3.fromRGB(255, 255, 255),

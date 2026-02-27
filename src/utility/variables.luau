@@ -15,6 +15,7 @@ variables.userInputService = getService("UserInputService")
 variables.guiService = getService("GuiService")
 variables.localPlayer = getService("Players").LocalPlayer
 variables.tweenService = getService('TweenService')
+variables.httpService = getService('HttpService')
 variables.guiContainer =
     if variables.runService:IsStudio() then variables.localPlayer.PlayerGui
     elseif gethui then gethui()
