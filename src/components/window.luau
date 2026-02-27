@@ -441,10 +441,11 @@ function Window.new(properties)
         end
     })
 
-    require(script.Parent.action).new(self, {
+    self.settingsAction = require(script.Parent.action).new(self, {
         name = 'Settings',
         icon = 129180860773723,
         order = 3,
+        linkedTab = self.rfSettings,
 
         callback = function()
             print('navigating to settings')
@@ -604,7 +605,8 @@ function Window:Show()
                 variables.tweenService:Create(element.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
                 variables.tweenService:Create(element.main, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
                 if element.iconLabel then variables.tweenService:Create(element.iconLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play() end
-        
+                if element.descriptor then variables.tweenService:Create(element.descriptor.titleLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0.7}):Play() end
+
                 if elementType == 'Toggle' then
                     variables.tweenService:Create(element.indicator, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.8}):Play()
                     variables.tweenService:Create(element.indicatorStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = 0.7}):Play()

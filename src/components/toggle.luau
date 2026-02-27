@@ -16,6 +16,7 @@ function Toggle.new(tab, properties)
         window = tab.window,
         name = properties.name or properties.Name or "Switch",
         icon = properties.icon or properties.Icon,
+        description = properties.description or properties.Description,
         forgetState = properties.forgetState or properties.ForgetState, -- dont save config for this element if true.
 
         callback = properties.callback or properties.Callback or function() end,
@@ -27,8 +28,6 @@ function Toggle.new(tab, properties)
         Size = UDim2.new(1, -20, 0, 43),
         BorderSizePixel = 0,
         Name = self.name,
-
-        LayoutOrder = 0,
 
         BackgroundTransparency = 1,
 
@@ -285,7 +284,35 @@ function Toggle.new(tab, properties)
         end
     end)
 
+    if self.description then
+        self.descriptor = require(script.Parent.descriptor).new(self.tab, { description = self.description })
+    end
+
     return self
 end
+
+
+function Toggle:MoveTo(index)
+    self.tab:_moveElement(self, index)
+end
+
+function Toggle:MoveToTop()
+    self.tab:_moveElement(self, 1)
+end
+
+function Toggle:MoveToBottom()
+    self.tab:_moveElement(self, #self.tab.elements)
+end
+
+function Toggle:MoveUp()
+    local idx = table.find(self.tab.elements, self)
+    if idx then self.tab:_moveElement(self, idx - 1) end
+end
+
+function Toggle:MoveDown()
+    local idx = table.find(self.tab.elements, self)
+    if idx then self.tab:_moveElement(self, idx + 1) end
+end
+
 
 return Toggle

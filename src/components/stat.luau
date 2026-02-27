@@ -16,6 +16,7 @@ function Statistic.new(tab, properties)
         window = tab.window,
         name = properties.name or properties.Name or "Statistic",
         icon = properties.icon or properties.Icon,
+        description = properties.description or properties.Description,
 
         callback = properties.callback or properties.Callback or function() end,
 
@@ -27,7 +28,6 @@ function Statistic.new(tab, properties)
         BorderSizePixel = 0,
         Name = self.name,
 
-        LayoutOrder = 0,
         BackgroundColor3 = Color3.fromRGB(25, 25, 25),
 
         BackgroundTransparency = 1,
@@ -246,7 +246,35 @@ function Statistic.new(tab, properties)
         end
     end)
 
+    if self.description then
+        self.descriptor = require(script.Parent.descriptor).new(self.tab, { description = self.description })
+    end
+
     return self
 end
+
+
+function Statistic:MoveTo(index)
+    self.tab:_moveElement(self, index)
+end
+
+function Statistic:MoveToTop()
+    self.tab:_moveElement(self, 1)
+end
+
+function Statistic:MoveToBottom()
+    self.tab:_moveElement(self, #self.tab.elements)
+end
+
+function Statistic:MoveUp()
+    local idx = table.find(self.tab.elements, self)
+    if idx then self.tab:_moveElement(self, idx - 1) end
+end
+
+function Statistic:MoveDown()
+    local idx = table.find(self.tab.elements, self)
+    if idx then self.tab:_moveElement(self, idx + 1) end
+end
+
 
 return Statistic
