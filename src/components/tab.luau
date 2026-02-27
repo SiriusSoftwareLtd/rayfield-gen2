@@ -193,9 +193,7 @@ function Tab.new(window, properties)
         end)
     end
 
-    if #self.window.tabs == 1 then
-        self:Select(true)
-    end
+    -- Auto-select is handled by Window:CreateTab after insertion
 
     self.window:Connect(self.window.signal, function(command)
         if command == 'hide' then

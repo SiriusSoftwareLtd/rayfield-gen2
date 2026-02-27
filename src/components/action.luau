@@ -22,7 +22,7 @@ function Action.new(window, properties)
         Name = self.name,
         BorderSizePixel = 0,
 
-        LayoutOrder = -properties.order or 0,
+        LayoutOrder = -(properties.order or 0),
         Size = UDim2.fromOffset(24, 24),
         BackgroundTransparency = 1,
 
