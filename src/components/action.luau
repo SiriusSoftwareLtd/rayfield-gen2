@@ -15,7 +15,8 @@ function Action.new(window, properties)
         window = assert(window, "Missing argument #1 (Window expected)"),
         name = properties.name or properties.Name or "Action",
         icon = assert(properties.icon or properties.Icon, "Missing argument (Icon expected)"),
-        callback = assert(properties.callback or properties.Callback, "Missing argument (Function expected)")
+        callback = assert(properties.callback or properties.Callback, "Missing argument (Function expected)"),
+        linkedTab = properties.linkedTab or properties.LinkedTab,
     }, Action)
 
     self.action = self.window:Create("Frame", {
@@ -62,8 +63,10 @@ function Action.new(window, properties)
         variables.tweenService:Create(self.iconLabel, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.2}):Play()
     end)
     
-    self.window:Connect(self.interact.MouseLeave, function() 
-        variables.tweenService:Create(self.iconLabel, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.6}):Play()
+    self.window:Connect(self.interact.MouseLeave, function()
+        if not (self.linkedTab and self.window.selectedTab == self.linkedTab) then
+            variables.tweenService:Create(self.iconLabel, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.6}):Play()
+        end
     end)
 
     self.window:Connect(self.window.signal, function(command)
@@ -71,7 +74,8 @@ function Action.new(window, properties)
 
         elseif command == 'show' then
             task.wait(0.6)
-            variables.tweenService:Create(self.iconLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.6}):Play()
+            local isActive = self.linkedTab and self.window.selectedTab == self.linkedTab
+            variables.tweenService:Create(self.iconLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = if isActive then 0.2 else 0.6}):Play()
         end
     end)
 

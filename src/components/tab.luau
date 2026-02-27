@@ -239,7 +239,11 @@ function Tab:Select(noAnimation)
         if tab ~= self.window.selectedTab then
             tab:Deselect()
         end
-    end 
+    end
+
+    if self ~= self.window.rfSettings and self.window.settingsAction and not noAnimation then
+        variables.tweenService:Create(self.window.settingsAction.iconLabel, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.6}):Play()
+    end
 end
 
 function Tab:Deselect()
@@ -254,10 +258,18 @@ function Tab:Deselect()
     end
 end
 
+local function assignOrder(element, order)
+    element.main.LayoutOrder = order
+    if element.descriptor then
+        element.descriptor.main.LayoutOrder = order + 1
+    end
+end
+
 -- Button
 function Tab:CreateButton(properties)
     local newElement = require(script.Parent.button).new(self, properties)
     table.insert(self.elements, newElement)
+    assignOrder(newElement, #self.elements * 10)
 
     return newElement
 end
@@ -267,25 +279,35 @@ end
 function Tab:CreateToggle(properties)
     local newElement = require(script.Parent.toggle).new(self, properties)
     table.insert(self.elements, newElement)
+    assignOrder(newElement, #self.elements * 10)
 
     return newElement
 end
 
 function Tab:CreateSwitch(properties)
-    local newElement = require(script.Parent.toggle).new(self, properties)
-    table.insert(self.elements, newElement)
-
-    return newElement
+    return self:CreateToggle(properties)
 end
 
 -- Stat
 function Tab:CreateStat(properties)
     local newElement = require(script.Parent.stat).new(self, properties)
     table.insert(self.elements, newElement)
+    assignOrder(newElement, #self.elements * 10)
 
     return newElement
 end
 
+
+function Tab:_moveElement(element, targetIndex)
+    local idx = table.find(self.elements, element)
+    if not idx then return end
+    table.remove(self.elements, idx)
+    targetIndex = math.clamp(targetIndex, 1, #self.elements + 1)
+    table.insert(self.elements, targetIndex, element)
+    for i, el in self.elements do
+        assignOrder(el, i * 10)
+    end
+end
 
 function Tab:Remove()
     -- remove tab
