@@ -11,7 +11,7 @@ local window = Rayfield:CreateWindow({
     configuration = {
         autoSave = true,
         autoLoad = true,
-        fileName = 'ExampleConfig',
+        fileName = 'ExampleConfigFile',
     },
 })
 
