@@ -48,7 +48,7 @@ if hasNativeFS then
 	function filesystem.delfolder(path)
 		delfolder(path)
 	end
-else
+elseif isStudio then
 	-- Studio simulation using Instance hierarchy under ReplicatedStorage.
 	-- Files are StringValues, folders are Folders. Glass is glass.
 
