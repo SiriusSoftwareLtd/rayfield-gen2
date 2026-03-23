@@ -288,6 +288,15 @@ function Tab:CreateSwitch(properties)
     return self:CreateToggle(properties)
 end
 
+-- Section
+function Tab:CreateSection(properties)
+    local newElement = require(script.Parent.section).new(self, properties)
+    table.insert(self.elements, newElement)
+    assignOrder(newElement, #self.elements * 10)
+
+    return newElement
+end
+
 -- Stat
 function Tab:CreateStat(properties)
     local newElement = require(script.Parent.stat).new(self, properties)
