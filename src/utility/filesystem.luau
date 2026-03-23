@@ -50,10 +50,10 @@ if hasNativeFS then
 	end
 else
 	-- Studio simulation using Instance hierarchy under ReplicatedStorage.
-	-- Files are StringValues, folders are Folders.
+	-- Files are StringValues, folders are Folders. Glass is glass.
 
 	local root = Instance.new("Folder")
-	root.Name = "RayfieldFileSystem"
+	root.Name = "Filesystem"
 	root.Parent = game:GetService("ReplicatedStorage")
 
 	local function splitPath(path)
