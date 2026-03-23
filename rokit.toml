@@ -1,6 +1,6 @@
 # Rokit for Rayfield Gen2
 
 [tools]
-lune = "lune-org/lune@0.10.4"
+lune = "lune-org/lune@0.8.9"
 darklua = "seaofvoices/darklua@0.18.0"
 rojo = "rojo-rbx/rojo@7.6.1"
