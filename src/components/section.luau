@@ -16,27 +16,29 @@ function Section.new(tab, properties)
         window = tab.window,
         name = properties.name or properties.Name or "Section",
         icon = properties.icon or properties.Icon,
-
-        callback = properties.callback or properties.Callback or function() end
     }, Section)
 
     self.main = self.window:Create("Frame", {
-        Size = UDim2.new(1, -20, 0, 43),
+        Size = UDim2.new(1, -40, 0, 20),
         BorderSizePixel = 0,
         Name = self.name,
-
-        -- Animation
-        BackgroundTransparency = 1, -- In = 0
-
+        BackgroundTransparency = 1,
         Parent = self.tab.tabPage,
-    }, {BackgroundColor3 = 'ElementColor', BackgroundTransparency = 'ElementTransparency'})
+    })
 
-    
+    self.window:Create("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        Padding = UDim.new(0, 6),
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        VerticalAlignment = Enum.VerticalAlignment.Top,
+        Parent = self.main,
+    })
+
     if self.icon then
         self.iconLabel = self.window:Create("ImageLabel", {
             -- Configurables
             Image = 'rbxassetid://'..tostring(self.icon),
-            
+
             -- Theming
             ImageColor3 = Color3.fromRGB(255, 255, 255),
 
@@ -44,30 +46,30 @@ function Section.new(tab, properties)
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
 
-            -- Animations
-            ImageTransparency = 1, -- In = 0
-       
-            Parent = self.container
+            -- Animation
+            ImageTransparency = 1, -- In = 0.65
+
+            Parent = self.main
         }, {ImageColor3 = 'ContentColor'})
     end
 
     self.title = self.window:Create("TextLabel", {
         -- Configurables
-        Text = self.name, -- tab name
+        Text = self.name,
 
-        Size = UDim2.fromOffset(250, 16),
+        Size = UDim2.fromOffset(0, 16),
         BorderSizePixel = 0,
         BackgroundTransparency = 1,
-        TextSize = 16,
+        TextSize = 15,
         AutomaticSize = Enum.AutomaticSize.X,
         TextXAlignment = Enum.TextXAlignment.Left,
         TextWrapped = true,
         LayoutOrder = 1,
 
         -- Animation
-        TextTransparency = 1, -- In = 0
-    
-        Parent = self.container
+        TextTransparency = 1, -- In = 0.6
+
+        Parent = self.main
     }, {TextColor3 = 'ContentColor', FontFace = 'Font'})
 
     self.window:Connect(self.window.signal, function(command)
@@ -75,14 +77,35 @@ function Section.new(tab, properties)
 
         elseif command == 'show' then
             task.wait(0.7)
-            variables.tweenService:Create(self.stroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeTransparency}):Play()
-            variables.tweenService:Create(self.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
-            variables.tweenService:Create(self.main, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
-            if self.icon then variables.tweenService:Create(self.iconLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play() end
+            variables.tweenService:Create(self.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0.6}):Play()
+            if self.icon then variables.tweenService:Create(self.iconLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.65}):Play() end
         end
     end)
 
     return self
+end
+
+
+function Section:MoveTo(index)
+    self.tab:_moveElement(self, index)
+end
+
+function Section:MoveToTop()
+    self.tab:_moveElement(self, 1)
+end
+
+function Section:MoveToBottom()
+    self.tab:_moveElement(self, #self.tab.elements)
+end
+
+function Section:MoveUp()
+    local idx = table.find(self.tab.elements, self)
+    if idx then self.tab:_moveElement(self, idx - 1) end
+end
+
+function Section:MoveDown()
+    local idx = table.find(self.tab.elements, self)
+    if idx then self.tab:_moveElement(self, idx + 1) end
 end
 
 

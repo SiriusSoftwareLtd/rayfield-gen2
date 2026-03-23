@@ -19,10 +19,17 @@ function Toggle.new(tab, properties)
         description = properties.description or properties.Description,
         forgetState = properties.forgetState or properties.ForgetState, -- dont save config for this element if true.
 
+        flag = properties.flag or properties.Flag,
+
         callback = properties.callback or properties.Callback or function() end,
 
         value = if (properties.value or properties.Value) ~= nil then (properties.value or properties.Value) else false,
     }, Toggle)
+
+    -- Register as a saveable control if flagged
+    if self.flag and not self.forgetState then
+        self.window.controls[self.flag] = self
+    end
 
     self.main = self.window:Create("Frame", {
         Size = UDim2.new(1, -20, 0, 43),
@@ -145,10 +152,10 @@ function Toggle.new(tab, properties)
         BorderSizePixel = 0,
 
         Size = UDim2.fromOffset(17, 17),
-        Position = UDim2.new(1, -40, 0.5, 0),
+        Position = self.value and UDim2.new(1, -20, 0.5, 0) or UDim2.new(1, -40, 0.5, 0),
         AnchorPoint = Vector2.new(0, 0.5),
         
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BackgroundColor3 = self.value and Color3.fromRGB(23, 153, 110) or Color3.fromRGB(255, 255, 255),
 
         -- Animation
         BackgroundTransparency = 1, -- In = 0.8
@@ -164,7 +171,7 @@ function Toggle.new(tab, properties)
     })
 
     self.indicatorStroke = self.window:Create("UIStroke", {
-        Color = Color3.fromRGB(255, 255, 255),
+        Color = self.value and Color3.fromRGB(32, 201, 144) or Color3.fromRGB(255, 255, 255),
 
         -- Animation
         Transparency = 1, -- In = 0.7
@@ -231,14 +238,12 @@ function Toggle.new(tab, properties)
             variables.tweenService:Create(self.indicatorStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = 0.7}):Play()
         end
 
-        task.spawn(function() 
+        task.spawn(function()
             local success, result = pcall(function()
                 self.callback(self.value)
-            end) 
+            end)
 
             if not success then
-                -- LOG ERROR IN WORKSPACE FILE. e.g logs.rfld 
-
                 variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = self.window.theme.ErrorColor}):Play()
                 variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = self.window.theme.ErrorStrokeColor}):Play()
                 self.title.Text = 'Error, log recorded in console.'
@@ -253,6 +258,10 @@ function Toggle.new(tab, properties)
                 variables.tweenService:Create(self.stroke, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = self.window.theme.ElementStroke}):Play()
             end
         end)
+
+        if self.flag and not self.forgetState and self.window.configuration.autoSave then
+            task.spawn(self.window.Save, self.window)
+        end
 
         task.wait(0.11)
 
@@ -314,5 +323,27 @@ function Toggle:MoveDown()
     if idx then self.tab:_moveElement(self, idx + 1) end
 end
 
+function Toggle:Set(value, skipCallback)
+    if self.value == value then return end
+    self.value = value
+
+    if value then
+        variables.tweenService:Create(self.indicator, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Position = UDim2.new(1, -20, 0.5, 0)}):Play()
+        variables.tweenService:Create(self.indicator, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(23, 153, 110)}):Play()
+        variables.tweenService:Create(self.indicator, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
+        variables.tweenService:Create(self.indicatorStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Color = Color3.fromRGB(32, 201, 144)}):Play()
+        variables.tweenService:Create(self.indicatorStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = 0}):Play()
+    else
+        variables.tweenService:Create(self.indicator, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Position = UDim2.new(1, -40, 0.5, 0)}):Play()
+        variables.tweenService:Create(self.indicator, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+        variables.tweenService:Create(self.indicator, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.8}):Play()
+        variables.tweenService:Create(self.indicatorStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Color = Color3.fromRGB(255, 255, 255)}):Play()
+        variables.tweenService:Create(self.indicatorStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = 0.7}):Play()
+    end
+
+    if not skipCallback then
+        task.spawn(self.callback, self.value)
+    end
+end
 
 return Toggle

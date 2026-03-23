@@ -8,6 +8,41 @@ local utility = script.Parent.Parent.utility
 -- Variables
 local variables = require(utility.variables)
 
+-- Colors
+local COLOR_POSITIVE = Color3.fromRGB(0, 170, 127)
+local COLOR_NEGATIVE = Color3.fromRGB(220, 60, 60)
+local COLOR_NEUTRAL = Color3.fromRGB(50, 140, 220)
+
+local function formatPct(pct)
+    if pct > 0 then
+        return string.format("+%.1f%%", pct)
+    elseif pct < 0 then
+        return string.format("%.1f%%", pct)
+    else
+        return "0%"
+    end
+end
+
+local function formatValue(value)
+    if typeof(value) ~= "number" then
+        return tostring(value)
+    end
+    local s = tostring(math.abs(math.floor(value)))
+    local result = s:reverse():gsub("%d%d%d", "%0,"):reverse()
+    if result:sub(1, 1) == "," then result = result:sub(2) end
+    return if value < 0 then "-" .. result else result
+end
+
+local function formatChange(delta)
+    if delta > 0 then
+        return "+" .. formatValue(math.round(delta))
+    elseif delta < 0 then
+        return formatValue(math.round(delta))
+    else
+        return "0"
+    end
+end
+
 function Statistic.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
 
@@ -20,7 +55,23 @@ function Statistic.new(tab, properties)
 
         callback = properties.callback or properties.Callback or function() end,
 
-        value = if (properties.value or properties.Value) ~= nil then (properties.value or properties.Value) else false,
+        value = if (properties.value or properties.Value) ~= nil then (properties.value or properties.Value) else 0,
+
+        numberEasing = if (properties.numberEasing ~= nil) then properties.numberEasing
+        elseif (properties.NumberEasing ~= nil) then properties.NumberEasing
+        else true,
+
+        changeMode = properties.changeMode or properties.ChangeMode or "percentage", -- "percentage" | "absolute"
+        changeBaseline = properties.changeBaseline or properties.ChangeBaseline or "previous",
+
+        prefix = properties.prefix or properties.Prefix or "",
+        suffix = properties.suffix or properties.Suffix or "",
+
+        _initialValue = nil,
+        _displayedValue = nil,
+        _valueAnimTask = nil,
+        _displayedPct = nil,
+        _pctAnimTask = nil,
     }, Statistic)
 
     self.main = self.window:Create("Frame", {
@@ -49,7 +100,7 @@ function Statistic.new(tab, properties)
     self.strokeGradient = self.window:Create("UIGradient", {
         Rotation = 80,
         Offset = Vector2.new(0, 0.5),
-        Color = ColorSequence.new(Color3.fromRGB(0, 170, 127)),
+        Color = ColorSequence.new(COLOR_NEUTRAL),
         Transparency = NumberSequence.new({
             NumberSequenceKeypoint.new(0, 0.85),
             NumberSequenceKeypoint.new(1, 0),
@@ -128,7 +179,7 @@ function Statistic.new(tab, properties)
     self.mainGradient = self.window:Create("UIGradient", {
         Rotation = 80,
         Offset = Vector2.new(0, 0.5),
-        Color = ColorSequence.new(Color3.fromRGB(0, 170, 127)),
+        Color = ColorSequence.new(COLOR_NEUTRAL),
         Transparency = NumberSequence.new({
             NumberSequenceKeypoint.new(0, 0.85),
             NumberSequenceKeypoint.new(1, 0),
@@ -141,7 +192,7 @@ function Statistic.new(tab, properties)
     self.glowGradient = self.window:Create("UIGradient", {
         Rotation = 80,
         Offset = Vector2.new(0, 0.5),
-        Color = ColorSequence.new(Color3.fromRGB(0, 170, 127)),
+        Color = ColorSequence.new(COLOR_NEUTRAL),
         Transparency = NumberSequence.new({
             NumberSequenceKeypoint.new(0, 0.85),
             NumberSequenceKeypoint.new(1, 0),
@@ -186,7 +237,7 @@ function Statistic.new(tab, properties)
 
     self.valueLabel = self.window:Create("TextLabel", {
         -- Configurables
-        Text = tostring(self.value),
+        Text = self.prefix .. formatValue(self.value) .. self.suffix,
 
         AnchorPoint = Vector2.new(0, 1),
         Position = UDim2.new(0, 20, 1, -15),
@@ -207,7 +258,7 @@ function Statistic.new(tab, properties)
 
     self.changeLabel = self.window:Create("TextLabel", {
         -- Configurables
-        Text = '+0%',
+        Text = '0%',
 
         AnchorPoint = Vector2.new(1, 1),
         Position = UDim2.new(1, -20, 1, -15),
@@ -220,7 +271,7 @@ function Statistic.new(tab, properties)
         LayoutOrder = 1,
         ZIndex = 10,
 
-        TextColor3 = Color3.fromRGB(29, 220, 115),
+        TextColor3 = COLOR_NEUTRAL,
 
         -- Animation
         TextTransparency = 1, -- In = 0
@@ -251,6 +302,140 @@ function Statistic.new(tab, properties)
     end
 
     return self
+end
+
+
+function Statistic:_setAccentColor(color, direction)
+    local seq = ColorSequence.new(color)
+    self.strokeGradient.Color = seq
+    self.mainGradient.Color = seq
+    self.glowGradient.Color = seq
+
+    -- Subtle rotation + offset shift to give the gradient a bit of life
+    local rotation = if direction == 1 then 92 elseif direction == -1 then 68 else 80
+    local offset = if direction == 1 then Vector2.new(0.04, 0.5) elseif direction == -1 then Vector2.new(-0.04, 0.5) else Vector2.new(0, 0.5)
+    local gradientTweenInfo = TweenInfo.new(0.6, Enum.EasingStyle.Exponential)
+    for _, gradient in { self.strokeGradient, self.mainGradient, self.glowGradient } do
+        variables.tweenService:Create(gradient, gradientTweenInfo, { Rotation = rotation, Offset = offset }):Play()
+    end
+
+    variables.tweenService:Create(self.glowImage, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageColor3 = color}):Play()
+    variables.tweenService:Create(self.changeLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextColor3 = color}):Play()
+end
+
+function Statistic:_formatValue(value)
+    return self.prefix .. formatValue(value) .. self.suffix
+end
+
+function Statistic:_formatChange(delta)
+    if self.changeMode == "absolute" then
+        return formatChange(delta)
+    else
+        return formatPct(delta)
+    end
+end
+
+function Statistic:Set(value)
+    assert(typeof(value) == "number", "Statistic:Set() - value must be a number, got " .. typeof(value))
+
+    local previousValue = self.value
+    local hasNoHistory = (previousValue == false or previousValue == nil)
+    self.value = value
+
+    if hasNoHistory then
+        self._initialValue = value
+    end
+
+    local refValue = if self.changeBaseline == "initial" then self._initialValue else previousValue
+    local noChange = hasNoHistory or refValue == value
+
+    -- Determine target change, color, and direction
+    local targetChange, infinityText, color, direction
+    if noChange then
+        targetChange = 0
+        color = COLOR_NEUTRAL
+        direction = 0
+    elseif refValue == 0 then
+        local sign = if value > 0 then "+" else "-"
+        local suffix = if self.changeMode == "percentage" then "∞%" else "∞"
+        infinityText = sign .. suffix
+        color = if value > 0 then COLOR_POSITIVE else COLOR_NEGATIVE
+        direction = if value > 0 then 1 else -1
+    elseif self.changeMode == "percentage" then
+        targetChange = ((value - refValue) / math.abs(refValue)) * 100
+        direction = if targetChange > 0 then 1 elseif targetChange < 0 then -1 else 0
+        color = if direction == 1 then COLOR_POSITIVE elseif direction == -1 then COLOR_NEGATIVE else COLOR_NEUTRAL
+    else
+        targetChange = value - refValue
+        direction = if targetChange > 0 then 1 elseif targetChange < 0 then -1 else 0
+        color = if direction == 1 then COLOR_POSITIVE elseif direction == -1 then COLOR_NEGATIVE else COLOR_NEUTRAL
+    end
+
+    self:_setAccentColor(color, direction)
+
+    -- Cancel any in-progress animations
+    if self._valueAnimTask then
+        task.cancel(self._valueAnimTask)
+        self._valueAnimTask = nil
+    end
+    if self._pctAnimTask then
+        task.cancel(self._pctAnimTask)
+        self._pctAnimTask = nil
+    end
+
+    -- Animate value label
+    if self.numberEasing and not hasNoHistory then
+        local startVal = if self._displayedValue ~= nil then self._displayedValue else previousValue
+        local startTime = tick()
+
+        self._valueAnimTask = task.spawn(function()
+            repeat
+                local alpha = math.min((tick() - startTime) / 0.5, 1)
+                local current = startVal + (value - startVal) * (1 - (1 - alpha) ^ 3)
+                self._displayedValue = current
+                self.valueLabel.Text = self:_formatValue(math.round(current))
+                task.wait()
+            until alpha >= 1
+            self._displayedValue = value
+            self.valueLabel.Text = self:_formatValue(value)
+        end)
+    else
+        self._displayedValue = value
+        self.valueLabel.Text = self:_formatValue(value)
+    end
+
+    -- Animate change label
+    if infinityText then
+        self.changeLabel.Text = infinityText
+        self._displayedPct = nil
+    elseif self.numberEasing and not noChange then
+        local startChange = if self._displayedPct ~= nil then self._displayedPct else 0
+        local startTime = tick()
+
+        self._pctAnimTask = task.spawn(function()
+            repeat
+                local alpha = math.min((tick() - startTime) / 0.5, 1)
+                local current = startChange + (targetChange - startChange) * (1 - (1 - alpha) ^ 3)
+                self._displayedPct = current
+                self.changeLabel.Text = self:_formatChange(current)
+                task.wait()
+            until alpha >= 1
+            self._displayedPct = targetChange
+            self.changeLabel.Text = self:_formatChange(targetChange)
+        end)
+    else
+        self._displayedPct = targetChange
+        self.changeLabel.Text = self:_formatChange(targetChange or 0)
+    end
+end
+
+function Statistic:ResetBaseline(newBaseline)
+    local baseline = if typeof(newBaseline) == "number" then newBaseline else self.value
+    self._initialValue = baseline
+    self.value = baseline
+    self._displayedPct = 0
+    self.changeLabel.Text = self:_formatChange(0)
+    self:_setAccentColor(COLOR_NEUTRAL, 0)
 end
 
 

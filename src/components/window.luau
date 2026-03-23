@@ -3,6 +3,7 @@
 -- Utility
 local utility = script.Parent.Parent.utility
 local SignalEngine = require(utility.SignalEngine)
+local filesystem = require(utility.filesystem)
 
 -- Variables
 local variables = require(utility.variables)
@@ -42,6 +43,7 @@ function Window.new(properties)
             if not cfg then return {} end
             return {
                 autoSave = cfg.autoSave or cfg.AutoSave,
+                autoLoad = cfg.autoLoad or cfg.AutoLoad,
                 fileName = cfg.fileName or cfg.FileName,
                 customFolder = cfg.customFolder or cfg.CustomFolder,
             }
@@ -548,7 +550,9 @@ function Window:Hide()
 end
 
 function Window:Show()
-    --self.signal:Fire('show')
+    if self.configuration.autoLoad then
+        self:Load()
+    end
 
     self.drag.drag.Visible = false
     self.main.Visible = true
@@ -598,22 +602,29 @@ function Window:Show()
 
     for _, tab in pairs(self.tabs) do
         if self.selectedTab == tab then
-            for _, element in ipairs(tab.elements) do
+            local perElementDelay = 0.03
+            local maxStaggeredElements = math.floor(2 / perElementDelay)
+
+            for elementIndex, element in ipairs(tab.elements) do
                 local elementType = element.__type
-        
-                variables.tweenService:Create(element.stroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = self.theme.ElementStrokeTransparency}):Play()
-                variables.tweenService:Create(element.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
-                variables.tweenService:Create(element.main, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
-                if element.iconLabel then variables.tweenService:Create(element.iconLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play() end
-                if element.descriptor then variables.tweenService:Create(element.descriptor.titleLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0.7}):Play() end
+
+                if elementType == 'Section' then
+                    variables.tweenService:Create(element.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0.6}):Play()
+                    if element.iconLabel then variables.tweenService:Create(element.iconLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.65}):Play() end
+                else
+                    variables.tweenService:Create(element.stroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = self.theme.ElementStrokeTransparency}):Play()
+                    variables.tweenService:Create(element.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
+                    variables.tweenService:Create(element.main, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
+                    if element.iconLabel then variables.tweenService:Create(element.iconLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play() end
+                    if element.descriptor then variables.tweenService:Create(element.descriptor.titleLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0.7}):Play() end
+                end
 
                 if elementType == 'Toggle' then
-                    variables.tweenService:Create(element.indicator, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.8}):Play()
-                    variables.tweenService:Create(element.indicatorStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = 0.7}):Play()
+                    variables.tweenService:Create(element.indicator, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = element.value and 0 or 0.8}):Play()
+                    variables.tweenService:Create(element.indicatorStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = element.value and 0 or 0.7}):Play()
                     variables.tweenService:Create(element.overlay, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
                     variables.tweenService:Create(element.containerStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = 0.85}):Play()
                     variables.tweenService:Create(element.functionContainer, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.9}):Play()
-                    -- this will be changed when :Set is ran after config is loaded.
                 elseif elementType == 'Button' then
         
                 elseif elementType == 'Statistic' then
@@ -623,19 +634,38 @@ function Window:Show()
                     variables.tweenService:Create(element.changeLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
                 end
 
-                --max out the wait at a certain amount of elements as to not have too long anims.
-                task.wait(0.03)
+                if elementIndex <= maxStaggeredElements then
+                    task.wait(perElementDelay)
+                end
             end
         else
             for _, element in ipairs(tab.elements) do
                 local elementType = element.__type
-    
-                -- instant tween it all..
-    
+
+                -- instant set all properties so they're visible when navigated to
+
+                if elementType == 'Section' then
+                    element.title.TextTransparency = 0.6
+                    if element.iconLabel then element.iconLabel.ImageTransparency = 0.65 end
+                else
+                    element.stroke.Transparency = self.theme.ElementStrokeTransparency
+                    element.title.TextTransparency = 0
+                    element.main.BackgroundTransparency = 0
+                    if element.iconLabel then element.iconLabel.ImageTransparency = 0 end
+                    if element.descriptor then element.descriptor.titleLabel.TextTransparency = 0.7 end
+                end
+
                 if elementType == 'Toggle' then
-        
-                elseif elementType == 'Button' then
-    
+                    element.indicator.BackgroundTransparency = if element.value then 0 else 0.8
+                    element.indicatorStroke.Transparency = if element.value then 0 else 0.7
+                    element.overlay.BackgroundTransparency = 0
+                    element.containerStroke.Transparency = 0.85
+                    element.functionContainer.BackgroundTransparency = 0.9
+                elseif elementType == 'Statistic' then
+                    element.gradientContainer.BackgroundTransparency = 0.7
+                    element.glowImage.ImageTransparency = 0.6
+                    element.valueLabel.TextTransparency = 0
+                    element.changeLabel.TextTransparency = 0
                 end
             end
         end
@@ -650,29 +680,40 @@ function Window:Show()
 end
 
 function Window:GetPath()
-    local path = 'Rayfield Gen2/Script Configurations/'
+    local dir = 'Rayfield/Configurations'
 
     if self.configuration.customFolder then
-        path = path..tostring(self.configuration.customFolder)..'/'
+        dir = dir .. '/' .. tostring(self.configuration.customFolder)
     end
 
-    path = path..tostring((self.configuration.fileName or self.name))..'.rfld'
+    local fileName = tostring(self.configuration.fileName or self.name) .. '.rfld'
 
-    return path
+    return dir, dir .. '/' .. fileName
+end
+
+function Window:EnsureDirectory()
+    local dir = self:GetPath()
+
+    local parts = {}
+    for part in string.gmatch(dir, "[^/]+") do
+        table.insert(parts, part)
+    end
+
+    local built = ''
+    for _, part in parts do
+        built = if built == '' then part else built .. '/' .. part
+        if not filesystem.isfolder(built) then
+            filesystem.makefolder(built)
+        end
+    end
 end
 
 function Window:Modify(element, newValue)
     -- e.g change title or subtitle text
 end
 
--- save/load not done
--- add studio saving i.e save to datastore for testing w/out execs
 function Window:Save()
-    local path = self:GetPath()
-
-    assert(typeof(path) == "string", "Invalid argument #1 (string expected)")
-    -- make custom assert func in utils !! to allow this
-    assert(writefile ~= nil, "Failed to save configuration. No writing capabilities.")
+    local _, fullPath = self:GetPath()
 
     local flags = {}
     for flag, control in self.controls do
@@ -685,24 +726,49 @@ function Window:Save()
         flags[flag] = value
     end
 
-    local success, parsed = pcall(variables.httpService.JSONEncode, variables.httpService, flags)
-    assert(success, "Failed to save configuration: failed to parse flags")
-    -- TODO: create directories for path
-    writefile(path, parsed)
+    local encodeSuccess, encoded = pcall(variables.httpService.JSONEncode, variables.httpService, flags)
+    if not encodeSuccess then
+        warn("Rayfield: Failed to encode configuration - " .. tostring(encoded))
+        return false
+    end
+
+    local ok, err = pcall(function()
+        self:EnsureDirectory()
+        filesystem.writefile(fullPath, encoded)
+    end)
+
+    if not ok then
+        warn("Rayfield: Failed to save configuration - " .. tostring(err))
+        return false
+    end
+
+    return true
 end
 
 function Window:Load()
-    local path = self:GetPath()
+    local dir, fullPath = self:GetPath()
 
-    assert(typeof(path) == "string", "Invalid argument #1 (string expected)")
-    assert(not isfile or isfile(path), "Can't load configuration, file doesn't exist.") -- no message is likely to be for production
+    if not filesystem.isfile(fullPath) then return false end
 
-    local config = assert(readfile and readfile(path), "Failed to load config: couldn't read config")
-    local success, parsed = pcall(variables.httpService.JSONDecode, variables.httpService, config)
+    local readOk, config = pcall(filesystem.readfile, fullPath)
+    if not readOk or not config then
+        warn("Rayfield: Failed to read configuration file")
+        return false
+    end
 
-    assert(success, "Can't load configuration, the file has an issue decoding.")
-    -- make new file with old data and call it CONFIGNAME (Incorrect Format).rfld
-    -- then delete old file
+    local decodeOk, parsed = pcall(variables.httpService.JSONDecode, variables.httpService, config)
+
+    if not decodeOk then
+        -- Backup the corrupt file and remove the original
+        warn("Rayfield: Configuration file has an invalid format, backing up and resetting")
+        local backupPath = dir .. '/' .. tostring(self.configuration.fileName or self.name) .. ' (Incorrect Format).rfld'
+        pcall(function()
+            self:EnsureDirectory()
+            filesystem.writefile(backupPath, config)
+            filesystem.delfile(fullPath)
+        end)
+        return false
+    end
 
     for flag, control in self.controls do
         local value = parsed[flag]
@@ -713,9 +779,11 @@ function Window:Load()
             if control.__type == "Keybind" and value ~= nil then
                 value = Enum[value[1]]:FromValue(value[2])
             end
-            control:Set(value)
+            control:Set(value, true)
         end
     end
+
+    return true
 end
 
 function Window:Navigate(tab)

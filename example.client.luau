@@ -1,128 +1,106 @@
 local rep = game:GetService("ReplicatedStorage")
-
 local Rayfield = require(rep.Rayfield)
 
 task.wait(2)
+
 local window = Rayfield:CreateWindow({
-    name = 'Window',
+    name = 'Example',
     subtitle = 'Rayfield Gen2',
-    --icon = 118726904892537,
+    theme = 'default',
 
-    theme = 'default'
+    configuration = {
+        autoSave = true,
+        autoLoad = true,
+        fileName = 'ExampleConfig',
+    },
 })
 
-local tab = window:CreateTab({
-    name = 'Tab Example 1',
-    icon = 91452555903853,
-})
-window:CreateTab({
-    name = 'Tab Example 2',
-    icon = 91452555903853,
+
+-- General
+local generalTab = window:CreateTab({
+    name = 'General',
+    icon = 93364949241311,
 })
 
-tab:CreateStat({
-    name = 'Stat',
-    -- other stuff
-    
-    callback = function()
-        --window:ChangeTheme('default')
-    end
-})
+generalTab:CreateSection({ name = 'Gameplay' })
 
-tab:CreateButton({
-    name = 'Button',
-    -- other stuff
-    
-    callback = function()
-        --window:ChangeTheme('default')
-    end
-})
-
-tab:CreateToggle({
-    name = 'Switch',
-    description = 'This is a description for the switch component, it can be pretty long so it will automatically wrap around to the next line.',
-    -- other stuffss
-    
+generalTab:CreateToggle({
+    name = 'Auto Sprint',
+    icon = 84750991656135,
+    flag = 'AutoSprint',
+    value = true,
     callback = function(value)
-        print(value)
+        print('Auto Sprint:', value)
     end
 })
 
-tab:CreateButton({
-    name = 'Button',
-    -- other stuff
-    
-    callback = function()
-        --window:ChangeTheme('default')
-    end
-})
-
-
-local buttontest = tab:CreateButton({
-    name = 'Button 1',
-    -- other stuff
-    
-    callback = function()
-        --window:ChangeTheme('default')
-    end
-})
-
-tab:CreateToggle({
-    name = 'Switch 1',
-    -- other stuffss
-    
+generalTab:CreateToggle({
+    name = 'Reduced Motion',
+    description = 'Disables screen shake and camera effects for a smoother experience.',
+    flag = 'ReducedMotion',
     callback = function(value)
-        print(value)
+        print('Reduced Motion:', value)
     end
 })
 
+generalTab:CreateSection({ name = 'Interface' })
 
-
-tab:CreateSwitch({
-    name = 'Switch 2',
-    -- other stuffss
-    
+generalTab:CreateToggle({
+    name = 'Show FPS Counter',
+    flag = 'ShowFPS',
     callback = function(value)
-        print(value)
+        print('Show FPS:', value)
     end
 })
 
-tab:CreateButton({
-    name = 'Move "Button 1" Up',
-    -- other stuff
-    
+generalTab:CreateToggle({
+    name = 'Compact HUD',
+    flag = 'CompactHUD',
+    callback = function(value)
+        print('Compact HUD:', value)
+    end
+})
+
+generalTab:CreateButton({
+    name = 'Reset Interface Layout',
+    icon = 125823673784681,
     callback = function()
-        buttontest:MoveUp()
-        --window:ChangeTheme('default')
+        print('Interface layout reset')
     end
 })
 
 
-
-tab:CreateToggle({
-    name = 'Switch',
-    -- other stuffss
-    
-    callback = function(value)
-        print(value)
-    end
+-- stats
+local statsTab = window:CreateTab({
+    name = 'Statistics',
+    icon = 85925158736685,
 })
 
-tab:CreateButton({
-    name = 'Button',
-    -- other stuff
-    
+statsTab:CreateSection({ name = 'Session Overview' })
+
+local revenue = statsTab:CreateStat({
+    name = 'Revenue',
+    icon = 117942554423479,
+    prefix = '$',
+    value = 12400,
+    changeMode = 'percentage',
+    changeBaseline = 'previous',
+})
+
+statsTab:CreateSection({ name = 'Quick Actions' })
+
+statsTab:CreateButton({
+    name = 'Simulate Sale',
     callback = function()
-        --window:ChangeTheme('default')
+        revenue:Set(revenue.value + math.random(500, 3000))
     end
 })
 
-tab:CreateToggle({
-    name = 'Switch',
-    -- other stuffss
-    
-    callback = function(value)
-        print(value)
+statsTab:CreateButton({
+    name = 'Reset Tracking',
+    description = 'Clears the change indicator and starts fresh from the current value.',
+    callback = function()
+        revenue:ResetBaseline()
     end
 })
 
