@@ -66,7 +66,6 @@ function Window.new(properties)
         Name = self.name,
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.new(0.5, 0, 0.5, 0),
-
         -- Animations
         Size = UDim2.fromOffset((self.size.X.Offset - 50), 0),
         BackgroundTransparency = 1, -- In = 0
@@ -429,7 +428,7 @@ function Window.new(properties)
         order = 1,
 
         callback = function()
-            print('close')
+            self:ToggleHide()
         end
     })
 
@@ -439,7 +438,7 @@ function Window.new(properties)
         order = 2,
 
         callback = function()
-            print('minimise')
+            self:ToggleMinimise()
         end
     })
 
@@ -467,6 +466,19 @@ function Window.new(properties)
 
 
     self.unloaded = false
+    self.minimised = false
+    self.hidden = true
+    self.animating = false
+    self.hasShownOnce = false
+
+    self.settings = {
+        toggleKeybind = Enum.KeyCode.K,
+    }
+
+    self:LoadSettings()
+    self:_buildRestoreButton()
+    self:_bindKeybind()
+    self:_buildSettingsUI()
 
     if self.theme.LiveAnimation then
         task.spawn(function()
@@ -489,9 +501,6 @@ function Window.new(properties)
             end
         end)
     end
-
-    
-    self:Hide()
 
     return self
 end
@@ -546,13 +555,440 @@ function Window:CreateTab(properties)
 end
 
 function Window:Hide()
-    self.signal:Fire('hide')
+    if self.animating then return end
+    self.animating = true
+    self.hidden = true
+    variables.rayfieldHidden = true
+
+    local fadeInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
+    self.drag.drag.Visible = false
+
+    variables.tweenService:Create(self.main, fadeInfo, {BackgroundTransparency = 1}):Play()
+    variables.tweenService:Create(self.shadowImage, fadeInfo, {ImageTransparency = 1}):Play()
+
+    if self.title then variables.tweenService:Create(self.title, fadeInfo, {TextTransparency = 1}):Play() end
+    if self.subtitle then variables.tweenService:Create(self.subtitle, fadeInfo, {TextTransparency = 1}):Play() end
+    if self.topbarIcon then variables.tweenService:Create(self.topbarIcon, fadeInfo, {ImageTransparency = 1}):Play() end
+
+    variables.tweenService:Create(self.dividerTop, fadeInfo, {BackgroundTransparency = 1}):Play()
+    variables.tweenService:Create(self.dividerBottom, fadeInfo, {BackgroundTransparency = 1}):Play()
+
+    for _, action in ipairs(self.actionContainer:GetChildren()) do
+        if action:IsA('Frame') then
+            variables.tweenService:Create(action.ImageLabel, fadeInfo, {ImageTransparency = 1}):Play()
+        end
+    end
+
+    for _, tab in pairs(self.tabs) do
+        if not tab.neglectSelector and tab.topbarItem then
+            if tab.topbarItemIcon then variables.tweenService:Create(tab.topbarItemIcon, fadeInfo, {ImageTransparency = 1}):Play() end
+            if tab.topbarItemTitle then variables.tweenService:Create(tab.topbarItemTitle, fadeInfo, {TextTransparency = 1}):Play() end
+        end
+    end
+
+    task.delay(0.3, function()
+        self.main.Visible = false
+
+        self.elements.Visible = false
+        self.tabList.Visible = false
+        for _, tab in pairs(self.tabs) do
+            if not tab.neglectSelector and tab.topbarItem then
+                tab.topbarItem.Visible = false
+            end
+        end
+
+        if self.restoreButton then
+            self.restoreButton.Visible = true
+            variables.tweenService:Create(self.restoreLabel, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.3}):Play()
+            variables.tweenService:Create(self.restoreFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.3}):Play()
+        end
+
+        self.animating = false
+    end)
+end
+
+function Window:ToggleHide()
+    if self.animating then return end
+    if self.hidden then
+        self:Show()
+    else
+        self:Hide()
+    end
+end
+
+function Window:ToggleMinimise()
+    if self.animating or self.hidden then return end
+    self.animating = true
+
+    if self.minimised then
+        self.minimised = false
+
+        local fadeInfo = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+
+        variables.tweenService:Create(self.main, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+            Size = self.size,
+        }):Play()
+
+        variables.tweenService:Create(self.shadowImage, fadeInfo, {ImageTransparency = 0.6}):Play()
+
+        variables.tweenService:Create(self.drag.drag, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+            Position = UDim2.new(
+                self.main.Position.X.Scale, self.main.Position.X.Offset,
+                self.main.Position.Y.Scale, self.main.Position.Y.Offset + self.size.Y.Offset / 2 + 15
+            ),
+        }):Play()
+
+        task.delay(0.2, function()
+            self.elements.Visible = true
+            self.tabList.Visible = true
+
+            variables.tweenService:Create(self.dividerBottom, fadeInfo, {
+                BackgroundTransparency = 0.85,
+                Size = UDim2.new(1, 0, 0, 1),
+            }):Play()
+            variables.tweenService:Create(self.dividerTop, fadeInfo, {
+                BackgroundTransparency = 0.85,
+                Size = UDim2.new(1, 0, 0, 1),
+            }):Play()
+
+            for _, tab in pairs(self.tabs) do
+                if not tab.neglectSelector and tab.topbarItem then
+                    tab.topbarItem.Visible = true
+                    if tab.topbarItemIcon then
+                        variables.tweenService:Create(tab.topbarItemIcon, fadeInfo, {ImageTransparency = if self.selectedTab == tab then 0.1 else 0.65}):Play()
+                    end
+                    if tab.topbarItemTitle then
+                        variables.tweenService:Create(tab.topbarItemTitle, fadeInfo, {TextTransparency = if self.selectedTab == tab then 0.1 else 0.65}):Play()
+                    end
+                end
+            end
+        end)
+
+        task.delay(0.5, function()
+            self.animating = false
+        end)
+    else
+        self.minimised = true
+
+        self.elements.Visible = false
+        self.tabList.Visible = false
+        for _, tab in pairs(self.tabs) do
+            if not tab.neglectSelector and tab.topbarItem then
+                tab.topbarItem.Visible = false
+            end
+        end
+
+        local fadeOutInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+        variables.tweenService:Create(self.shadowImage, fadeOutInfo, {ImageTransparency = 1}):Play()
+        variables.tweenService:Create(self.dividerTop, fadeOutInfo, {Size = UDim2.fromOffset(0, 1)}):Play()
+        variables.tweenService:Create(self.dividerBottom, fadeOutInfo, {Size = UDim2.fromOffset(0, 1)}):Play()
+
+        variables.tweenService:Create(self.main, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+            Size = UDim2.fromOffset(self.size.X.Offset, 66),
+        }):Play()
+
+        variables.tweenService:Create(self.drag.drag, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+            Position = UDim2.new(
+                self.main.Position.X.Scale, self.main.Position.X.Offset,
+                self.main.Position.Y.Scale, self.main.Position.Y.Offset + 66 / 2 + 15
+            ),
+        }):Play()
+
+        task.delay(0.5, function()
+            self.animating = false
+        end)
+    end
+end
+
+function Window:_buildRestoreButton()
+    self.restoreButton = self:Create("Frame", {
+        Size = UDim2.fromOffset(140, 28),
+        Position = UDim2.new(0.5, 0, 0, 8),
+        AnchorPoint = Vector2.new(0.5, 0),
+        BackgroundTransparency = 1,
+        Visible = false,
+        ZIndex = 100000,
+
+        Parent = self.screenGui,
+    })
+
+    self.restoreFrame = self:Create("Frame", {
+        Size = UDim2.fromScale(1, 1),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromScale(0.5, 0.5),
+        BackgroundTransparency = 1,
+        ZIndex = 100000,
+
+        Parent = self.restoreButton,
+    }, {BackgroundColor3 = {'WindowColor', function(color)
+        if typeof(color) == 'ColorSequence' then
+            return color.Keypoints[1].Value
+        else
+            return color
+        end
+    end}})
+
+    self:Create("UICorner", {
+        CornerRadius = UDim.new(1, 0),
+        Parent = self.restoreFrame,
+    })
+
+    self:Create("UIStroke", {
+        Transparency = 0.85,
+        Color = Color3.fromRGB(255, 255, 255),
+        Parent = self.restoreFrame,
+    })
+
+    self.restoreLabel = self:Create("TextLabel", {
+        Text = 'Show Rayfield',
+        Size = UDim2.fromScale(1, 1),
+        BackgroundTransparency = 1,
+        TextSize = 13,
+        TextTransparency = 1,
+        ZIndex = 100001,
+
+        Parent = self.restoreFrame,
+    }, {TextColor3 = 'TitlingColor', FontFace = 'Font'})
+
+    local restoreInteract = self:Create("TextButton", {
+        BackgroundTransparency = 1,
+        Size = UDim2.fromScale(1, 1),
+        TextTransparency = 1,
+        ZIndex = 100002,
+
+        Parent = self.restoreButton,
+    })
+
+    self:Connect(restoreInteract.MouseButton1Click, function()
+        self:ToggleHide()
+    end)
+
+    self:Connect(restoreInteract.MouseEnter, function()
+        variables.tweenService:Create(self.restoreFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.1}):Play()
+        variables.tweenService:Create(self.restoreLabel, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
+    end)
+
+    self:Connect(restoreInteract.MouseLeave, function()
+        variables.tweenService:Create(self.restoreFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.3}):Play()
+        variables.tweenService:Create(self.restoreLabel, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.3}):Play()
+    end)
+end
+
+function Window:_bindKeybind()
+    self:Connect(variables.userInputService.InputBegan, function(input, processed)
+        if processed then return end
+        if input.KeyCode == self.settings.toggleKeybind then
+            self:ToggleHide()
+        end
+    end)
+end
+
+function Window:_buildSettingsUI()
+    self.rfSettings:CreateSection({ name = 'General' })
+
+    self.rfSettings:CreateButton({
+        name = 'Toggle Keybind: ' .. self.settings.toggleKeybind.Name,
+        icon = 100604009889706,
+        callback = function()
+            print('Rayfield: Keybind changing will be available with the Keybind element.')
+        end
+    })
+
+    self.rfSettings:CreateSection({ name = 'Window' })
+
+    self.rfSettings:CreateButton({
+        name = 'Reset Window Position',
+        callback = function()
+            variables.tweenService:Create(self.main, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+                Position = UDim2.new(0.5, 0, 0.5, 0),
+            }):Play()
+            variables.tweenService:Create(self.drag.drag, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+                Position = UDim2.new(0.5, 0, 0.5, self.size.Y.Offset / 2 + 15),
+            }):Play()
+        end
+    })
+end
+
+function Window:GetSettingsPath()
+    local dir = 'Rayfield/Settings'
+    return dir, dir .. '/rayfield.rfld'
+end
+
+function Window:SaveSettings()
+    local _, fullPath = self:GetSettingsPath()
+
+    local data = {
+        toggleKeybind = { tostring(self.settings.toggleKeybind.EnumType), self.settings.toggleKeybind.Value },
+    }
+
+    local ok, encoded = pcall(variables.httpService.JSONEncode, variables.httpService, data)
+    if not ok then return false end
+
+    local writeOk, err = pcall(function()
+        local dir = self:GetSettingsPath()
+        local parts = {}
+        for part in string.gmatch(dir, "[^/]+") do
+            table.insert(parts, part)
+        end
+        local built = ''
+        for _, part in parts do
+            built = if built == '' then part else built .. '/' .. part
+            if not filesystem.isfolder(built) then
+                filesystem.makefolder(built)
+            end
+        end
+
+        filesystem.writefile(fullPath, encoded)
+    end)
+
+    if not writeOk then
+        warn("Rayfield: Failed to save settings - " .. tostring(err))
+        return false
+    end
+
+    return true
+end
+
+function Window:LoadSettings()
+    local _, fullPath = self:GetSettingsPath()
+
+    local exists = pcall(function() return filesystem.isfile(fullPath) end)
+    if not exists then return false end
+
+    local fileExists = false
+    pcall(function() fileExists = filesystem.isfile(fullPath) end)
+    if not fileExists then return false end
+
+    local readOk, config = pcall(filesystem.readfile, fullPath)
+    if not readOk or not config then return false end
+
+    local decodeOk, parsed = pcall(variables.httpService.JSONDecode, variables.httpService, config)
+    if not decodeOk then return false end
+
+    if parsed.toggleKeybind then
+        pcall(function()
+            self.settings.toggleKeybind = Enum[parsed.toggleKeybind[1]]:FromValue(parsed.toggleKeybind[2])
+        end)
+    end
+
+    return true
+end
+
+function Window:_setElementsShown()
+    for _, tab in pairs(self.tabs) do
+        for _, element in ipairs(tab.elements) do
+            local elementType = element.__type
+
+            if elementType == 'Section' then
+                element.title.TextTransparency = 0.6
+                if element.iconLabel then element.iconLabel.ImageTransparency = 0.65 end
+            else
+                element.stroke.Transparency = self.theme.ElementStrokeTransparency
+                element.title.TextTransparency = 0
+                element.main.BackgroundTransparency = self.theme.ElementTransparency or 0
+                if element.iconLabel then element.iconLabel.ImageTransparency = 0 end
+                if element.descriptor then element.descriptor.titleLabel.TextTransparency = 0.7 end
+            end
+
+            if elementType == 'Toggle' then
+                element.indicator.BackgroundTransparency = if element.value then 0 else 0.8
+                element.indicatorStroke.Transparency = if element.value then 0 else 0.7
+                element.overlay.BackgroundTransparency = 0
+                element.containerStroke.Transparency = 0.85
+                element.functionContainer.BackgroundTransparency = 0.9
+            elseif elementType == 'Statistic' then
+                element.gradientContainer.BackgroundTransparency = 0.7
+                element.glowImage.ImageTransparency = 0.6
+                element.valueLabel.TextTransparency = 0
+                element.changeLabel.TextTransparency = 0
+            end
+        end
+    end
 end
 
 function Window:Show()
-    if self.configuration.autoLoad then
+    if self.animating then return end
+    self.animating = true
+
+    if self.configuration.autoLoad and self.hidden then
         self:Load()
     end
+
+    self.hidden = false
+    self.minimised = false
+    variables.rayfieldHidden = false
+
+    if self.restoreButton then
+        variables.tweenService:Create(self.restoreLabel, TweenInfo.new(0.15, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 1}):Play()
+        variables.tweenService:Create(self.restoreFrame, TweenInfo.new(0.15, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+        task.delay(0.15, function()
+            if self.restoreButton then
+                self.restoreButton.Visible = false
+            end
+        end)
+    end
+
+    if self.hasShownOnce then
+        self:_quickRestore()
+    else
+        self.hasShownOnce = true
+        self:_firstShow()
+    end
+end
+
+function Window:_quickRestore()
+    local fadeInfo = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+
+    self.main.Size = self.size
+    self.main.Visible = true
+    self.elements.Visible = true
+    self.tabList.Visible = true
+
+    self:_setElementsShown()
+
+    variables.tweenService:Create(self.main, fadeInfo, {BackgroundTransparency = 0}):Play()
+    variables.tweenService:Create(self.shadowImage, fadeInfo, {ImageTransparency = 0.6}):Play()
+
+    variables.tweenService:Create(self.dividerTop, fadeInfo, {BackgroundTransparency = 0.85, Size = UDim2.new(1, 0, 0, 1)}):Play()
+    variables.tweenService:Create(self.dividerBottom, fadeInfo, {BackgroundTransparency = 0.85, Size = UDim2.new(1, 0, 0, 1)}):Play()
+
+    if self.topbarIcon then variables.tweenService:Create(self.topbarIcon, fadeInfo, {ImageTransparency = 0}):Play() end
+    if self.title then variables.tweenService:Create(self.title, fadeInfo, {TextTransparency = 0}):Play() end
+    if self.subtitle then variables.tweenService:Create(self.subtitle, fadeInfo, {TextTransparency = 0.7}):Play() end
+
+    for _, action in ipairs(self.actionContainer:GetChildren()) do
+        if action:IsA('Frame') then
+            variables.tweenService:Create(action.ImageLabel, fadeInfo, {ImageTransparency = 0.6}):Play()
+        end
+    end
+
+    for _, tab in pairs(self.tabs) do
+        if not tab.neglectSelector and tab.topbarItem then
+            tab.topbarItem.Visible = true
+            if tab.topbarItemIcon then
+                variables.tweenService:Create(tab.topbarItemIcon, fadeInfo, {ImageTransparency = if self.selectedTab == tab then 0.1 else 0.65}):Play()
+            end
+            if tab.topbarItemTitle then
+                variables.tweenService:Create(tab.topbarItemTitle, fadeInfo, {TextTransparency = if self.selectedTab == tab then 0.1 else 0.65}):Play()
+            end
+        end
+    end
+
+    -- Drag handle
+    self.drag.drag.Visible = true
+    self.drag.dragCosmetic.Size = UDim2.fromOffset(100, 4)
+    variables.tweenService:Create(self.drag.dragCosmetic, fadeInfo, {BackgroundTransparency = 0.7}):Play()
+
+    task.delay(0.4, function()
+        self.animating = false
+    end)
+end
+
+function Window:_firstShow()
+    -- Intro animation
+    self.elements.Visible = true
+    self.tabList.Visible = true
 
     self.drag.drag.Visible = false
     self.main.Visible = true
@@ -568,7 +1004,6 @@ function Window:Show()
     task.wait(0.1)
     if self.subtitle then variables.tweenService:Create(self.subtitle, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0.7}):Play() end
 
-    -- animation for actions, but should be chnged to get actions another way rather than getchildren
     for _, action in ipairs(self.actionContainer:GetChildren()) do
         if action:IsA('Frame') then
             task.wait(0.02)
@@ -578,7 +1013,6 @@ function Window:Show()
 
     task.wait(0.2)
     variables.tweenService:Create(self.dividerBottom, TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.85, Size = UDim2.new(1, 0, 0, 1)}):Play()
-
 
     task.spawn(function()
         for _, tab in pairs(self.tabs) do
@@ -590,7 +1024,7 @@ function Window:Show()
                 end
 
                 task.wait(0.04)
-            
+
                 if tab.name then
                     variables.tweenService:Create(tab.topbarItemTitle, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = if self.selectedTab == tab then 0.1 else 0.65}):Play()
                 end
@@ -626,7 +1060,7 @@ function Window:Show()
                     variables.tweenService:Create(element.containerStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = 0.85}):Play()
                     variables.tweenService:Create(element.functionContainer, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.9}):Play()
                 elseif elementType == 'Button' then
-        
+
                 elseif elementType == 'Statistic' then
                     variables.tweenService:Create(element.gradientContainer, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.7}):Play()
                     variables.tweenService:Create(element.glowImage, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.6}):Play()
@@ -641,8 +1075,6 @@ function Window:Show()
         else
             for _, element in ipairs(tab.elements) do
                 local elementType = element.__type
-
-                -- instant set all properties so they're visible when navigated to
 
                 if elementType == 'Section' then
                     element.title.TextTransparency = 0.6
@@ -676,7 +1108,8 @@ function Window:Show()
     self.drag.drag.Visible = true
     variables.tweenService:Create(self.drag.dragCosmetic, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.7}):Play()
     variables.tweenService:Create(self.drag.dragCosmetic, TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(100, 4)}):Play()
-            
+
+    self.animating = false
 end
 
 function Window:GetPath()
