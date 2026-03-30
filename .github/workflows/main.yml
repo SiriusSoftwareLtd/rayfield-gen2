@@ -1,21 +1,10 @@
-name: Pushed
+name: Release
 permissions:
   contents: write
 on:
   push:
-    paths:
-      - '**.luau'
-      - '**.lua'
-      - '**.rbxm'
-      - '**.json'
-      - '**.yml'
-  pull_request:
-    paths:
-      - '**.luau'
-      - '**.lua'
-      - '**.rbxm'
-      - '**.json'
-      - '**.yml'
+    branches:
+      - main
 
 jobs:
   build_and_bundle:
@@ -24,12 +13,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           submodules: true
 
+      - name: Read Version
+        id: version
+        run: |
+          VERSION="v$(cat version.txt)"
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+          if git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "SKIP=true" >> $GITHUB_OUTPUT
+          else
+            echo "SKIP=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Setup RoKit
+        if: steps.version.outputs.SKIP == 'false'
         uses: CompeyDev/setup-rokit@v0.1.2
 
       - name: Install RoKit packages
+        if: steps.version.outputs.SKIP == 'false'
         run: |
           rokit trust rojo-rbx/rojo
           rokit trust lune-org/lune
@@ -37,18 +41,14 @@ jobs:
           rokit install
 
       - name: Bundle
+        if: steps.version.outputs.SKIP == 'false'
         run: lune run wax bundle output="build/bundled.luau" input="wax.project.json" minify=true
 
-      - name: Fetch Version
-        id: version
-        run: |
-          VERSION=$(cat version.txt)
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-
       - name: Finalise Release, Publish
+        if: steps.version.outputs.SKIP == 'false'
         uses: ncipollo/release-action@v1
         with:
           artifacts: build/bundled.luau
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag: "${{ env.VERSION }}-${{ github.run_id }}"
-          name: Rayfield ${{ env.VERSION }}
+          tag: "${{ steps.version.outputs.VERSION }}"
+          name: "Rayfield ${{ steps.version.outputs.VERSION }}"

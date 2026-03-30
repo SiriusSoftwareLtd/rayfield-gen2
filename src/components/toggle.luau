@@ -7,6 +7,7 @@ local utility = script.Parent.Parent.utility
 
 -- Variables
 local variables = require(utility.variables)
+local functions = require(utility.functions)
 
 function Toggle.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
@@ -19,7 +20,7 @@ function Toggle.new(tab, properties)
         description = properties.description or properties.Description,
         forgetState = properties.forgetState or properties.ForgetState, -- dont save config for this element if true.
 
-        flag = properties.flag or properties.Flag,
+        flag = properties.flag or properties.Flag or (not (properties.forgetState or properties.ForgetState) and functions.deriveFlagFromName(properties.name or properties.Name or "Switch") or nil),
 
         callback = properties.callback or properties.Callback or function() end,
 
@@ -27,7 +28,7 @@ function Toggle.new(tab, properties)
     }, Toggle)
 
     -- Register as a saveable control if flagged
-    if self.flag and not self.forgetState then
+    if self.flag and self.flag ~= "" and not self.forgetState then
         self.window.controls[self.flag] = self
     end
 
