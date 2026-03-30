@@ -1,6 +1,5 @@
 # Rayfield
-Rayfield Generation 2
+Rayfield Gen2
 
-**Documentation** for Rayfield Gen2
-
-[docs.sirius.menu](https://docs.sirius.menu/rayfield-gen2)
+Get Started
+[Sirius Developer Suite - Rayfield Gen2](https://docs.sirius.menu/rayfield-gen2)
