@@ -19,7 +19,7 @@ jobs:
       - name: Read Version
         id: version
         run: |
-          VERSION="v$(cat version.txt)"
+          VERSION="$(cat version.txt)"
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
           if git rev-parse "$VERSION" >/dev/null 2>&1; then
@@ -51,4 +51,4 @@ jobs:
           artifacts: build/bundled.luau
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: "${{ steps.version.outputs.VERSION }}"
-          name: "Rayfield ${{ steps.version.outputs.VERSION }}"
+          name: "Rayfield Gen2 ${{ steps.version.outputs.VERSION }}"
