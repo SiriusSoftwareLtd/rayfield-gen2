@@ -8,10 +8,21 @@ local utility = script.Parent.Parent.utility
 -- Variables
 local variables = require(utility.variables)
 
--- Colors
-local COLOR_POSITIVE = Color3.fromRGB(0, 170, 127)
-local COLOR_NEGATIVE = Color3.fromRGB(220, 60, 60)
-local COLOR_NEUTRAL = Color3.fromRGB(50, 140, 220)
+-- Accent gradients per direction (fill drives the card + glow, stroke is the brighter edge)
+local accents = {
+    positive = {
+        fill = ColorSequence.new(Color3.fromRGB(0, 170, 127), Color3.fromRGB(0, 134, 98)),
+        stroke = ColorSequence.new(Color3.fromRGB(0, 213, 156), Color3.fromRGB(0, 189, 135)),
+    },
+    negative = {
+        fill = ColorSequence.new(Color3.fromRGB(172, 47, 47), Color3.fromRGB(135, 37, 37)),
+        stroke = ColorSequence.new(Color3.fromRGB(255, 75, 75), Color3.fromRGB(244, 67, 67)),
+    },
+    neutral = {
+        fill = ColorSequence.new(Color3.fromRGB(39, 109, 172), Color3.fromRGB(31, 86, 135)),
+        stroke = ColorSequence.new(Color3.fromRGB(63, 175, 255), Color3.fromRGB(56, 155, 244)),
+    },
+}
 
 local function formatPct(pct)
     if pct > 0 then
@@ -78,6 +89,7 @@ function Statistic.new(tab, properties)
         Size = UDim2.new(1, -20, 0, 90),
         BorderSizePixel = 0,
         Name = self.name,
+        ZIndex = 5,
 
         BackgroundColor3 = Color3.fromRGB(25, 25, 25),
 
@@ -98,9 +110,9 @@ function Statistic.new(tab, properties)
     }, {Transparency = 'ElementStrokeTransparency'})
 
     self.strokeGradient = self.window:Create("UIGradient", {
-        Rotation = 80,
+        Rotation = 2,
         Offset = Vector2.new(0, 0.5),
-        Color = ColorSequence.new(COLOR_NEUTRAL),
+        Color = accents.neutral.stroke,
         Transparency = NumberSequence.new({
             NumberSequenceKeypoint.new(0, 0.85),
             NumberSequenceKeypoint.new(1, 0),
@@ -116,17 +128,18 @@ function Statistic.new(tab, properties)
         BorderSizePixel = 0,
         LayoutOrder = -1,
         BackgroundTransparency = 1,
+        ZIndex = 5,
 
         Parent = self.main,
-    }, {BackgroundColor3 = 'ElementColor', BackgroundTransparency = 'ElementTransparency'})
+    })
 
     self.gradientContainer = self.window:Create("Frame", {
         Size = UDim2.fromScale(1, 1),
         Position = UDim2.fromOffset(0, 0),
         BorderSizePixel = 0,
-        LayoutOrder = -1,
-        BackgroundTransparency = 1, -- In 0.7
+        BackgroundTransparency = 1, -- In 0
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        ZIndex = 5,
 
         Parent = self.main,
     })
@@ -136,25 +149,25 @@ function Statistic.new(tab, properties)
         Position = UDim2.fromScale(0.5, 0.5),
         AnchorPoint = Vector2.new(0.5, 0.5),
         BorderSizePixel = 0,
-        LayoutOrder = -1,
         BackgroundTransparency = 1,
+        ZIndex = 4,
 
         Parent = self.main,
-    }, {BackgroundColor3 = 'ElementColor', BackgroundTransparency = 'ElementTransparency'})
+    })
 
     self.glowImage = self.window:Create("ImageLabel", {
         Image = 'rbxassetid://5587865193',
         ImageColor3 = Color3.fromRGB(255, 255, 255),
         Size = UDim2.fromScale(1.15, 1),
-        
+
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.fromScale(0.5, 0.5),
         BackgroundTransparency = 1,
-        ZIndex = 0,
+        ZIndex = 4,
 
         -- Animation
         ImageTransparency = 1, -- In = 0.6
-       
+
         Parent = self.glowContainer
     })
 
@@ -169,17 +182,18 @@ function Statistic.new(tab, properties)
         TextXAlignment = Enum.TextXAlignment.Left,
         TextWrapped = true,
         LayoutOrder = 1,
+        ZIndex = 10,
 
         -- Animation
         TextTransparency = 1, -- In = 0
-    
+
         Parent = self.titleContainer
-    }, {TextColor3 = 'ContentColor', FontFace = 'Font'})
+    }, {TextColor3 = 'ContentColor', FontFace = 'TitleFont'})
 
     self.mainGradient = self.window:Create("UIGradient", {
-        Rotation = 80,
+        Rotation = 2,
         Offset = Vector2.new(0, 0.5),
-        Color = ColorSequence.new(COLOR_NEUTRAL),
+        Color = accents.neutral.fill,
         Transparency = NumberSequence.new({
             NumberSequenceKeypoint.new(0, 0.85),
             NumberSequenceKeypoint.new(1, 0),
@@ -190,9 +204,9 @@ function Statistic.new(tab, properties)
     })
 
     self.glowGradient = self.window:Create("UIGradient", {
-        Rotation = 80,
+        Rotation = 2,
         Offset = Vector2.new(0, 0.5),
-        Color = ColorSequence.new(COLOR_NEUTRAL),
+        Color = accents.neutral.fill,
         Transparency = NumberSequence.new({
             NumberSequenceKeypoint.new(0, 0.85),
             NumberSequenceKeypoint.new(1, 0),
@@ -210,17 +224,18 @@ function Statistic.new(tab, properties)
         self.iconLabel = self.window:Create("ImageLabel", {
             -- Configurables
             Image = 'rbxassetid://'..tostring(self.icon),
-            
+
             -- Theming
             ImageColor3 = Color3.fromRGB(255, 255, 255),
 
             Size = UDim2.fromOffset(32, 32),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
+            ZIndex = 10,
 
             -- Animation
             ImageTransparency = 1, -- In = 0
-       
+
             Parent = self.titleContainer
         }, {ImageColor3 = 'ContentColor'})
     end
@@ -252,7 +267,7 @@ function Statistic.new(tab, properties)
 
         -- Animation
         TextTransparency = 1, -- In = 0
-    
+
         Parent = self.main
     }, {TextColor3 = 'ContentColor', FontFace = 'Font'})
 
@@ -262,22 +277,21 @@ function Statistic.new(tab, properties)
 
         AnchorPoint = Vector2.new(1, 1),
         Position = UDim2.new(1, -20, 1, -15),
-        Size = UDim2.fromOffset(200, 20),
+        Size = UDim2.fromOffset(200, 15),
         BorderSizePixel = 0,
         BackgroundTransparency = 1,
         TextSize = 15,
         TextXAlignment = Enum.TextXAlignment.Right,
         TextWrapped = true,
+        RichText = true,
         LayoutOrder = 1,
         ZIndex = 10,
 
-        TextColor3 = COLOR_NEUTRAL,
-
         -- Animation
         TextTransparency = 1, -- In = 0
-    
+
         Parent = self.main
-    }, {FontFace = 'Font'})
+    }, {TextColor3 = 'ContentColor', FontFace = 'Font'})
 
     -- Function
 
@@ -288,7 +302,7 @@ function Statistic.new(tab, properties)
             task.wait(0.7)
             variables.tweenService:Create(self.stroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeTransparency}):Play()
             variables.tweenService:Create(self.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
-            variables.tweenService:Create(self.gradientContainer, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.7}):Play()
+            variables.tweenService:Create(self.gradientContainer, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
             variables.tweenService:Create(self.glowImage, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.6}):Play()
             variables.tweenService:Create(self.main, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
             variables.tweenService:Create(self.valueLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
@@ -305,22 +319,19 @@ function Statistic.new(tab, properties)
 end
 
 
-function Statistic:_setAccentColor(color, direction)
-    local seq = ColorSequence.new(color)
-    self.strokeGradient.Color = seq
-    self.mainGradient.Color = seq
-    self.glowGradient.Color = seq
+function Statistic:_setAccent(key, direction)
+    local accent = accents[key]
+    self.strokeGradient.Color = accent.stroke
+    self.mainGradient.Color = accent.fill
+    self.glowGradient.Color = accent.fill
 
     -- Subtle rotation + offset shift to give the gradient a bit of life
-    local rotation = if direction == 1 then 92 elseif direction == -1 then 68 else 80
+    local rotation = if direction == 1 then 14 elseif direction == -1 then -10 else 2
     local offset = if direction == 1 then Vector2.new(0.04, 0.5) elseif direction == -1 then Vector2.new(-0.04, 0.5) else Vector2.new(0, 0.5)
     local gradientTweenInfo = TweenInfo.new(0.6, Enum.EasingStyle.Exponential)
     for _, gradient in { self.strokeGradient, self.mainGradient, self.glowGradient } do
         variables.tweenService:Create(gradient, gradientTweenInfo, { Rotation = rotation, Offset = offset }):Play()
     end
-
-    variables.tweenService:Create(self.glowImage, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageColor3 = color}):Play()
-    variables.tweenService:Create(self.changeLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextColor3 = color}):Play()
 end
 
 function Statistic:_formatValue(value)
@@ -349,29 +360,29 @@ function Statistic:Set(value)
     local refValue = if self.changeBaseline == "initial" then self._initialValue else previousValue
     local noChange = hasNoHistory or refValue == value
 
-    -- Determine target change, color, and direction
-    local targetChange, infinityText, color, direction
+    -- Determine target change, accent, and direction
+    local targetChange, infinityText, accentKey, direction
     if noChange then
         targetChange = 0
-        color = COLOR_NEUTRAL
+        accentKey = 'neutral'
         direction = 0
     elseif refValue == 0 then
         local sign = if value > 0 then "+" else "-"
         local suffix = if self.changeMode == "percentage" then "∞%" else "∞"
         infinityText = sign .. suffix
-        color = if value > 0 then COLOR_POSITIVE else COLOR_NEGATIVE
+        accentKey = if value > 0 then 'positive' else 'negative'
         direction = if value > 0 then 1 else -1
     elseif self.changeMode == "percentage" then
         targetChange = ((value - refValue) / math.abs(refValue)) * 100
         direction = if targetChange > 0 then 1 elseif targetChange < 0 then -1 else 0
-        color = if direction == 1 then COLOR_POSITIVE elseif direction == -1 then COLOR_NEGATIVE else COLOR_NEUTRAL
+        accentKey = if direction == 1 then 'positive' elseif direction == -1 then 'negative' else 'neutral'
     else
         targetChange = value - refValue
         direction = if targetChange > 0 then 1 elseif targetChange < 0 then -1 else 0
-        color = if direction == 1 then COLOR_POSITIVE elseif direction == -1 then COLOR_NEGATIVE else COLOR_NEUTRAL
+        accentKey = if direction == 1 then 'positive' elseif direction == -1 then 'negative' else 'neutral'
     end
 
-    self:_setAccentColor(color, direction)
+    self:_setAccent(accentKey, direction)
 
     -- Cancel any in-progress animations
     if self._valueAnimTask then
@@ -435,7 +446,7 @@ function Statistic:ResetBaseline(newBaseline)
     self.value = baseline
     self._displayedPct = 0
     self.changeLabel.Text = self:_formatChange(0)
-    self:_setAccentColor(COLOR_NEUTRAL, 0)
+    self:_setAccent('neutral', 0)
 end
 
 

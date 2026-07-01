@@ -33,7 +33,6 @@ function Descriptor.new(tab, properties)
     self.titleLabel = self.window:Create("TextLabel", {
         AutomaticSize = Enum.AutomaticSize.Y,
         BackgroundTransparency = 1,
-        FontFace = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium, Enum.FontStyle.Normal),
         RichText = true,
         Size = UDim2.new(1, -90, 0, 0),
         Text = self.description,
@@ -45,7 +44,7 @@ function Descriptor.new(tab, properties)
         TextTransparency = 1, -- In = 0.7
 
         Parent = self.main,
-    }, { TextColor3 = 'ContentColor' })
+    }, { TextColor3 = 'ContentColor', FontFace = 'Font' })
 
     -- Bottom spacing
     self.window:Create("Frame", {

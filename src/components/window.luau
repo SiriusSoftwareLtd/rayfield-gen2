@@ -16,6 +16,8 @@ local Window = {}
 Window.__index = Window
 
 function Window.new(properties)
+    properties = if typeof(properties) == "table" then properties else {}
+
     local self = setmetatable({
         name = properties.name or properties.Name or "Rayfield Window",
         subheading = properties.subtitle or properties.Subtitle,
@@ -24,14 +26,17 @@ function Window.new(properties)
         connections = {},
 
         icon = properties.icon or properties.Icon,
+        showName = properties.showName or properties.ShowName or "Rayfield",
+        showIcon = properties.showIcon or properties.ShowIcon or 80387863064905,
 
         themeProperties = {},
         tabs = {},
+        tags = {},
         selectedTab = nil,
         theme = if typeof(properties.theme or properties.Theme) == 'table'
         then (properties.theme or properties.Theme)
-        elseif typeof(properties.theme or properties.Theme) == 'string' 
-        then require(themes[string.lower((properties.theme or properties.Theme))]) -- check if theme exists first too...
+        elseif typeof(properties.theme or properties.Theme) == 'string' and themes[string.lower(properties.theme or properties.Theme)]
+        then require(themes[string.lower((properties.theme or properties.Theme))])
         else require(themes['default']),
 
         signal = SignalEngine.new(),
@@ -56,6 +61,7 @@ function Window.new(properties)
         ResetOnSpawn = false,
         Enabled = true,
         DisplayOrder = 99999,
+        ZIndexBehavior = Enum.ZIndexBehavior.Global,
 
         Parent = variables.guiContainer,
     })
@@ -64,6 +70,7 @@ function Window.new(properties)
     self.main = self:Create("Frame", {
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         Name = self.name,
+        ZIndex = 1,
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.new(0.5, 0, 0.5, 0),
         -- Animations
@@ -115,73 +122,6 @@ function Window.new(properties)
         Parent = self.main
     })
 
-    self.dividerTop = self:Create("Frame", {
-        BorderSizePixel = 0,
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-        Position = UDim2.new(0, 0, 1, 0),
-        BackgroundTransparency = 0.85,
-        
-        
-        -- Animations
-        Size = UDim2.fromOffset(0, 1), -- In = 1, 0, 0, 1
-
-        Parent = self.topbar
-    }, {BackgroundColor3 = 'DividerColor'})
-
-    self.dividerBottom = self:Create("Frame", {
-        BorderSizePixel = 0,
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-        Position = UDim2.new(0, 0, 0, 105),
-        BackgroundTransparency = 0.85,
-
-        -- Animations
-        Size = UDim2.fromOffset(0, 1), -- In = 1, 0, 0, 1
-
-        Parent = self.main,
-    })
-
-    self.dividerTopGradient = self:Create("UIGradient", {
-        Parent = self.dividerTop,
-        Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 1, 0),
-            NumberSequenceKeypoint.new(0.1, 0.75, 0),
-            NumberSequenceKeypoint.new(0.300499, 0, 0),
-            NumberSequenceKeypoint.new(0.5, 0.75, 0),
-            NumberSequenceKeypoint.new(1, 1, 0)
-        })
-    }, 
-        {
-            Color = {'DividerColor', function(color)
-                if typeof(color) == 'ColorSequence' then
-                    return color
-                else
-                    return ColorSequence.new(color)
-                end
-            
-            end 
-    }})
-
-    self.dividerBottomGradient = self:Create("UIGradient", {
-        Parent = self.dividerBottom,
-        Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 1, 0),
-            NumberSequenceKeypoint.new(0.1, 0.75, 0),
-            NumberSequenceKeypoint.new(0.300499, 0, 0),
-            NumberSequenceKeypoint.new(0.5, 0.75, 0),
-            NumberSequenceKeypoint.new(1, 1, 0)
-        })
-    },
-        {
-            Color = {'DividerColor', function(color)
-                if typeof(color) == 'ColorSequence' then
-                    return color
-                else
-                    return ColorSequence.new(color)
-                end
-            
-            end 
-    }})
-
     self.topContainer = self:Create("Frame", {
         Size = UDim2.new(0, 300, 0, 24),
         Position = UDim2.new(0, 25, 0.5, 0),
@@ -204,9 +144,9 @@ function Window.new(properties)
     })
 
     self.titleContainer = self:Create("Frame", {
-        Size = UDim2.new(1, -42, 0, 24),
+        Size = UDim2.fromOffset(50, 24),
         Position = UDim2.new(0, 25, 0.5, 0),
-        AutomaticSize = Enum.AutomaticSize.Y,
+        AutomaticSize = Enum.AutomaticSize.XY,
         AnchorPoint = Vector2.new(0, 0.5),
         BackgroundTransparency = 1,
         LayoutOrder = 1,
@@ -232,7 +172,8 @@ function Window.new(properties)
             TextColor3 = Color3.fromRGB(255, 255, 255),
             FontFace = Font.new("rbxassetid://12187365364", Enum.FontWeight.SemiBold),
 
-            Size = UDim2.new(1, 0, 0, 20),
+            Size = UDim2.fromOffset(50, 20),
+            AutomaticSize = Enum.AutomaticSize.X,
             
             BackgroundTransparency = 1,
             TextSize = 20,
@@ -265,7 +206,8 @@ function Window.new(properties)
             -- Configurables
             Text = self.subheading, -- window name
 
-            Size = UDim2.new(1, 0, 0, 12),
+            Size = UDim2.fromOffset(50, 12),
+            AutomaticSize = Enum.AutomaticSize.X,
             BackgroundTransparency = 1,
             TextSize = 12,
             TextXAlignment = Enum.TextXAlignment.Left,
@@ -278,6 +220,27 @@ function Window.new(properties)
         }, {TextColor3 = 'TitlingColor', FontFace = 'Font'})
     end
 
+    self.tagContainer = self:Create("Frame", {
+        AnchorPoint = Vector2.new(0, 0.5),
+        Position = UDim2.new(0, 25, 0.5, 0),
+        Size = UDim2.fromOffset(50, 24),
+        AutomaticSize = Enum.AutomaticSize.XY,
+        BackgroundTransparency = 1,
+        LayoutOrder = 2,
+        Visible = false,
+
+        Parent = self.topContainer,
+    })
+
+    self.tagContainerLayout = self:Create("UIListLayout", {
+        Padding = UDim.new(0, 5),
+        FillDirection = Enum.FillDirection.Horizontal,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+
+        Parent = self.tagContainer
+    })
+
     -- Shadow
     self.shadowContainer = self:Create("Frame", {
         
@@ -286,7 +249,7 @@ function Window.new(properties)
         Position = UDim2.fromScale(0.5, 0.5),
         AnchorPoint = Vector2.new(0.5, 0.5),
         BackgroundTransparency = 1,
-        ZIndex = 0,
+        ZIndex = -1,
 
         Parent = self.main,
     })
@@ -299,7 +262,7 @@ function Window.new(properties)
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.fromScale(0.5, 0.5),
         BackgroundTransparency = 1,
-        ZIndex = 0,
+        ZIndex = -1,
 
         -- Animations
         ImageTransparency = 1, -- In = 0.6
@@ -349,8 +312,10 @@ function Window.new(properties)
 
     -- Tabs Preparation
     self.tabList = self:Create("ScrollingFrame", {
+        Name = "Tabs",
+        Active = true,
         Size = UDim2.new(1, 0, 0, 36),
-        Position = UDim2.new(0.5, 0, 0, 68),
+        Position = UDim2.new(0.5, 0, 0, 66),
         AnchorPoint = Vector2.new(0.5, 0),
         
         BackgroundTransparency = 1,
@@ -363,7 +328,7 @@ function Window.new(properties)
     })
 
     self.tabListLayout = self:Create('UIListLayout', {
-        Padding = UDim.new(0, 15),
+        Padding = UDim.new(0, 7),
         FillDirection = Enum.FillDirection.Horizontal,
         VerticalAlignment = Enum.VerticalAlignment.Center,
         HorizontalAlignment = Enum.HorizontalAlignment.Left,
@@ -372,22 +337,9 @@ function Window.new(properties)
         Parent = self.tabList
     })
 
-    self:Create("Frame", {
-        
-
-        Size = UDim2.new(0, 10, 0, 0),
-        BackgroundTransparency = 1,
-        LayoutOrder = -1,
-
-        Parent = self.tabList
-    })
-
-    self:Create("Frame", {
-        
-
-        Size = UDim2.new(0, 10, 0, 0),
-        BackgroundTransparency = 1,
-        LayoutOrder = 999999,
+    self:Create("UIPadding", {
+        PaddingLeft = UDim.new(0, 22),
+        PaddingRight = UDim.new(0, 10),
 
         Parent = self.tabList
     })
@@ -479,6 +431,7 @@ function Window.new(properties)
     self:_buildRestoreButton()
     self:_bindKeybind()
     self:_buildSettingsUI()
+    self:_buildLicense()
 
     if self.theme.LiveAnimation then
         task.spawn(function()
@@ -554,6 +507,12 @@ function Window:CreateTab(properties)
     return newTab
 end
 
+function Window:CreateTag(properties)
+    local newTag = require(script.Parent.tag).new(self, properties)
+    table.insert(self.tags, newTag)
+    return newTag
+end
+
 function Window:Hide()
     if self.animating then return end
     self.animating = true
@@ -571,19 +530,19 @@ function Window:Hide()
     if self.subtitle then variables.tweenService:Create(self.subtitle, fadeInfo, {TextTransparency = 1}):Play() end
     if self.topbarIcon then variables.tweenService:Create(self.topbarIcon, fadeInfo, {ImageTransparency = 1}):Play() end
 
-    variables.tweenService:Create(self.dividerTop, fadeInfo, {BackgroundTransparency = 1}):Play()
-    variables.tweenService:Create(self.dividerBottom, fadeInfo, {BackgroundTransparency = 1}):Play()
-
     for _, action in ipairs(self.actionContainer:GetChildren()) do
         if action:IsA('Frame') then
             variables.tweenService:Create(action.ImageLabel, fadeInfo, {ImageTransparency = 1}):Play()
         end
     end
 
+    for _, tag in self.tags do
+        tag:_setShown(false, fadeInfo)
+    end
+
     for _, tab in pairs(self.tabs) do
         if not tab.neglectSelector and tab.topbarItem then
-            if tab.topbarItemIcon then variables.tweenService:Create(tab.topbarItemIcon, fadeInfo, {ImageTransparency = 1}):Play() end
-            if tab.topbarItemTitle then variables.tweenService:Create(tab.topbarItemTitle, fadeInfo, {TextTransparency = 1}):Play() end
+            tab:_applyVisual('hidden', fadeInfo)
         end
     end
 
@@ -600,8 +559,6 @@ function Window:Hide()
 
         if self.restoreButton then
             self.restoreButton.Visible = true
-            variables.tweenService:Create(self.restoreLabel, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.3}):Play()
-            variables.tweenService:Create(self.restoreFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.3}):Play()
         end
 
         self.animating = false
@@ -643,24 +600,10 @@ function Window:ToggleMinimise()
             self.elements.Visible = true
             self.tabList.Visible = true
 
-            variables.tweenService:Create(self.dividerBottom, fadeInfo, {
-                BackgroundTransparency = 0.85,
-                Size = UDim2.new(1, 0, 0, 1),
-            }):Play()
-            variables.tweenService:Create(self.dividerTop, fadeInfo, {
-                BackgroundTransparency = 0.85,
-                Size = UDim2.new(1, 0, 0, 1),
-            }):Play()
-
             for _, tab in pairs(self.tabs) do
                 if not tab.neglectSelector and tab.topbarItem then
                     tab.topbarItem.Visible = true
-                    if tab.topbarItemIcon then
-                        variables.tweenService:Create(tab.topbarItemIcon, fadeInfo, {ImageTransparency = if self.selectedTab == tab then 0.1 else 0.65}):Play()
-                    end
-                    if tab.topbarItemTitle then
-                        variables.tweenService:Create(tab.topbarItemTitle, fadeInfo, {TextTransparency = if self.selectedTab == tab then 0.1 else 0.65}):Play()
-                    end
+                    tab:_applyVisual(if self.selectedTab == tab then 'selected' else 'unselected', fadeInfo)
                 end
             end
         end)
@@ -681,8 +624,6 @@ function Window:ToggleMinimise()
 
         local fadeOutInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
         variables.tweenService:Create(self.shadowImage, fadeOutInfo, {ImageTransparency = 1}):Play()
-        variables.tweenService:Create(self.dividerTop, fadeOutInfo, {Size = UDim2.fromOffset(0, 1)}):Play()
-        variables.tweenService:Create(self.dividerBottom, fadeOutInfo, {Size = UDim2.fromOffset(0, 1)}):Play()
 
         variables.tweenService:Create(self.main, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
             Size = UDim2.fromOffset(self.size.X.Offset, 66),
@@ -703,57 +644,122 @@ end
 
 function Window:_buildRestoreButton()
     self.restoreButton = self:Create("Frame", {
-        Size = UDim2.fromOffset(140, 28),
-        Position = UDim2.new(0.5, 0, 0, 8),
+        Name = "Show",
+        Size = UDim2.fromOffset(185, 50),
+        Position = UDim2.new(0.5, 0, 0, 20),
         AnchorPoint = Vector2.new(0.5, 0),
-        BackgroundTransparency = 1,
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BorderSizePixel = 0,
         Visible = false,
         ZIndex = 100000,
+
+        BackgroundTransparency = 0,
 
         Parent = self.screenGui,
     })
 
-    self.restoreFrame = self:Create("Frame", {
-        Size = UDim2.fromScale(1, 1),
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.fromScale(0.5, 0.5),
-        BackgroundTransparency = 1,
-        ZIndex = 100000,
+    self:Create("UICorner", {
+        CornerRadius = UDim.new(1, 0),
 
         Parent = self.restoreButton,
-    }, {BackgroundColor3 = {'WindowColor', function(color)
-        if typeof(color) == 'ColorSequence' then
-            return color.Keypoints[1].Value
-        else
-            return color
-        end
-    end}})
+    })
+
+    self.restoreStroke = self:Create("UIStroke", {
+        Color = Color3.fromRGB(255, 255, 255),
+        Transparency = 0.9,
+
+        Parent = self.restoreButton,
+    })
+
+    self:Create("UIGradient", {
+        Rotation = 270,
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(12, 13, 13)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(27, 27, 27)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(35, 35, 35)),
+        }),
+
+        Parent = self.restoreButton,
+    })
+
+    self.restoreIcon = self:Create("ImageLabel", {
+        Name = "icon",
+        AnchorPoint = Vector2.new(0, 0.5),
+        Position = UDim2.new(0, 16, 0.5, 0),
+        Size = UDim2.fromOffset(24, 24),
+        BackgroundTransparency = 1,
+        Image = 'rbxassetid://'..tostring(self.showIcon),
+        ZIndex = 100001,
+
+        ImageTransparency = 0,
+
+        Parent = self.restoreButton,
+    })
 
     self:Create("UICorner", {
         CornerRadius = UDim.new(1, 0),
-        Parent = self.restoreFrame,
+
+        Parent = self.restoreIcon,
     })
 
-    self:Create("UIStroke", {
-        Transparency = 0.85,
-        Color = Color3.fromRGB(255, 255, 255),
-        Parent = self.restoreFrame,
+    local textContainer = self:Create("Frame", {
+        AnchorPoint = Vector2.new(0, 0.5),
+        Position = UDim2.new(0, 50, 0.5, 0),
+        Size = UDim2.new(1, -60, 0, 32),
+        BackgroundTransparency = 1,
+        ZIndex = 100001,
+
+        Parent = self.restoreButton,
+    })
+
+    self:Create("UIListLayout", {
+        Padding = UDim.new(0, 1),
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+
+        Parent = textContainer,
     })
 
     self.restoreLabel = self:Create("TextLabel", {
-        Text = 'Show Rayfield',
-        Size = UDim2.fromScale(1, 1),
+        Name = "Title",
+        Text = self.showName,
+        Size = UDim2.new(1, 0, 0, 16),
         BackgroundTransparency = 1,
-        TextSize = 13,
-        TextTransparency = 1,
+        FontFace = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium),
+        RichText = true,
+        TextColor3 = Color3.fromRGB(240, 240, 240),
+        TextSize = 16,
+        TextWrapped = true,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        LayoutOrder = 1,
         ZIndex = 100001,
 
-        Parent = self.restoreFrame,
-    }, {TextColor3 = 'TitlingColor', FontFace = 'Font'})
+        TextTransparency = 0,
+
+        Parent = textContainer,
+    })
+
+    self.restoreSubtitle = self:Create("TextLabel", {
+        Name = "License",
+        Text = "Tap to show",
+        Size = UDim2.new(1, 0, 0, 14),
+        BackgroundTransparency = 1,
+        FontFace = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium),
+        TextColor3 = Color3.fromRGB(255, 255, 255),
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        LayoutOrder = 2,
+        ZIndex = 100001,
+
+        TextTransparency = 0.5,
+
+        Parent = textContainer,
+    })
 
     local restoreInteract = self:Create("TextButton", {
         BackgroundTransparency = 1,
         Size = UDim2.fromScale(1, 1),
+        Text = "",
         TextTransparency = 1,
         ZIndex = 100002,
 
@@ -762,16 +768,6 @@ function Window:_buildRestoreButton()
 
     self:Connect(restoreInteract.MouseButton1Click, function()
         self:ToggleHide()
-    end)
-
-    self:Connect(restoreInteract.MouseEnter, function()
-        variables.tweenService:Create(self.restoreFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.1}):Play()
-        variables.tweenService:Create(self.restoreLabel, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
-    end)
-
-    self:Connect(restoreInteract.MouseLeave, function()
-        variables.tweenService:Create(self.restoreFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.3}):Play()
-        variables.tweenService:Create(self.restoreLabel, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.3}):Play()
     end)
 end
 
@@ -808,6 +804,194 @@ function Window:_buildSettingsUI()
             }):Play()
         end
     })
+end
+
+function Window:_buildLicense()
+    -- "Signed in as" welcome card, shown once for a new/changed account (sits above the topbar)
+    self.license = self:Create("Frame", {
+        Name = "License",
+        AnchorPoint = Vector2.new(0, 1),
+        Position = UDim2.new(0, 0, 0, 65),
+        Size = UDim2.fromOffset(200, 50),
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BorderSizePixel = 0,
+        ZIndex = 0,
+        Visible = false,
+
+        Parent = self.main,
+    })
+
+    self:Create("UICorner", {
+        CornerRadius = UDim.new(1, 0),
+
+        Parent = self.license,
+    })
+
+    self.licenseStroke = self:Create("UIStroke", {
+        Color = Color3.fromRGB(255, 255, 255),
+        Transparency = 1, -- In = 0.9
+
+        Parent = self.license,
+    })
+
+    self:Create("UIGradient", {
+        Rotation = 270,
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(12, 13, 13)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(27, 27, 27)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(35, 35, 35)),
+        }),
+
+        Parent = self.license,
+    })
+
+    self.licenseAvatar = self:Create("ImageLabel", {
+        Name = "Avatar",
+        AnchorPoint = Vector2.new(0, 0.5),
+        Position = UDim2.new(0, 10, 0.5, 0),
+        Size = UDim2.fromOffset(32, 32),
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BorderSizePixel = 0,
+        ZIndex = 0,
+        Image = `rbxthumb://type=AvatarHeadShot&id={variables.localPlayer.UserId}&w=48&h=48`,
+
+        -- Animation
+        BackgroundTransparency = 1, -- In = 0.95
+        ImageTransparency = 1, -- In = 0
+
+        Parent = self.license,
+    })
+
+    self:Create("UICorner", {
+        CornerRadius = UDim.new(1, 0),
+
+        Parent = self.licenseAvatar,
+    })
+
+    local container = self:Create("Frame", {
+        AnchorPoint = Vector2.new(0, 0.5),
+        Position = UDim2.new(0, 50, 0.5, 0),
+        Size = UDim2.new(1, -60, 0, 32),
+        BackgroundTransparency = 1,
+        ZIndex = 0,
+
+        Parent = self.license,
+    })
+
+    self:Create("UIListLayout", {
+        Padding = UDim.new(0, 1),
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+
+        Parent = container,
+    })
+
+    self.licenseSubtitle = self:Create("TextLabel", {
+        Name = "License",
+        Text = "Signed in as",
+        Size = UDim2.new(1, 0, 0, 14),
+        BackgroundTransparency = 1,
+        FontFace = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium),
+        TextColor3 = Color3.fromRGB(255, 255, 255),
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ZIndex = 0,
+
+        -- Animation
+        TextTransparency = 1, -- In = 0.5
+
+        Parent = container,
+    })
+
+    self.licenseTitle = self:Create("TextLabel", {
+        Name = "Title",
+        Text = variables.localPlayer.DisplayName,
+        Size = UDim2.new(1, 0, 0, 16),
+        BackgroundTransparency = 1,
+        FontFace = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium),
+        RichText = true,
+        TextColor3 = Color3.fromRGB(240, 240, 240),
+        TextSize = 16,
+        TextWrapped = true,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        LayoutOrder = 1,
+        ZIndex = 0,
+
+        -- Animation
+        TextTransparency = 1, -- In = 0
+
+        Parent = container,
+    })
+end
+
+function Window:_isNewUser()
+    -- No filesystem available — just show the banner every launch.
+    if typeof(filesystem.isfile) ~= "function" or typeof(filesystem.writefile) ~= "function" then
+        return true
+    end
+
+    local path = 'Rayfield/lastuser.txt'
+    local currentId = tostring(variables.localPlayer.UserId)
+    local isNew = true
+
+    pcall(function()
+        if filesystem.isfile(path) then
+            isNew = filesystem.readfile(path) ~= currentId
+        end
+    end)
+
+    pcall(function()
+        if typeof(filesystem.isfolder) == "function" and not filesystem.isfolder('Rayfield') then
+            filesystem.makefolder('Rayfield')
+        end
+        filesystem.writefile(path, currentId)
+    end)
+
+    return isNew
+end
+
+function Window:_setLicenseShown(shown, tweenInfo)
+    -- Fade as well as slide, so if the window is minimised mid-animation the banner just
+    -- fades out instead of being left abruptly clipped or repositioned.
+    local targets = {
+        [self.license] = { BackgroundTransparency = if shown then 0 else 1 },
+        [self.licenseStroke] = { Transparency = if shown then 0.9 else 1 },
+        [self.licenseAvatar] = { BackgroundTransparency = if shown then 0.95 else 1, ImageTransparency = if shown then 0 else 1 },
+        [self.licenseSubtitle] = { TextTransparency = if shown then 0.5 else 1 },
+        [self.licenseTitle] = { TextTransparency = if shown then 0 else 1 },
+    }
+
+    for instance, props in targets do
+        if tweenInfo then
+            variables.tweenService:Create(instance, tweenInfo, props):Play()
+        else
+            for property, value in props do
+                instance[property] = value
+            end
+        end
+    end
+end
+
+function Window:_playLicenseBanner()
+    task.spawn(function()
+        local slideInfo = TweenInfo.new(0.7, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+
+        self.license.Position = UDim2.new(0, 0, 0, 65)
+        self:_setLicenseShown(false)
+        self.license.Visible = true
+
+        -- Slide down + fade in, hold ~3s, then slide back up + fade out and hide.
+        variables.tweenService:Create(self.license, slideInfo, {Position = UDim2.new(0, 0, 0, -8)}):Play()
+        self:_setLicenseShown(true, slideInfo)
+
+        task.wait(3)
+
+        variables.tweenService:Create(self.license, slideInfo, {Position = UDim2.new(0, 0, 0, 65)}):Play()
+        self:_setLicenseShown(false, slideInfo)
+
+        task.wait(0.7)
+        self.license.Visible = false
+    end)
 end
 
 function Window:GetSettingsPath()
@@ -853,9 +1037,6 @@ end
 function Window:LoadSettings()
     local _, fullPath = self:GetSettingsPath()
 
-    local exists = pcall(function() return filesystem.isfile(fullPath) end)
-    if not exists then return false end
-
     local fileExists = false
     pcall(function() fileExists = filesystem.isfile(fullPath) end)
     if not fileExists then return false end
@@ -898,10 +1079,15 @@ function Window:_setElementsShown()
                 element.containerStroke.Transparency = 0.85
                 element.functionContainer.BackgroundTransparency = 0.9
             elseif elementType == 'Statistic' then
-                element.gradientContainer.BackgroundTransparency = 0.7
+                element.gradientContainer.BackgroundTransparency = 0
                 element.glowImage.ImageTransparency = 0.6
                 element.valueLabel.TextTransparency = 0
                 element.changeLabel.TextTransparency = 0
+            elseif elementType == 'Slider' then
+                element.track.BackgroundTransparency = 0
+                element.progress.BackgroundTransparency = 0
+                element.handle.BackgroundTransparency = 0
+                element.valueLabel.TextTransparency = 0.3
             end
         end
     end
@@ -920,13 +1106,7 @@ function Window:Show()
     variables.rayfieldHidden = false
 
     if self.restoreButton then
-        variables.tweenService:Create(self.restoreLabel, TweenInfo.new(0.15, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 1}):Play()
-        variables.tweenService:Create(self.restoreFrame, TweenInfo.new(0.15, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
-        task.delay(0.15, function()
-            if self.restoreButton then
-                self.restoreButton.Visible = false
-            end
-        end)
+        self.restoreButton.Visible = false
     end
 
     if self.hasShownOnce then
@@ -950,9 +1130,6 @@ function Window:_quickRestore()
     variables.tweenService:Create(self.main, fadeInfo, {BackgroundTransparency = 0}):Play()
     variables.tweenService:Create(self.shadowImage, fadeInfo, {ImageTransparency = 0.6}):Play()
 
-    variables.tweenService:Create(self.dividerTop, fadeInfo, {BackgroundTransparency = 0.85, Size = UDim2.new(1, 0, 0, 1)}):Play()
-    variables.tweenService:Create(self.dividerBottom, fadeInfo, {BackgroundTransparency = 0.85, Size = UDim2.new(1, 0, 0, 1)}):Play()
-
     if self.topbarIcon then variables.tweenService:Create(self.topbarIcon, fadeInfo, {ImageTransparency = 0}):Play() end
     if self.title then variables.tweenService:Create(self.title, fadeInfo, {TextTransparency = 0}):Play() end
     if self.subtitle then variables.tweenService:Create(self.subtitle, fadeInfo, {TextTransparency = 0.7}):Play() end
@@ -963,15 +1140,14 @@ function Window:_quickRestore()
         end
     end
 
+    for _, tag in self.tags do
+        tag:_setShown(true, fadeInfo)
+    end
+
     for _, tab in pairs(self.tabs) do
         if not tab.neglectSelector and tab.topbarItem then
             tab.topbarItem.Visible = true
-            if tab.topbarItemIcon then
-                variables.tweenService:Create(tab.topbarItemIcon, fadeInfo, {ImageTransparency = if self.selectedTab == tab then 0.1 else 0.65}):Play()
-            end
-            if tab.topbarItemTitle then
-                variables.tweenService:Create(tab.topbarItemTitle, fadeInfo, {TextTransparency = if self.selectedTab == tab then 0.1 else 0.65}):Play()
-            end
+            tab:_applyVisual(if self.selectedTab == tab then 'selected' else 'unselected', fadeInfo)
         end
     end
 
@@ -995,9 +1171,7 @@ function Window:_firstShow()
     variables.tweenService:Create(self.main, TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut), {BackgroundTransparency = 0, Size = self.size}):Play()
     task.wait(0.5)
     variables.tweenService:Create(self.shadowImage, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.6}):Play()
-    task.wait(0.2)
-    variables.tweenService:Create(self.dividerTop, TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.85, Size = UDim2.new(1, 0, 0, 1)}):Play()
-    task.wait(0.1)
+    task.wait(0.3)
 
     if self.icon then variables.tweenService:Create(self.topbarIcon, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play() end
     if self.title then variables.tweenService:Create(self.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play() end
@@ -1011,23 +1185,17 @@ function Window:_firstShow()
         end
     end
 
+    for _, tag in self.tags do
+        tag:_setShown(true, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out))
+    end
+
     task.wait(0.2)
-    variables.tweenService:Create(self.dividerBottom, TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.85, Size = UDim2.new(1, 0, 0, 1)}):Play()
 
     task.spawn(function()
         for _, tab in pairs(self.tabs) do
             if not tab.neglectSelector then
                 tab.topbarItem.Visible = true
-
-                if tab.icon then
-                    variables.tweenService:Create(tab.topbarItemIcon, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = if self.selectedTab == tab then 0.1 else 0.65}):Play()
-                end
-
-                task.wait(0.04)
-
-                if tab.name then
-                    variables.tweenService:Create(tab.topbarItemTitle, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = if self.selectedTab == tab then 0.1 else 0.65}):Play()
-                end
+                tab:_applyVisual(if self.selectedTab == tab then 'selected' else 'unselected', TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out))
 
                 task.wait(0.15)
             end
@@ -1062,10 +1230,15 @@ function Window:_firstShow()
                 elseif elementType == 'Button' then
 
                 elseif elementType == 'Statistic' then
-                    variables.tweenService:Create(element.gradientContainer, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.7}):Play()
+                    variables.tweenService:Create(element.gradientContainer, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
                     variables.tweenService:Create(element.glowImage, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.6}):Play()
                     variables.tweenService:Create(element.valueLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
                     variables.tweenService:Create(element.changeLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
+                elseif elementType == 'Slider' then
+                    variables.tweenService:Create(element.track, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
+                    variables.tweenService:Create(element.progress, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
+                    variables.tweenService:Create(element.handle, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
+                    variables.tweenService:Create(element.valueLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0.3}):Play()
                 end
 
                 if elementIndex <= maxStaggeredElements then
@@ -1094,10 +1267,15 @@ function Window:_firstShow()
                     element.containerStroke.Transparency = 0.85
                     element.functionContainer.BackgroundTransparency = 0.9
                 elseif elementType == 'Statistic' then
-                    element.gradientContainer.BackgroundTransparency = 0.7
+                    element.gradientContainer.BackgroundTransparency = 0
                     element.glowImage.ImageTransparency = 0.6
                     element.valueLabel.TextTransparency = 0
                     element.changeLabel.TextTransparency = 0
+                elseif elementType == 'Slider' then
+                    element.track.BackgroundTransparency = 0
+                    element.progress.BackgroundTransparency = 0
+                    element.handle.BackgroundTransparency = 0
+                    element.valueLabel.TextTransparency = 0.3
                 end
             end
         end
@@ -1110,6 +1288,11 @@ function Window:_firstShow()
     variables.tweenService:Create(self.drag.dragCosmetic, TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(100, 4)}):Play()
 
     self.animating = false
+
+    -- Welcome the user once if this is a new/changed account on this device.
+    if self:_isNewUser() then
+        self:_playLicenseBanner()
+    end
 end
 
 function Window:GetPath()

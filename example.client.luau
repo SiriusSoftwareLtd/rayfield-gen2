@@ -15,10 +15,15 @@ local window = Rayfield:CreateWindow({
     },
 })
 
+window:CreateTag({
+    text = 'us-en',
+    icon = 75184136063371,
+    color = Color3.fromRGB(255, 175, 15),
+})
 
 -- General
 local generalTab = window:CreateTab({
-    name = 'General',
+    name = 'Home',
     icon = 93364949241311,
 })
 
@@ -40,6 +45,17 @@ generalTab:CreateToggle({
     flag = 'ReducedMotion',
     callback = function(value)
         print('Reduced Motion:', value)
+    end
+})
+
+generalTab:CreateSlider({
+    name = 'Field of View',
+    range = {70, 120},
+    increment = 1,
+    value = 90,
+    suffix = '°',
+    callback = function(value)
+        print('FOV:', value)
     end
 })
 
@@ -72,7 +88,7 @@ generalTab:CreateButton({
 
 -- stats
 local statsTab = window:CreateTab({
-    name = 'Statistics',
+    name = 'Numbers',
     icon = 85925158736685,
 })
 

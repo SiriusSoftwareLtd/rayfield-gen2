@@ -9,6 +9,17 @@ local SignalEngine = require(utility.SignalEngine)
 -- Variables
 local variables = require(utility.variables)
 
+-- Pill transparencies per state. Gradient stays constant (theme TabBackground/TabStroke), selection is just transparency.
+local tabStates = {
+    selected   = { background = 0,   stroke = 0,   content = 0 },
+    hover      = { background = 0.4, stroke = 0.3, content = 0.3 },
+    unselected = { background = 0.8, stroke = 0.65, content = 0.5 },
+    hidden     = { background = 1,   stroke = 1,   content = 1 },
+}
+
+local selectTweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+local hoverTweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
 function Tab.new(window, properties)
     properties = if typeof(properties) == "table" then properties else {}
 
@@ -29,14 +40,14 @@ function Tab.new(window, properties)
     if not self.neglectSelector then -- Allow for tabs to be hidden from the tab selector, for Rayfield Settings.
         -- Topbar Item
         self.topbarItem = self.window:Create("Frame", {
-
-            Size = UDim2.fromScale(0, 1),
-            BackgroundTransparency = 1,
-            BorderSizePixel = 0,
-            AutomaticSize = Enum.AutomaticSize.XY,
             Name = self.name,
+            Size = UDim2.fromOffset(0, 34), -- min size, grows with content
+            AutomaticSize = Enum.AutomaticSize.X,
+            BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+            BorderSizePixel = 0,
 
             -- Animation
+            BackgroundTransparency = 1, -- In = 0 / 0.8
             Visible = false, -- In = true
 
             LayoutOrder = self.customOrder or 0,
@@ -44,19 +55,74 @@ function Tab.new(window, properties)
             Parent = self.window.tabList,
         })
 
-        self.topbarItemContainer = self.window:Create("Frame", {
-
-            AnchorPoint = Vector2.new(0, 0.5),
-            Position = UDim2.fromScale(0, 0.5),
-            Size = UDim2.fromOffset(0, 0),
+        self.topbarItemInteract = self.window:Create("TextButton", {
+            Active = false,
             BackgroundTransparency = 1,
+            Size = UDim2.fromScale(1, 1),
             BorderSizePixel = 0,
-            AutomaticSize = Enum.AutomaticSize.XY,
+            Text = "",
+            TextTransparency = 1,
 
             Parent = self.topbarItem,
         })
 
-        self.topbarItemContainerListLayout = self.window:Create('UIListLayout', {
+        self.window:Create("UICorner", {
+            CornerRadius = UDim.new(1, 0),
+
+            Parent = self.topbarItem,
+        })
+
+        self.topbarItemGradient = self.window:Create("UIGradient", {
+            Rotation = 90,
+
+            Parent = self.topbarItem,
+        }, {Color = {'TabBackground', function(color)
+            if typeof(color) == 'ColorSequence' then
+                return color
+            else
+                return ColorSequence.new(color)
+            end
+        end}})
+
+        self.topbarItemStroke = self.window:Create("UIStroke", {
+            ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+            Color = Color3.fromRGB(255, 255, 255),
+
+            -- Animation
+            Transparency = 1, -- In = 0 / 0.5
+
+            Parent = self.topbarItem,
+        })
+
+        self.topbarItemStrokeGradient = self.window:Create("UIGradient", {
+            Rotation = 90,
+
+            Parent = self.topbarItemStroke,
+        }, {Color = {'TabStroke', function(color)
+            if typeof(color) == 'ColorSequence' then
+                return color
+            else
+                return ColorSequence.new(color)
+            end
+        end}})
+
+        self.topbarItemContainer = self.window:Create("Frame", {
+            Size = UDim2.fromOffset(0, 34),
+            AutomaticSize = Enum.AutomaticSize.X,
+            BackgroundTransparency = 1,
+            BorderSizePixel = 0,
+
+            Parent = self.topbarItem,
+        })
+
+        self.window:Create("UIPadding", {
+            PaddingLeft = UDim.new(0, 13),
+            PaddingRight = UDim.new(0, 14),
+
+            Parent = self.topbarItemContainer,
+        })
+
+        self.topbarItemLayout = self.window:Create('UIListLayout', {
             Padding = UDim.new(0, 6),
             FillDirection = Enum.FillDirection.Horizontal,
             VerticalAlignment = Enum.VerticalAlignment.Center,
@@ -70,14 +136,14 @@ function Tab.new(window, properties)
             self.topbarItemIcon = self.window:Create("ImageLabel", {
                 -- Configurables
                 Image = 'rbxassetid://'..tostring(self.icon),
-                
+
                 Size = UDim2.fromOffset(16, 16),
                 BorderSizePixel = 0,
                 BackgroundTransparency = 1,
 
                 -- Animation
-                ImageTransparency = 1, -- In = 0.65
-           
+                ImageTransparency = 1, -- In = 0 / 0.5
+
                 Parent = self.topbarItemContainer
             }, {ImageColor3 = 'TabColor'})
         end
@@ -91,30 +157,20 @@ function Tab.new(window, properties)
                 BorderSizePixel = 0,
                 BackgroundTransparency = 1,
                 TextSize = 16,
-                AutomaticSize = Enum.AutomaticSize.X,
+                AutomaticSize = Enum.AutomaticSize.XY,
                 TextXAlignment = Enum.TextXAlignment.Left,
                 TextWrapped = true,
+                LayoutOrder = 1,
 
                 -- Animation
-                TextTransparency = 1, -- In = 0.65
-            
+                TextTransparency = 1, -- In = 0 / 0.5
+
                 Parent = self.topbarItemContainer
             }, {TextColor3 = 'TabColor', FontFace = 'Font'})
         end
 
-        self.topbarItemInteract = self.window:Create("TextButton", {
-            BackgroundTransparency = 1,
-            Size = UDim2.fromScale(1, 1),
-            BorderSizePixel = 0,
-            Position = UDim2.fromScale(0.5, 0.5),
-            AnchorPoint = Vector2.new(0.5, 0.5),
-            TextTransparency = 1,
-
-            Parent = self.topbarItem,
-        })
-
     end
-    
+
     -- Tab Page
     self.tabPage = self.window:Create("ScrollingFrame", {
         Name = self.name,
@@ -164,31 +220,19 @@ function Tab.new(window, properties)
     })
 
     if not self.neglectSelector then
-        self.window:Connect(self.topbarItemInteract.MouseButton1Click, function() 
+        self.window:Connect(self.topbarItemInteract.MouseButton1Click, function()
            self:Select()
         end)
 
-        self.window:Connect(self.topbarItemInteract.MouseEnter, function() 
+        self.window:Connect(self.topbarItemInteract.MouseEnter, function()
             if self.window.selectedTab ~= self then
-                if self.icon then
-                    variables.tweenService:Create(self.topbarItemIcon, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.45}):Play()
-                end
-
-                if self.name then
-                    variables.tweenService:Create(self.topbarItemTitle, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.45}):Play()
-                end
+                self:_applyVisual('hover', hoverTweenInfo)
             end
         end)
 
-        self.window:Connect(self.topbarItemInteract.MouseLeave, function() 
+        self.window:Connect(self.topbarItemInteract.MouseLeave, function()
             if self.window.selectedTab ~= self then
-                if self.icon then
-                    variables.tweenService:Create(self.topbarItemIcon, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.65}):Play()
-                end
-                
-                if self.name then
-                    variables.tweenService:Create(self.topbarItemTitle, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.65}):Play()
-                end
+                self:_applyVisual('unselected', hoverTweenInfo)
             end
         end)
     end
@@ -197,21 +241,14 @@ function Tab.new(window, properties)
 
     self.window:Connect(self.window.signal, function(command)
         if command == 'hide' then
-            if not self.neglectSelector then
+            if not self.neglectSelector and self.topbarItem then
                 self.topbarItem.Visible = false
             end
         elseif command == 'show' then
             task.wait(0.75)
-            if not self.neglectSelector then
+            if not self.neglectSelector and self.topbarItem then
                 self.topbarItem.Visible = true
-
-                if self.icon then
-                    variables.tweenService:Create(self.topbarItemIcon, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = if self.window.selectedTab == self then 0.1 else 0.65}):Play()
-                end
-                
-                if self.name then
-                    variables.tweenService:Create(self.topbarItemTitle, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = if self.window.selectedTab == self then 0.1 else 0.65}):Play()
-                end
+                self:_applyVisual(if self.window.selectedTab == self then 'selected' else 'unselected', selectTweenInfo)
             end
         end
     end)
@@ -220,24 +257,42 @@ function Tab.new(window, properties)
 end
 
 
+function Tab:_applyVisual(stateName, tweenInfo)
+    if self.neglectSelector or not self.topbarItem then return end
+
+    local state = tabStates[stateName]
+    if not state then return end
+
+    if tweenInfo then
+        variables.tweenService:Create(self.topbarItem, tweenInfo, { BackgroundTransparency = state.background }):Play()
+        variables.tweenService:Create(self.topbarItemStroke, tweenInfo, { Transparency = state.stroke }):Play()
+        if self.topbarItemIcon then
+            variables.tweenService:Create(self.topbarItemIcon, tweenInfo, { ImageTransparency = state.content }):Play()
+        end
+        if self.topbarItemTitle then
+            variables.tweenService:Create(self.topbarItemTitle, tweenInfo, { TextTransparency = state.content }):Play()
+        end
+    else
+        self.topbarItem.BackgroundTransparency = state.background
+        self.topbarItemStroke.Transparency = state.stroke
+        if self.topbarItemIcon then self.topbarItemIcon.ImageTransparency = state.content end
+        if self.topbarItemTitle then self.topbarItemTitle.TextTransparency = state.content end
+    end
+end
+
 
 function Tab:Select(noAnimation)
     self.window.selectedTab = self
     self.window:Navigate(self.tabPage)
 
+    -- noAnimation = initial selection; the pill is still hidden and the window reveal shows it.
     if not self.neglectSelector and not noAnimation then
-        if self.icon then
-            variables.tweenService:Create(self.topbarItemIcon, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.1}):Play()
-        end
-
-        if self.name then
-            variables.tweenService:Create(self.topbarItemTitle, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.1}):Play()
-        end
+        self:_applyVisual('selected', selectTweenInfo)
     end
 
     for _, tab in self.window.tabs do
         if tab ~= self.window.selectedTab then
-            tab:Deselect()
+            tab:Deselect(noAnimation)
         end
     end
 
@@ -246,15 +301,9 @@ function Tab:Select(noAnimation)
     end
 end
 
-function Tab:Deselect()
-    if not self.neglectSelector then
-        if self.icon then
-            variables.tweenService:Create(self.topbarItemIcon, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.65}):Play()
-        end
-        
-        if self.name then
-            variables.tweenService:Create(self.topbarItemTitle, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.65}):Play()
-        end
+function Tab:Deselect(noAnimation)
+    if not self.neglectSelector and not noAnimation then
+        self:_applyVisual('unselected', selectTweenInfo)
     end
 end
 
@@ -300,6 +349,15 @@ end
 -- Stat
 function Tab:CreateStat(properties)
     local newElement = require(script.Parent.stat).new(self, properties)
+    table.insert(self.elements, newElement)
+    assignOrder(newElement, #self.elements * 10)
+
+    return newElement
+end
+
+-- Slider
+function Tab:CreateSlider(properties)
+    local newElement = require(script.Parent.slider).new(self, properties)
     table.insert(self.elements, newElement)
     assignOrder(newElement, #self.elements * 10)
 

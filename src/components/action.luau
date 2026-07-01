@@ -57,7 +57,15 @@ function Action.new(window, properties)
         Parent = self.action,
     })
 
-    self.window:Connect(self.interact.MouseButton1Click, properties.callback)
+    self.window:Connect(self.interact.MouseButton1Click, function()
+        task.spawn(function()
+            local success, result = pcall(self.callback)
+            if not success then
+                warn(`Rayfield encountered an error, with the callback for a {self.__type} component named '{self.name}':`)
+                print(result)
+            end
+        end)
+    end)
 
     self.window:Connect(self.interact.MouseEnter, function() 
         variables.tweenService:Create(self.iconLabel, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.2}):Play()
