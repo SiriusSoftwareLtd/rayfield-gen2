@@ -13,14 +13,17 @@ local accents = {
     positive = {
         fill = ColorSequence.new(Color3.fromRGB(0, 170, 127), Color3.fromRGB(0, 134, 98)),
         stroke = ColorSequence.new(Color3.fromRGB(0, 213, 156), Color3.fromRGB(0, 189, 135)),
+        glow = Color3.fromRGB(23, 153, 110),
     },
     negative = {
         fill = ColorSequence.new(Color3.fromRGB(172, 47, 47), Color3.fromRGB(135, 37, 37)),
         stroke = ColorSequence.new(Color3.fromRGB(255, 75, 75), Color3.fromRGB(244, 67, 67)),
+        glow = Color3.fromRGB(154, 42, 42),
     },
     neutral = {
         fill = ColorSequence.new(Color3.fromRGB(39, 109, 172), Color3.fromRGB(31, 86, 135)),
         stroke = ColorSequence.new(Color3.fromRGB(63, 175, 255), Color3.fromRGB(56, 155, 244)),
+        glow = Color3.fromRGB(35, 98, 154),
     },
 }
 
@@ -144,31 +147,13 @@ function Statistic.new(tab, properties)
         Parent = self.main,
     })
 
-    self.glowContainer = self.window:Create("Frame", {
-        Size = UDim2.new(1, 35, 1, 35),
-        Position = UDim2.fromScale(0.5, 0.5),
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        BorderSizePixel = 0,
-        BackgroundTransparency = 1,
-        ZIndex = 4,
+    -- Accent glow behind the stat (UIShadow, no image)
+    self.statGlow = self.window:Create("UIShadow", {
+        Color = accents.neutral.glow,
+        Transparency = 1, -- In = 0.4
+        ZIndex = -1,
 
-        Parent = self.main,
-    })
-
-    self.glowImage = self.window:Create("ImageLabel", {
-        Image = 'rbxassetid://5587865193',
-        ImageColor3 = Color3.fromRGB(255, 255, 255),
-        Size = UDim2.fromScale(1.15, 1),
-
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.fromScale(0.5, 0.5),
-        BackgroundTransparency = 1,
-        ZIndex = 4,
-
-        -- Animation
-        ImageTransparency = 1, -- In = 0.6
-
-        Parent = self.glowContainer
+        Parent = self.gradientContainer,
     })
 
     self.title = self.window:Create("TextLabel", {
@@ -201,19 +186,6 @@ function Statistic.new(tab, properties)
 
 
         Parent = self.gradientContainer
-    })
-
-    self.glowGradient = self.window:Create("UIGradient", {
-        Rotation = 2,
-        Offset = Vector2.new(0, 0.5),
-        Color = accents.neutral.fill,
-        Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.85),
-            NumberSequenceKeypoint.new(1, 0),
-          }),
-
-
-        Parent = self.glowImage
     })
 
     self.window:Create("UICorner", {
@@ -303,7 +275,7 @@ function Statistic.new(tab, properties)
             variables.tweenService:Create(self.stroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeTransparency}):Play()
             variables.tweenService:Create(self.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
             variables.tweenService:Create(self.gradientContainer, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
-            variables.tweenService:Create(self.glowImage, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.6}):Play()
+            variables.tweenService:Create(self.statGlow, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = 0.4}):Play()
             variables.tweenService:Create(self.main, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
             variables.tweenService:Create(self.valueLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
             variables.tweenService:Create(self.changeLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
@@ -323,13 +295,13 @@ function Statistic:_setAccent(key, direction)
     local accent = accents[key]
     self.strokeGradient.Color = accent.stroke
     self.mainGradient.Color = accent.fill
-    self.glowGradient.Color = accent.fill
+    variables.tweenService:Create(self.statGlow, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), { Color = accent.glow }):Play()
 
     -- Subtle rotation + offset shift to give the gradient a bit of life
     local rotation = if direction == 1 then 14 elseif direction == -1 then -10 else 2
     local offset = if direction == 1 then Vector2.new(0.04, 0.5) elseif direction == -1 then Vector2.new(-0.04, 0.5) else Vector2.new(0, 0.5)
     local gradientTweenInfo = TweenInfo.new(0.6, Enum.EasingStyle.Exponential)
-    for _, gradient in { self.strokeGradient, self.mainGradient, self.glowGradient } do
+    for _, gradient in { self.strokeGradient, self.mainGradient } do
         variables.tweenService:Create(gradient, gradientTweenInfo, { Rotation = rotation, Offset = offset }):Play()
     end
 end

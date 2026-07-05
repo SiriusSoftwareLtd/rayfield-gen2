@@ -277,46 +277,19 @@ function Window.new(properties)
     })
 
     -- Shadow
-    self.shadowContainer = self:Create("Frame", {
-        
-
-        Size = UDim2.new(1, 35, 1, 35),
-        Position = UDim2.fromScale(0.5, 0.5),
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        BackgroundTransparency = 1,
+    self.windowShadow = self:Create("UIShadow", {
+        -- Animations
+        Transparency = 1, -- In = 0.6
         ZIndex = -1,
 
         Parent = self.main,
-    })
-
-    self.shadowImage = self:Create("ImageLabel", {
-        Image = 5587865193,
-        ImageColor3 = Color3.fromRGB(255, 255, 255),
-        Size = UDim2.fromScale(1.6, 1.3),
-        
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.fromScale(0.5, 0.5),
-        BackgroundTransparency = 1,
-        ZIndex = -1,
-
-        -- Animations
-        ImageTransparency = 1, -- In = 0.6
-       
-        Parent = self.shadowContainer
-    })
-
-    self.shadowGradient = self:Create("UIGradient", {
-        Rotation = 250,
-        Offset = Vector2.new(0, 0.2),
-        Parent = self.shadowImage,
-    }, { 
-        Color = {'ShadowColor', function(color)
+    }, {Color = {'ShadowColor', function(color)
         if typeof(color) == 'ColorSequence' then
-            return color
+            return color.Keypoints[1].Value
         else
-            return ColorSequence.new(color)
+            return color
         end
-    end }})
+    end}})
 
 
     -- Elements Preparation
@@ -474,17 +447,12 @@ function Window.new(properties)
             local tweenInfo = TweenInfo.new(10, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
 
             while not self.unloaded do
-                local tweenS = variables.tweenService:Create(self.shadowGradient, tweenInfo, {
-                    Offset = Vector2.new(if out then 0.4 else -0.2, 0), Rotation = (if out then 220 else 280)
-                })
-
                 local tweenW = variables.tweenService:Create(self.windowGradient, tweenInfo, {
                     Offset = Vector2.new(if out then 0.4 else -0.2, 0), Rotation = (if out then 220 else 280)
                 })
 
                 tweenW:Play()
-                tweenS:Play()
-                tweenS.Completed:Wait()
+                tweenW.Completed:Wait()
                 out = not out
             end
         end)
@@ -559,7 +527,7 @@ function Window:Hide()
     self.drag.drag.Visible = false
 
     variables.tweenService:Create(self.main, fadeInfo, {BackgroundTransparency = 1}):Play()
-    variables.tweenService:Create(self.shadowImage, fadeInfo, {ImageTransparency = 1}):Play()
+    variables.tweenService:Create(self.windowShadow, fadeInfo, {Transparency =1}):Play()
     variables.tweenService:Create(self.bottomFade, fadeInfo, {BackgroundTransparency = 1}):Play()
 
     if self.title then variables.tweenService:Create(self.title, fadeInfo, {TextTransparency = 1}):Play() end
@@ -623,7 +591,7 @@ function Window:ToggleMinimise()
             Size = self.size,
         }):Play()
 
-        variables.tweenService:Create(self.shadowImage, fadeInfo, {ImageTransparency = 0.6}):Play()
+        variables.tweenService:Create(self.windowShadow, fadeInfo, {Transparency =0.6}):Play()
         variables.tweenService:Create(self.bottomFade, fadeInfo, {BackgroundTransparency = 0}):Play()
 
         variables.tweenService:Create(self.drag.drag, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
@@ -660,7 +628,7 @@ function Window:ToggleMinimise()
         end
 
         local fadeOutInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-        variables.tweenService:Create(self.shadowImage, fadeOutInfo, {ImageTransparency = 1}):Play()
+        variables.tweenService:Create(self.windowShadow, fadeOutInfo, {Transparency = 1}):Play()
         variables.tweenService:Create(self.bottomFade, fadeOutInfo, {BackgroundTransparency = 1}):Play()
 
         variables.tweenService:Create(self.main, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
@@ -1118,7 +1086,7 @@ function Window:_setElementsShown()
                 element.functionContainer.BackgroundTransparency = 0.9
             elseif elementType == 'Statistic' then
                 element.gradientContainer.BackgroundTransparency = 0
-                element.glowImage.ImageTransparency = 0.6
+                element.statGlow.Transparency = 0.4
                 element.valueLabel.TextTransparency = 0
                 element.changeLabel.TextTransparency = 0
             elseif elementType == 'Slider' then
@@ -1169,7 +1137,7 @@ function Window:_quickRestore()
     self:_setElementsShown()
 
     variables.tweenService:Create(self.main, fadeInfo, {BackgroundTransparency = 0}):Play()
-    variables.tweenService:Create(self.shadowImage, fadeInfo, {ImageTransparency = 0.6}):Play()
+    variables.tweenService:Create(self.windowShadow, fadeInfo, {Transparency =0.6}):Play()
     variables.tweenService:Create(self.bottomFade, fadeInfo, {BackgroundTransparency = 0}):Play()
 
     if self.topbarIcon then variables.tweenService:Create(self.topbarIcon, fadeInfo, {ImageTransparency = 0}):Play() end
@@ -1212,7 +1180,7 @@ function Window:_firstShow()
     self.main.Visible = true
     variables.tweenService:Create(self.main, TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut), {BackgroundTransparency = 0, Size = self.size}):Play()
     task.wait(0.5)
-    variables.tweenService:Create(self.shadowImage, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.6}):Play()
+    variables.tweenService:Create(self.windowShadow, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = 0.6}):Play()
     variables.tweenService:Create(self.bottomFade, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
     task.wait(0.3)
 
@@ -1274,7 +1242,7 @@ function Window:_firstShow()
 
                 elseif elementType == 'Statistic' then
                     variables.tweenService:Create(element.gradientContainer, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
-                    variables.tweenService:Create(element.glowImage, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.6}):Play()
+                    variables.tweenService:Create(element.statGlow, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = 0.4}):Play()
                     variables.tweenService:Create(element.valueLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
                     variables.tweenService:Create(element.changeLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
                 elseif elementType == 'Slider' then
@@ -1314,7 +1282,7 @@ function Window:_firstShow()
                     element.functionContainer.BackgroundTransparency = 0.9
                 elseif elementType == 'Statistic' then
                     element.gradientContainer.BackgroundTransparency = 0
-                    element.glowImage.ImageTransparency = 0.6
+                    element.statGlow.Transparency = 0.4
                     element.valueLabel.TextTransparency = 0
                     element.changeLabel.TextTransparency = 0
                 elseif elementType == 'Slider' then
