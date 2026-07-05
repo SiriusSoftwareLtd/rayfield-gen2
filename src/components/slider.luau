@@ -53,21 +53,7 @@ function Slider.new(tab, properties)
         Parent = self.tab.tabPage,
     }, {BackgroundTransparency = 'ElementTransparency'})
 
-    self.window:Create("UIGradient", {
-        Rotation = 270,
-
-        Parent = self.main,
-    }, {Color = 'ElementGradient'})
-
-    self.window:Create("UICorner", {
-        Parent = self.main,
-    }, {CornerRadius = 'ElementCornerRadius'})
-
-    self.stroke = self.window:Create("UIStroke", {
-        Transparency = 1,
-
-        Parent = self.main,
-    }, {Color = 'ElementStroke', Transparency = 'ElementStrokeTransparency'})
+    self.stroke = self.window:StyleElementBody(self.main)
 
     -- Left: title (+ icon) stacked over the value
     self.container = self.window:Create("Frame", {
@@ -208,15 +194,8 @@ function Slider.new(tab, properties)
         end
     end}})
 
-    -- Green glow behind the filled progress
-    self.window:Create("UIShadow", {
-        Color = Color3.fromRGB(23, 153, 110),
-        BlurRadius = UDim.new(0, 20),
-        Transparency = 0.55,
-        ZIndex = -1,
-
-        Parent = self.progress,
-    })
+    -- Green glow behind the filled progress (revealed on show)
+    self.progressGlow = self.window:CreateGlow(self.progress, Color3.fromRGB(23, 153, 110), 20, 1)
 
     -- Handle blob: solid white at rest, ghosts + grows a stroke while held
     self.handle = self.window:Create("Frame", {
@@ -237,15 +216,8 @@ function Slider.new(tab, properties)
         Parent = self.handle,
     })
 
-    -- White glow behind the drag handle
-    self.window:Create("UIShadow", {
-        Color = Color3.fromRGB(255, 255, 255),
-        BlurRadius = UDim.new(0, 10),
-        Transparency = 0.8,
-        ZIndex = -1,
-
-        Parent = self.handle,
-    })
+    -- White glow behind the drag handle (revealed on show)
+    self.handleGlow = self.window:CreateGlow(self.handle, Color3.fromRGB(255, 255, 255), 10, 1)
 
     self.handleStroke = self.window:Create("UIStroke", {
         Transparency = 1, -- 0.6 while held
@@ -347,7 +319,7 @@ function Slider:_updateFromMouse()
         self.value = value
         self.valueLabel.Text = self:_format(value)
         self:_renderProgress(followInfo)
-        task.spawn(self.callback, value)
+        self:_fireCallback(value)
     end
 end
 
@@ -361,6 +333,30 @@ function Slider:_setHeld(held)
     end
 end
 
+-- Contained callback: pcall so a bad callback can't spam raw errors on every
+-- drag frame; flash the element red once (debounced) like the other components.
+function Slider:_fireCallback(value)
+    task.spawn(function()
+        local ok, err = pcall(self.callback, value)
+        if ok or self._errored then return end
+        self._errored = true
+
+        variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = self.window.theme.ErrorColor}):Play()
+        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = self.window.theme.ErrorStrokeColor}):Play()
+        self.title.Text = 'Error, log recorded in console.'
+
+        warn(`Rayfield encountered an error, with the callback for a {self.__type} component named '{self.name}':`)
+        print(err)
+
+        task.wait(1)
+
+        self.title.Text = self.name
+        variables.tweenService:Create(self.main, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+        variables.tweenService:Create(self.stroke, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = self.window.theme.ElementStroke}):Play()
+        self._errored = false
+    end)
+end
+
 function Slider:Set(value, skipCallback)
     value = math.clamp(math.round(value / self.increment) * self.increment, self.range[1], self.range[2])
     self.value = value
@@ -368,8 +364,22 @@ function Slider:Set(value, skipCallback)
     self:_renderProgress(tweenInfo)
 
     if not skipCallback then
-        task.spawn(self.callback, value)
+        self:_fireCallback(value)
     end
+end
+
+-- glows delayed so they don't float in before the bar during the window-open fade
+local sliderGlowReveal = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out, 0, false, 0.35)
+
+function Slider:_setShown(animate)
+    local w = self.window
+    w:_revealCommon(self, animate)
+    w:_reveal(self.track, {BackgroundTransparency = 0}, animate)
+    w:_reveal(self.progress, {BackgroundTransparency = 0}, animate)
+    w:_reveal(self.handle, {BackgroundTransparency = 0}, animate)
+    w:_reveal(self.valueLabel, {TextTransparency = 0.3}, animate)
+    w:_reveal(self.progressGlow, {Transparency = 0.55}, animate, sliderGlowReveal)
+    w:_reveal(self.handleGlow, {Transparency = 0.8}, animate, sliderGlowReveal)
 end
 
 function Slider:MoveTo(index)

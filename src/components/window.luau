@@ -16,6 +16,9 @@ local themes = script.Parent.Parent.themes
 local Window = {}
 Window.__index = Window
 
+-- Default entrance-reveal tween (elements override with their own where needed)
+local REVEAL_INFO = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+
 function Window.new(properties)
     properties = if typeof(properties) == "table" then properties else {}
 
@@ -1067,40 +1070,7 @@ end
 function Window:_setElementsShown()
     for _, tab in pairs(self.tabs) do
         for _, element in ipairs(tab.elements) do
-            local elementType = element.__type
-
-            if elementType == 'Section' then
-                element.title.TextTransparency = 0.6
-                if element.iconLabel then element.iconLabel.ImageTransparency = 0.65 end
-            else
-                element.stroke.Transparency = self.theme.ElementStrokeTransparency
-                element.title.TextTransparency = 0
-                element.main.BackgroundTransparency = self.theme.ElementTransparency or 0
-                if element.iconLabel then element.iconLabel.ImageTransparency = 0 end
-                if element.descriptor then element.descriptor.titleLabel.TextTransparency = 0.7 end
-            end
-
-            if elementType == 'Toggle' then
-                element.indicator.BackgroundTransparency = if element.value then 0 else 0.8
-                element.indicatorStroke.Transparency = if element.value then 0 else 0.7
-                element.indicatorGlow.Transparency = if element.value then 0.4 else 1
-                element.overlay.BackgroundTransparency = 0
-                element.containerStroke.Transparency = 0.85
-                element.functionContainer.BackgroundTransparency = 0.9
-            elseif elementType == 'Statistic' then
-                element.gradientContainer.BackgroundTransparency = 0
-                element.glowImage.ImageTransparency = 0.6
-                element.valueLabel.TextTransparency = 0
-                element.changeLabel.TextTransparency = 0
-            elseif elementType == 'Slider' then
-                element.track.BackgroundTransparency = 0
-                element.progress.BackgroundTransparency = 0
-                element.handle.BackgroundTransparency = 0
-                element.valueLabel.TextTransparency = 0.3
-            elseif elementType == 'Dropdown' then
-                element.selectedLabel.TextTransparency = 0.5
-                element.chevron.ImageTransparency = 0.5
-            end
+            element:_setShown(false)
         end
     end
 end
@@ -1222,43 +1192,7 @@ function Window:_firstShow()
             local maxStaggeredElements = math.floor(2 / perElementDelay)
 
             for elementIndex, element in ipairs(tab.elements) do
-                local elementType = element.__type
-
-                if elementType == 'Section' then
-                    variables.tweenService:Create(element.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0.6}):Play()
-                    if element.iconLabel then variables.tweenService:Create(element.iconLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.65}):Play() end
-                else
-                    variables.tweenService:Create(element.stroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = self.theme.ElementStrokeTransparency}):Play()
-                    variables.tweenService:Create(element.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
-                    variables.tweenService:Create(element.main, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
-                    if element.iconLabel then variables.tweenService:Create(element.iconLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play() end
-                    if element.descriptor then variables.tweenService:Create(element.descriptor.titleLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0.7}):Play() end
-                end
-
-                if elementType == 'Toggle' then
-                    variables.tweenService:Create(element.indicator, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = element.value and 0 or 0.8}):Play()
-                    variables.tweenService:Create(element.indicatorStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = element.value and 0 or 0.7}):Play()
-                    -- Delay the glow until the element fill is opaque, so it doesn't bleed through the fade-in
-                    variables.tweenService:Create(element.indicatorGlow, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out, 0, false, 0.35), {Transparency = element.value and 0.4 or 1}):Play()
-                    variables.tweenService:Create(element.overlay, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
-                    variables.tweenService:Create(element.containerStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = 0.85}):Play()
-                    variables.tweenService:Create(element.functionContainer, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.9}):Play()
-                elseif elementType == 'Button' then
-
-                elseif elementType == 'Statistic' then
-                    variables.tweenService:Create(element.gradientContainer, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
-                    variables.tweenService:Create(element.glowImage, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.6}):Play()
-                    variables.tweenService:Create(element.valueLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
-                    variables.tweenService:Create(element.changeLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
-                elseif elementType == 'Slider' then
-                    variables.tweenService:Create(element.track, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
-                    variables.tweenService:Create(element.progress, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
-                    variables.tweenService:Create(element.handle, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
-                    variables.tweenService:Create(element.valueLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0.3}):Play()
-                elseif elementType == 'Dropdown' then
-                    variables.tweenService:Create(element.selectedLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0.5}):Play()
-                    variables.tweenService:Create(element.chevron, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.5}):Play()
-                end
+                element:_setShown(true)
 
                 if elementIndex <= maxStaggeredElements then
                     task.wait(perElementDelay)
@@ -1266,40 +1200,7 @@ function Window:_firstShow()
             end
         else
             for _, element in ipairs(tab.elements) do
-                local elementType = element.__type
-
-                if elementType == 'Section' then
-                    element.title.TextTransparency = 0.6
-                    if element.iconLabel then element.iconLabel.ImageTransparency = 0.65 end
-                else
-                    element.stroke.Transparency = self.theme.ElementStrokeTransparency
-                    element.title.TextTransparency = 0
-                    element.main.BackgroundTransparency = 0
-                    if element.iconLabel then element.iconLabel.ImageTransparency = 0 end
-                    if element.descriptor then element.descriptor.titleLabel.TextTransparency = 0.7 end
-                end
-
-                if elementType == 'Toggle' then
-                    element.indicator.BackgroundTransparency = if element.value then 0 else 0.8
-                    element.indicatorStroke.Transparency = if element.value then 0 else 0.7
-                    element.indicatorGlow.Transparency = if element.value then 0.4 else 1
-                    element.overlay.BackgroundTransparency = 0
-                    element.containerStroke.Transparency = 0.85
-                    element.functionContainer.BackgroundTransparency = 0.9
-                elseif elementType == 'Statistic' then
-                    element.gradientContainer.BackgroundTransparency = 0
-                    element.glowImage.ImageTransparency = 0.6
-                    element.valueLabel.TextTransparency = 0
-                    element.changeLabel.TextTransparency = 0
-                elseif elementType == 'Slider' then
-                    element.track.BackgroundTransparency = 0
-                    element.progress.BackgroundTransparency = 0
-                    element.handle.BackgroundTransparency = 0
-                    element.valueLabel.TextTransparency = 0.3
-                elseif elementType == 'Dropdown' then
-                    element.selectedLabel.TextTransparency = 0.5
-                    element.chevron.ImageTransparency = 0.5
-                end
+                element:_setShown(false)
             end
         end
     end
@@ -1458,6 +1359,79 @@ function Window:Create(className, properties, themeProperties)
 
     table.insert(self.instances, instance)
     return instance
+end
+
+-- Soft glow behind a GuiObject via a native UIShadow (no image). ZIndex -1 keeps it behind.
+function Window:CreateGlow(parent, color, blur, transparency)
+    return self:Create("UIShadow", {
+        Color = color,
+        BlurRadius = UDim.new(0, blur),
+        Transparency = transparency,
+        ZIndex = -1,
+
+        Parent = parent,
+    })
+end
+
+-- Additive white hover-brighten overlay filling an element (fill colour comes from the gradient).
+-- Tween its BackgroundTransparency 1 -> ~0.97 on hover.
+function Window:CreateHoverOverlay(parent)
+    local overlay = self:Create("Frame", {
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BackgroundTransparency = 1,
+        Size = UDim2.fromScale(1, 1),
+        BorderSizePixel = 0,
+        ZIndex = 1,
+
+        Parent = parent,
+    })
+
+    self:Create("UICorner", {
+        Parent = overlay,
+    }, {CornerRadius = 'ElementCornerRadius'})
+
+    return overlay
+end
+
+-- Standard element body: white base + gradient fill + rounded corner + flat stroke (hidden until shown).
+-- Returns the stroke; call after creating `main` with a white BackgroundColor3.
+function Window:StyleElementBody(main)
+    self:Create("UIGradient", {
+        Rotation = 270,
+
+        Parent = main,
+    }, {Color = 'ElementGradient'})
+
+    self:Create("UICorner", {
+        Parent = main,
+    }, {CornerRadius = 'ElementCornerRadius'})
+
+    return self:Create("UIStroke", {
+        Transparency = 1,
+
+        Parent = main,
+    }, {Color = 'ElementStroke', Transparency = 'ElementStrokeTransparency'})
+end
+
+-- Reveal a single instance: instantly set props when animate is false, else tween them with info.
+function Window:_reveal(instance, props, animate, info)
+    if not instance then return end
+    if animate then
+        variables.tweenService:Create(instance, info or REVEAL_INFO, props):Play()
+    else
+        for property, value in props do
+            instance[property] = value
+        end
+    end
+end
+
+-- Reveal the parts every non-Section element shares (fill/stroke/title/icon/descriptor).
+function Window:_revealCommon(element, animate)
+    self:_reveal(element.stroke, {Transparency = self.theme.ElementStrokeTransparency}, animate)
+    self:_reveal(element.title, {TextTransparency = 0}, animate)
+    self:_reveal(element.main, {BackgroundTransparency = self.theme.ElementTransparency or 0}, animate)
+    if element.iconLabel then self:_reveal(element.iconLabel, {ImageTransparency = 0}, animate) end
+    if element.descriptor then self:_reveal(element.descriptor.titleLabel, {TextTransparency = 0.7}, animate) end
 end
 
 function Window:Connect(signal, callback)

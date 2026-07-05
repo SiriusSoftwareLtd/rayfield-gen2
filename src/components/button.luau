@@ -33,36 +33,8 @@ function Button.new(tab, properties)
         Parent = self.tab.tabPage,
     }, {BackgroundTransparency = 'ElementTransparency'})
 
-    self.window:Create("UIGradient", {
-        Rotation = 270,
-
-        Parent = self.main,
-    }, {Color = 'ElementGradient'})
-
-    -- Additive hover brighten (fill colour comes from the gradient now)
-    self.hoverOverlay = self.window:Create("Frame", {
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-        BackgroundTransparency = 1, -- hover -> 0.97
-        Size = UDim2.fromScale(1, 1),
-        BorderSizePixel = 0,
-        ZIndex = 1,
-
-        Parent = self.main,
-    })
-
-    self.window:Create("UICorner", {
-        Parent = self.hoverOverlay,
-    }, {CornerRadius = 'ElementCornerRadius'})
-
-    self.window:Create("UICorner", {
-        Parent = self.main,
-    }, {CornerRadius = 'ElementCornerRadius'})
-
-    self.stroke = self.window:Create("UIStroke", {
-        Transparency = 1,
-
-        Parent = self.main,
-    }, {Color = 'ElementStroke', Transparency = 'ElementStrokeTransparency'})
+    self.stroke = self.window:StyleElementBody(self.main)
+    self.hoverOverlay = self.window:CreateHoverOverlay(self.main)
     
     self.container = self.window:Create("Frame", {
         BorderSizePixel = 0,
@@ -199,6 +171,10 @@ function Button.new(tab, properties)
     return self
 end
 
+
+function Button:_setShown(animate)
+    self.window:_revealCommon(self, animate)
+end
 
 function Button:MoveTo(index)
     self.tab:_moveElement(self, index)

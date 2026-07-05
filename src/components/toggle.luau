@@ -45,36 +45,8 @@ function Toggle.new(tab, properties)
         Parent = self.tab.tabPage,
     }, {BackgroundTransparency = 'ElementTransparency'})
 
-    self.window:Create("UIGradient", {
-        Rotation = 270,
-
-        Parent = self.main,
-    }, {Color = 'ElementGradient'})
-
-    -- Additive hover brighten (fill colour comes from the gradient now)
-    self.hoverOverlay = self.window:Create("Frame", {
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-        BackgroundTransparency = 1, -- hover -> 0.97
-        Size = UDim2.fromScale(1, 1),
-        BorderSizePixel = 0,
-        ZIndex = 1,
-
-        Parent = self.main,
-    })
-
-    self.window:Create("UICorner", {
-        Parent = self.hoverOverlay,
-    }, {CornerRadius = 'ElementCornerRadius'})
-
-    self.window:Create("UICorner", {
-        Parent = self.main,
-    }, {CornerRadius = 'ElementCornerRadius'})
-
-    self.stroke = self.window:Create("UIStroke", {
-        Transparency = 1,
-
-        Parent = self.main
-    }, {Color = 'ElementStroke', Transparency = 'ElementStrokeTransparency'})
+    self.stroke = self.window:StyleElementBody(self.main)
+    self.hoverOverlay = self.window:CreateHoverOverlay(self.main)
     
     self.container = self.window:Create("Frame", {
         BorderSizePixel = 0,
@@ -206,14 +178,8 @@ function Toggle.new(tab, properties)
     })
 
     -- Green glow behind the selector, only while toggled on
-    self.indicatorGlow = self.window:Create("UIShadow", {
-        Color = Color3.fromRGB(23, 153, 110),
-        BlurRadius = UDim.new(0, 20),
-        Transparency = 1, -- In = 0.4 (only while on; Transparency gates visibility)
-        ZIndex = -1,
-
-        Parent = self.indicator,
-    })
+    -- Green glow behind the selector; hidden until on (gated by Transparency: 1 hidden, 0.4 shown)
+    self.indicatorGlow = self.window:CreateGlow(self.indicator, Color3.fromRGB(23, 153, 110), 20, 1)
 
     self.overlay = self.window:Create("Frame", {
         BorderSizePixel = 0,
@@ -402,6 +368,21 @@ function Toggle:_animateIndicator()
         variables.tweenService:Create(self.indicator, info, {Position = UDim2.new(1, -47, 0.5, 0), BackgroundColor3 = Color3.fromRGB(255, 255, 255), BackgroundTransparency = 0.8}):Play()
         variables.tweenService:Create(self.indicatorStroke, info, {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.7}):Play()
     end
+end
+
+local toggleReveal = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+-- glow delayed so it doesn't bleed through the fill fade-in on window open
+local toggleGlowReveal = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out, 0, false, 0.35)
+
+function Toggle:_setShown(animate)
+    local w = self.window
+    w:_revealCommon(self, animate)
+    w:_reveal(self.indicator, {BackgroundTransparency = self.value and 0 or 0.8}, animate, toggleReveal)
+    w:_reveal(self.indicatorStroke, {Transparency = self.value and 0 or 0.7}, animate, toggleReveal)
+    w:_reveal(self.indicatorGlow, {Transparency = self.value and 0.4 or 1}, animate, toggleGlowReveal)
+    w:_reveal(self.overlay, {BackgroundTransparency = 0}, animate, toggleReveal)
+    w:_reveal(self.containerStroke, {Transparency = 0.85}, animate, toggleReveal)
+    w:_reveal(self.functionContainer, {BackgroundTransparency = 0.9}, animate, toggleReveal)
 end
 
 function Toggle:MoveTo(index)

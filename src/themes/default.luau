@@ -7,17 +7,11 @@ return {
     }),
     ShadowColor = Color3.fromRGB(20, 20, 20),
 
-    ElementColor = Color3.fromRGB(30, 30, 30),
     ElementStroke = Color3.fromRGB(35, 35, 35),
-    -- Per-element fill/stroke gradients (applied over a white base)
+    -- Per-element fill gradient (applied over a white base)
     ElementGradient = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 30)),
         ColorSequenceKeypoint.new(0.9999, Color3.fromRGB(35, 35, 35)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(35, 35, 35)),
-    }),
-    ElementStrokeGradient = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(35, 35, 35)),
-        ColorSequenceKeypoint.new(0.9999, Color3.fromRGB(38, 38, 38)),
         ColorSequenceKeypoint.new(1, Color3.fromRGB(35, 35, 35)),
     }),
     DividerColor = Color3.fromRGB(255, 255, 255),
@@ -37,14 +31,10 @@ return {
     DarkToggleOverlay = true,
     ElementTransparency = 0,
     ElementStrokeTransparency = 0,
-    ElementHoverTransparency = 0,
     ElementStrokeHoverTransparency = 0,
-    ElementHoverColor = Color3.fromRGB(35, 35, 35),
     ElementStrokeHover = Color3.fromRGB(50, 50, 50),
-    ElementStrokeHoverColor = Color3.fromRGB(50, 50, 50),
     ElementCornerRadius = UDim.new(0, 12),
     ElementTextHoverColor = Color3.fromRGB(255, 255, 255),
-    ElementContentHoverColor = Color3.fromRGB(255, 255, 255),
     TitlingColor = Color3.fromRGB(255, 255, 255),
 
     DropdownHighlight = Color3.fromRGB(255, 255, 255),

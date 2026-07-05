@@ -450,6 +450,15 @@ function Statistic:ResetBaseline(newBaseline)
 end
 
 
+function Statistic:_setShown(animate)
+    local w = self.window
+    w:_revealCommon(self, animate)
+    w:_reveal(self.gradientContainer, {BackgroundTransparency = 0}, animate)
+    w:_reveal(self.glowImage, {ImageTransparency = 0.6}, animate)
+    w:_reveal(self.valueLabel, {TextTransparency = 0}, animate)
+    w:_reveal(self.changeLabel, {TextTransparency = 0}, animate)
+end
+
 function Statistic:MoveTo(index)
     self.tab:_moveElement(self, index)
 end

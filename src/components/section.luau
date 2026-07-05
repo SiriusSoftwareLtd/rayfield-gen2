@@ -86,6 +86,12 @@ function Section.new(tab, properties)
 end
 
 
+function Section:_setShown(animate)
+    local w = self.window
+    w:_reveal(self.title, {TextTransparency = 0.6}, animate)
+    if self.iconLabel then w:_reveal(self.iconLabel, {ImageTransparency = 0.65}, animate) end
+end
+
 function Section:MoveTo(index)
     self.tab:_moveElement(self, index)
 end

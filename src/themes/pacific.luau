@@ -11,21 +11,15 @@ return {
 
     LiveAnimation = true, -- Subtly changes window gradient and shadow offset to make Rayfield feel more natural.
 
-    ElementColor = Color3.fromRGB(255, 255, 255),
     ElementTransparency = 0.8,
     ElementStroke = Color3.fromRGB(255, 255, 255),
-    -- White gradients = no-op tint over the translucent pacific elements
+    -- White gradient = no-op tint over the translucent pacific elements
     ElementGradient = ColorSequence.new(Color3.fromRGB(255, 255, 255)),
-    ElementStrokeGradient = ColorSequence.new(Color3.fromRGB(255, 255, 255)),
     ElementStrokeTransparency = 0.65,
-    ElementHoverTransparency = 0.3,
     DarkToggleOverlay = false,
     ElementStrokeHoverTransparency = 0,
-    ElementHoverColor = Color3.fromRGB(255, 255, 255),
     ElementStrokeHover = Color3.fromRGB(255, 255, 255),
-    ElementStrokeHoverColor = Color3.fromRGB(255, 255, 255),
     ElementCornerRadius = UDim.new(0, 12),
-    ElementContentHoverColor = Color3.fromRGB(8, 132, 248),
     DividerColor = Color3.fromRGB(255, 255, 255),
     TabColor = Color3.fromRGB(255, 255, 255),
     -- Placeholder greys (readable on the gradient window) — refine in the theme pass.

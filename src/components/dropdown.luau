@@ -64,6 +64,13 @@ function Dropdown.new(tab, properties)
         _optionFrames = {},
     }, Dropdown)
 
+    -- Prune the initial value to options that actually exist (matches Set/Refresh)
+    local prunedValue = {}
+    for _, v in self.value do
+        if table.find(self.options, v) then table.insert(prunedValue, v) end
+    end
+    self.value = prunedValue
+
     -- Register as a saveable control if flagged
     if self.flag and self.flag ~= "" and not self.forgetState then
         self.window.controls[self.flag] = self
@@ -81,36 +88,8 @@ function Dropdown.new(tab, properties)
         Parent = self.tab.tabPage,
     }, {BackgroundTransparency = 'ElementTransparency'})
 
-    self.window:Create("UIGradient", {
-        Rotation = 270,
-
-        Parent = self.main,
-    }, {Color = 'ElementGradient'})
-
-    -- Additive hover brighten (fill colour comes from the gradient now)
-    self.hoverOverlay = self.window:Create("Frame", {
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-        BackgroundTransparency = 1, -- hover -> 0.97
-        Size = UDim2.fromScale(1, 1),
-        BorderSizePixel = 0,
-        ZIndex = 1,
-
-        Parent = self.main,
-    })
-
-    self.window:Create("UICorner", {
-        Parent = self.hoverOverlay,
-    }, {CornerRadius = 'ElementCornerRadius'})
-
-    self.window:Create("UICorner", {
-        Parent = self.main,
-    }, {CornerRadius = 'ElementCornerRadius'})
-
-    self.stroke = self.window:Create("UIStroke", {
-        Transparency = 1,
-
-        Parent = self.main
-    }, {Color = 'ElementStroke', Transparency = 'ElementStrokeTransparency'})
+    self.stroke = self.window:StyleElementBody(self.main)
+    self.hoverOverlay = self.window:CreateHoverOverlay(self.main)
 
     self.top = self.window:Create("Frame", {
         Size = UDim2.new(1, 0, 0, 41),
@@ -655,6 +634,13 @@ function Dropdown:Set(value, skipCallback)
     end
 end
 
+
+function Dropdown:_setShown(animate)
+    local w = self.window
+    w:_revealCommon(self, animate)
+    w:_reveal(self.selectedLabel, {TextTransparency = 0.5}, animate)
+    w:_reveal(self.chevron, {ImageTransparency = 0.5}, animate)
+end
 
 function Dropdown:MoveTo(index)
     self.tab:_moveElement(self, index)
