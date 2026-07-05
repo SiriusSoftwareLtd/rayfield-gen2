@@ -42,7 +42,7 @@ function Button.new(tab, properties)
     -- Additive hover brighten (fill colour comes from the gradient now)
     self.hoverOverlay = self.window:Create("Frame", {
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-        BackgroundTransparency = 1, -- hover -> 0.94
+        BackgroundTransparency = 1, -- hover -> 0.97
         Size = UDim2.fromScale(1, 1),
         BorderSizePixel = 0,
         ZIndex = 1,

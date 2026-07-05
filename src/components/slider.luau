@@ -212,7 +212,7 @@ function Slider.new(tab, properties)
     self.window:Create("UIShadow", {
         Color = Color3.fromRGB(23, 153, 110),
         BlurRadius = UDim.new(0, 20),
-        Transparency = 0.4,
+        Transparency = 0.55,
         ZIndex = -1,
 
         Parent = self.progress,
@@ -241,7 +241,7 @@ function Slider.new(tab, properties)
     self.window:Create("UIShadow", {
         Color = Color3.fromRGB(255, 255, 255),
         BlurRadius = UDim.new(0, 10),
-        Transparency = 0.7,
+        Transparency = 0.8,
         ZIndex = -1,
 
         Parent = self.handle,

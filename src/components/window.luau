@@ -36,7 +36,7 @@ function Window.new(properties)
         selectedTab = nil,
         theme = if typeof(properties.theme or properties.Theme) == 'table'
         then (properties.theme or properties.Theme)
-        elseif typeof(properties.theme or properties.Theme) == 'string' and themes[string.lower(properties.theme or properties.Theme)]
+        elseif typeof(properties.theme or properties.Theme) == 'string' and themes:FindFirstChild(string.lower(properties.theme or properties.Theme))
         then require(themes[string.lower((properties.theme or properties.Theme))])
         else require(themes['default']),
 
@@ -446,7 +446,7 @@ function Window.new(properties)
     if self.theme.LiveAnimation then
         task.spawn(function()
             local out = true
-            local tweenInfo = TweenInfo.new(10, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+            local tweenInfo = TweenInfo.new(10, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
             while not self.unloaded do
                 local tweenW = variables.tweenService:Create(self.windowGradient, tweenInfo, {
@@ -468,7 +468,7 @@ function Window:ChangeTheme(theme)
     -- ^ gonna be accepting strings and checking with a theme dict
 
     theme = if typeof(theme) == 'table' then theme
-        elseif typeof(theme) == 'string' and themes[string.lower(theme)]
+        elseif typeof(theme) == 'string' and themes:FindFirstChild(string.lower(theme))
         then require(themes[string.lower(theme)])
         else require(themes['default'])
 

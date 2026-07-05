@@ -54,7 +54,7 @@ function Toggle.new(tab, properties)
     -- Additive hover brighten (fill colour comes from the gradient now)
     self.hoverOverlay = self.window:Create("Frame", {
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-        BackgroundTransparency = 1, -- hover -> 0.94
+        BackgroundTransparency = 1, -- hover -> 0.97
         Size = UDim2.fromScale(1, 1),
         BorderSizePixel = 0,
         ZIndex = 1,
@@ -209,9 +209,8 @@ function Toggle.new(tab, properties)
     self.indicatorGlow = self.window:Create("UIShadow", {
         Color = Color3.fromRGB(23, 153, 110),
         BlurRadius = UDim.new(0, 20),
-        Transparency = 1, -- In = 0.4 (only while on)
+        Transparency = 1, -- In = 0.4 (only while on; Transparency gates visibility)
         ZIndex = -1,
-        Enabled = self.value or false,
 
         Parent = self.indicator,
     })
@@ -368,7 +367,6 @@ function Toggle.new(tab, properties)
     self.window:Connect(self.main.MouseLeave, function()
         variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeTransparency, Color = self.window.theme.ElementStroke}):Play()
         variables.tweenService:Create(self.title, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextColor3 = self.window.theme.ContentColor}):Play()
-        variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = self.window.theme.ElementTransparency}):Play()
         variables.tweenService:Create(self.hoverOverlay, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
     end)
 
@@ -395,7 +393,6 @@ end
 function Toggle:_animateIndicator()
     local info = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
     if self.indicatorGlow then
-        self.indicatorGlow.Enabled = self.value
         variables.tweenService:Create(self.indicatorGlow, info, {Transparency = self.value and 0.4 or 1}):Play()
     end
     if self.value then
