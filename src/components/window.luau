@@ -58,6 +58,7 @@ function Window.new(properties)
 
     -- Rayfield Gen2 Screen
     self.screenGui = self:Create("ScreenGui", {
+        Name = variables.httpService:GenerateGUID(false),
         IgnoreGuiInset = true,
         ResetOnSpawn = false,
         Enabled = true,
@@ -112,6 +113,43 @@ function Window.new(properties)
         end
     
     end }})
+
+    -- Bottom fade — gradient overlay so elements scroll out softly at the window's base
+    self.bottomFade = self:Create("Frame", {
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BorderSizePixel = 0,
+        AnchorPoint = Vector2.new(0, 1),
+        Position = UDim2.fromScale(0, 1),
+        Size = UDim2.new(1, 0, 0, 50),
+        ZIndex = 100,
+
+        -- Animation
+        BackgroundTransparency = 1, -- In = 0
+
+        Parent = self.main,
+    })
+
+    self:Create("UICorner", {
+        Parent = self.bottomFade,
+    }, {CornerRadius = 'CornerRoundness'})
+
+    self.bottomFadeGradient = self:Create("UIGradient", {
+        Rotation = 270,
+        Offset = Vector2.new(0, 0.2),
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0),
+            NumberSequenceKeypoint.new(0.4601, 0),
+            NumberSequenceKeypoint.new(1, 1),
+        }),
+
+        Parent = self.bottomFade,
+    }, {Color = {'WindowColor', function(color)
+        if typeof(color) == 'ColorSequence' then
+            return color
+        else
+            return ColorSequence.new(color)
+        end
+    end}})
 
 
     -- Topbar
@@ -526,6 +564,7 @@ function Window:Hide()
 
     variables.tweenService:Create(self.main, fadeInfo, {BackgroundTransparency = 1}):Play()
     variables.tweenService:Create(self.shadowImage, fadeInfo, {ImageTransparency = 1}):Play()
+    variables.tweenService:Create(self.bottomFade, fadeInfo, {BackgroundTransparency = 1}):Play()
 
     if self.title then variables.tweenService:Create(self.title, fadeInfo, {TextTransparency = 1}):Play() end
     if self.subtitle then variables.tweenService:Create(self.subtitle, fadeInfo, {TextTransparency = 1}):Play() end
@@ -589,6 +628,7 @@ function Window:ToggleMinimise()
         }):Play()
 
         variables.tweenService:Create(self.shadowImage, fadeInfo, {ImageTransparency = 0.6}):Play()
+        variables.tweenService:Create(self.bottomFade, fadeInfo, {BackgroundTransparency = 0}):Play()
 
         variables.tweenService:Create(self.drag.drag, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
             Position = UDim2.new(
@@ -625,6 +665,7 @@ function Window:ToggleMinimise()
 
         local fadeOutInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
         variables.tweenService:Create(self.shadowImage, fadeOutInfo, {ImageTransparency = 1}):Play()
+        variables.tweenService:Create(self.bottomFade, fadeOutInfo, {BackgroundTransparency = 1}):Play()
 
         variables.tweenService:Create(self.main, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
             Size = UDim2.fromOffset(self.size.X.Offset, 66),
@@ -1133,6 +1174,7 @@ function Window:_quickRestore()
 
     variables.tweenService:Create(self.main, fadeInfo, {BackgroundTransparency = 0}):Play()
     variables.tweenService:Create(self.shadowImage, fadeInfo, {ImageTransparency = 0.6}):Play()
+    variables.tweenService:Create(self.bottomFade, fadeInfo, {BackgroundTransparency = 0}):Play()
 
     if self.topbarIcon then variables.tweenService:Create(self.topbarIcon, fadeInfo, {ImageTransparency = 0}):Play() end
     if self.title then variables.tweenService:Create(self.title, fadeInfo, {TextTransparency = 0}):Play() end
@@ -1175,6 +1217,7 @@ function Window:_firstShow()
     variables.tweenService:Create(self.main, TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut), {BackgroundTransparency = 0, Size = self.size}):Play()
     task.wait(0.5)
     variables.tweenService:Create(self.shadowImage, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.6}):Play()
+    variables.tweenService:Create(self.bottomFade, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
     task.wait(0.3)
 
     if self.icon then variables.tweenService:Create(self.topbarIcon, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play() end

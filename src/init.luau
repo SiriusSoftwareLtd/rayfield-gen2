@@ -4,7 +4,7 @@ local image = require(script.utility.image)
 
 local function createBanner()
     local ui = Instance.new("ScreenGui")
-    ui.Name = "Rayfield"
+    ui.Name = variables.httpService:GenerateGUID(false)
     ui.ClipToDeviceSafeArea = false
     ui.DisplayOrder = 1e+05
     ui.IgnoreGuiInset = true
