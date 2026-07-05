@@ -1089,6 +1089,9 @@ function Window:_setElementsShown()
                 element.progress.BackgroundTransparency = 0
                 element.handle.BackgroundTransparency = 0
                 element.valueLabel.TextTransparency = 0.3
+            elseif elementType == 'Dropdown' then
+                element.selectedLabel.TextTransparency = 0.5
+                element.chevron.ImageTransparency = 0.5
             end
         end
     end
@@ -1240,6 +1243,9 @@ function Window:_firstShow()
                     variables.tweenService:Create(element.progress, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
                     variables.tweenService:Create(element.handle, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
                     variables.tweenService:Create(element.valueLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0.3}):Play()
+                elseif elementType == 'Dropdown' then
+                    variables.tweenService:Create(element.selectedLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0.5}):Play()
+                    variables.tweenService:Create(element.chevron, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.5}):Play()
                 end
 
                 if elementIndex <= maxStaggeredElements then
@@ -1277,6 +1283,9 @@ function Window:_firstShow()
                     element.progress.BackgroundTransparency = 0
                     element.handle.BackgroundTransparency = 0
                     element.valueLabel.TextTransparency = 0.3
+                elseif elementType == 'Dropdown' then
+                    element.selectedLabel.TextTransparency = 0.5
+                    element.chevron.ImageTransparency = 0.5
                 end
             end
         end
