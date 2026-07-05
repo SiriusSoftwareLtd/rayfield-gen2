@@ -46,21 +46,35 @@ function Slider.new(tab, properties)
         Size = UDim2.new(1, -20, 0, 65),
         BorderSizePixel = 0,
         Name = self.name,
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 
         BackgroundTransparency = 1,
 
         Parent = self.tab.tabPage,
-    }, {BackgroundColor3 = 'ElementColor', BackgroundTransparency = 'ElementTransparency'})
+    }, {BackgroundTransparency = 'ElementTransparency'})
+
+    self.window:Create("UIGradient", {
+        Rotation = 270,
+
+        Parent = self.main,
+    }, {Color = 'ElementGradient'})
 
     self.window:Create("UICorner", {
         Parent = self.main,
     }, {CornerRadius = 'ElementCornerRadius'})
 
     self.stroke = self.window:Create("UIStroke", {
+        Color = Color3.fromRGB(255, 255, 255),
         Transparency = 1,
 
         Parent = self.main,
-    }, {Color = 'ElementStroke', Transparency = 'ElementStrokeTransparency'})
+    }, {Transparency = 'ElementStrokeTransparency'})
+
+    self.window:Create("UIGradient", {
+        Rotation = 270,
+
+        Parent = self.stroke,
+    }, {Color = 'ElementStrokeGradient'})
 
     -- Left: title (+ icon) stacked over the value
     self.container = self.window:Create("Frame", {
@@ -255,11 +269,11 @@ function Slider.new(tab, properties)
     })
 
     self.window:Connect(self.main.MouseEnter, function()
-        variables.tweenService:Create(self.main, tweenInfo, {BackgroundColor3 = self.window.theme.ElementHoverColor, BackgroundTransparency = self.window.theme.ElementHoverTransparency}):Play()
+        variables.tweenService:Create(self.main, tweenInfo, {BackgroundTransparency = self.window.theme.ElementHoverTransparency}):Play()
     end)
 
     self.window:Connect(self.main.MouseLeave, function()
-        variables.tweenService:Create(self.main, tweenInfo, {BackgroundColor3 = self.window.theme.ElementColor, BackgroundTransparency = self.window.theme.ElementTransparency}):Play()
+        variables.tweenService:Create(self.main, tweenInfo, {BackgroundTransparency = self.window.theme.ElementTransparency}):Play()
     end)
 
     self.window:Connect(self.interact.InputBegan, function(input)

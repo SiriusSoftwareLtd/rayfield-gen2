@@ -74,21 +74,35 @@ function Dropdown.new(tab, properties)
         BorderSizePixel = 0,
         Name = self.name,
         ClipsDescendants = true,
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 
         BackgroundTransparency = 1,
 
         Parent = self.tab.tabPage,
-    }, {BackgroundColor3 = 'ElementColor', BackgroundTransparency = 'ElementTransparency'})
+    }, {BackgroundTransparency = 'ElementTransparency'})
+
+    self.window:Create("UIGradient", {
+        Rotation = 270,
+
+        Parent = self.main,
+    }, {Color = 'ElementGradient'})
 
     self.window:Create("UICorner", {
         Parent = self.main,
     }, {CornerRadius = 'ElementCornerRadius'})
 
     self.stroke = self.window:Create("UIStroke", {
+        Color = Color3.fromRGB(255, 255, 255),
         Transparency = 1,
 
         Parent = self.main
-    }, {Color = 'ElementStroke', Transparency = 'ElementStrokeTransparency'})
+    }, {Transparency = 'ElementStrokeTransparency'})
+
+    self.window:Create("UIGradient", {
+        Rotation = 270,
+
+        Parent = self.stroke,
+    }, {Color = 'ElementStrokeGradient'})
 
     self.top = self.window:Create("Frame", {
         Size = UDim2.new(1, 0, 0, 41),
@@ -310,8 +324,8 @@ function Dropdown.new(tab, properties)
         task.wait(1)
 
         self.title.Text = self.name
-        variables.tweenService:Create(self.main, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {BackgroundColor3 = self.window.theme.ElementColor}):Play()
-        variables.tweenService:Create(self.stroke, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = self.window.theme.ElementStroke}):Play()
+        variables.tweenService:Create(self.main, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+        variables.tweenService:Create(self.stroke, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = Color3.fromRGB(255, 255, 255)}):Play()
     end
 
     self._renderOptionState = renderOptionState
@@ -474,15 +488,15 @@ function Dropdown.new(tab, properties)
 
     self.window:Connect(self.main.MouseEnter, function()
         if self._isOpen then return end
-        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeHoverTransparency, Color = self.window.theme.ElementStrokeHover}):Play()
+        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeHoverTransparency}):Play()
         variables.tweenService:Create(self.title, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextColor3 = self.window.theme.ElementTextHoverColor}):Play()
-        variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = self.window.theme.ElementHoverTransparency, BackgroundColor3 = self.window.theme.ElementHoverColor}):Play()
+        variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = self.window.theme.ElementHoverTransparency}):Play()
     end)
 
     self.window:Connect(self.main.MouseLeave, function()
-        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeTransparency, Color = self.window.theme.ElementStroke}):Play()
+        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeTransparency}):Play()
         variables.tweenService:Create(self.title, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextColor3 = self.window.theme.ContentColor}):Play()
-        variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = self.window.theme.ElementTransparency, BackgroundColor3 = self.window.theme.ElementColor}):Play()
+        variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = self.window.theme.ElementTransparency}):Play()
     end)
 
 

@@ -14,6 +14,9 @@ return {
     ElementColor = Color3.fromRGB(255, 255, 255),
     ElementTransparency = 0.8,
     ElementStroke = Color3.fromRGB(255, 255, 255),
+    -- White gradients = no-op tint over the translucent pacific elements
+    ElementGradient = ColorSequence.new(Color3.fromRGB(255, 255, 255)),
+    ElementStrokeGradient = ColorSequence.new(Color3.fromRGB(255, 255, 255)),
     ElementStrokeTransparency = 0.65,
     ElementHoverTransparency = 0.3,
     DarkToggleOverlay = false,
