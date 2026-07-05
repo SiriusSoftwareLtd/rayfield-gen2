@@ -100,8 +100,8 @@ function Window.new(properties)
     })
 
     self.windowGradient = self:Create("UIGradient", {
-        Rotation = 250,
-        Offset = Vector2.new(0, 0.2),
+        Rotation = 270,
+        Offset = Vector2.new(0, -0.1),
 
         Parent = self.main
     }, {Color = {'WindowColor', function(color)
@@ -120,7 +120,7 @@ function Window.new(properties)
         BorderSizePixel = 0,
         AnchorPoint = Vector2.new(0, 1),
         Position = UDim2.fromScale(0, 1),
-        Size = UDim2.new(1, 0, 0, 50),
+        Size = UDim2.new(1, 0, -0.093, 100),
         ZIndex = 100,
 
         -- Animation
@@ -136,20 +136,16 @@ function Window.new(properties)
     self.bottomFadeGradient = self:Create("UIGradient", {
         Rotation = 270,
         Offset = Vector2.new(0, 0.2),
+        Color = ColorSequence.new(Color3.fromRGB(10, 10, 10)),
         Transparency = NumberSequence.new({
             NumberSequenceKeypoint.new(0, 0),
-            NumberSequenceKeypoint.new(0.4601, 0),
+            NumberSequenceKeypoint.new(0.4414, 0),
+            NumberSequenceKeypoint.new(0.7007, 0.631),
             NumberSequenceKeypoint.new(1, 1),
         }),
 
         Parent = self.bottomFade,
-    }, {Color = {'WindowColor', function(color)
-        if typeof(color) == 'ColorSequence' then
-            return color
-        else
-            return ColorSequence.new(color)
-        end
-    end}})
+    })
 
 
     -- Topbar

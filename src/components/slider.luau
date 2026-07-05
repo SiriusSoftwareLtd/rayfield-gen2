@@ -201,6 +201,15 @@ function Slider.new(tab, properties)
         end
     end}})
 
+    -- Green glow behind the filled progress
+    self.window:Create("UIShadow", {
+        Color = Color3.fromRGB(23, 153, 110),
+        Transparency = 0.4,
+        ZIndex = -1,
+
+        Parent = self.progress,
+    })
+
     -- Handle blob: solid white at rest, ghosts + grows a stroke while held
     self.handle = self.window:Create("Frame", {
         AnchorPoint = Vector2.new(1, 0.5),
@@ -216,6 +225,15 @@ function Slider.new(tab, properties)
 
     self.window:Create("UICorner", {
         CornerRadius = UDim.new(1, 0),
+
+        Parent = self.handle,
+    })
+
+    -- White glow behind the drag handle
+    self.window:Create("UIShadow", {
+        Color = Color3.fromRGB(255, 255, 255),
+        Transparency = 0.7,
+        ZIndex = -1,
 
         Parent = self.handle,
     })

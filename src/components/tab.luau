@@ -199,22 +199,9 @@ function Tab.new(window, properties)
         Parent = self.tabPage
     })
 
-    self.window:Create("Frame", {
-        BorderSizePixel = 0,
-
-        Size = UDim2.fromOffset(0, 3),
-        BackgroundTransparency = 1,
-        LayoutOrder = -1,
-
-        Parent = self.tabPage
-    })
-
-    self.window:Create("Frame", {
-        BorderSizePixel = 0,
-
-        Size = UDim2.fromOffset(0, 12),
-        BackgroundTransparency = 1,
-        LayoutOrder = 999999,
+    self.window:Create("UIPadding", {
+        PaddingTop = UDim.new(0, 10),
+        PaddingBottom = UDim.new(0, 33),
 
         Parent = self.tabPage
     })

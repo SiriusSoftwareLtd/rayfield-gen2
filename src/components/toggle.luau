@@ -183,6 +183,16 @@ function Toggle.new(tab, properties)
         Parent = self.indicator,
     })
 
+    -- Green glow behind the selector, only while toggled on
+    self.indicatorGlow = self.window:Create("UIShadow", {
+        Color = Color3.fromRGB(23, 153, 110),
+        Transparency = 0.4,
+        ZIndex = -1,
+        Enabled = self.value or false,
+
+        Parent = self.indicator,
+    })
+
     self.overlay = self.window:Create("Frame", {
         BorderSizePixel = 0,
 
@@ -360,6 +370,7 @@ end
 
 function Toggle:_animateIndicator()
     local info = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+    if self.indicatorGlow then self.indicatorGlow.Enabled = self.value end
     if self.value then
         variables.tweenService:Create(self.indicator, info, {Position = UDim2.new(1, -28, 0.5, 0), BackgroundColor3 = Color3.fromRGB(23, 153, 110), BackgroundTransparency = 0}):Play()
         variables.tweenService:Create(self.indicatorStroke, info, {Color = Color3.fromRGB(32, 201, 144), Transparency = 0}):Play()

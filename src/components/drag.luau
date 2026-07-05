@@ -48,6 +48,15 @@ function Drag.new(window, properties)
         Parent = self.dragCosmetic
     })
 
+    -- White glow behind the drag bar
+    self.window:Create("UIShadow", {
+        Color = Color3.fromRGB(255, 255, 255),
+        Transparency = 0.5,
+        ZIndex = -1,
+
+        Parent = self.dragCosmetic,
+    })
+
     self.dragInteract = self.window:Create("TextButton", {
         BackgroundTransparency = 1,
         Size = UDim2.fromScale(1, 1),
