@@ -21,6 +21,14 @@ window:CreateTag({
     color = Color3.fromRGB(255, 175, 15),
 })
 
+task.delay(4, function()
+    window:Notify({
+        title = 'Welcome back',
+        content = 'Rayfield Gen2 loaded. Notifications support an icon, auto-dismiss, hover-to-pause and click-to-dismiss.',
+        icon = 93364949241311,
+    })
+end)
+
 -- General
 local generalTab = window:CreateTab({
     name = 'Home',
@@ -105,6 +113,18 @@ generalTab:CreateButton({
     icon = 125823673784681,
     callback = function()
         print('Interface layout reset')
+    end
+})
+
+generalTab:CreateButton({
+    name = 'Test Notification',
+    icon = 93364949241311,
+    callback = function()
+        window:Notify({
+            title = 'Heads up',
+            content = 'This is a notification. Hover to pause it, or click to dismiss early.',
+            icon = 93364949241311,
+        })
     end
 })
 

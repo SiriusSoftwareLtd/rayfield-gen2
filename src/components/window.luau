@@ -521,6 +521,32 @@ function Window:CreateTag(properties)
     return newTag
 end
 
+function Window:Notify(properties)
+    if not self.notifications then
+        self.notifications = self:Create("Frame", {
+            Name = "Notifications",
+            Size = UDim2.new(0, 300, 0, 800),
+            Position = UDim2.new(1, -20, 1, -20),
+            AnchorPoint = Vector2.new(1, 1),
+            BackgroundTransparency = 1,
+
+            Parent = self.screenGui,
+        })
+
+        self:Create("UIListLayout", {
+            FillDirection = Enum.FillDirection.Vertical,
+            VerticalAlignment = Enum.VerticalAlignment.Bottom,
+            HorizontalAlignment = Enum.HorizontalAlignment.Center,
+            SortOrder = Enum.SortOrder.LayoutOrder,
+            Padding = UDim.new(0, 8),
+
+            Parent = self.notifications,
+        })
+    end
+
+    return require(script.Parent.notification).new(self, properties)
+end
+
 function Window:Hide()
     if self.animating then return end
     self.animating = true
