@@ -11,12 +11,18 @@ local utility = script.Parent.Parent.utility
 local variables = require(utility.variables)
 
 -- Grow-in slide + swipe-out-left on exit, Quint easing per project rule
-local growInfo = TweenInfo.new(0.55, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-local fadeInfo = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
--- swipe + fade both fast-start over the same window so the card is visible while it moves
-local swipeInfo = TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-local exitFadeInfo = TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-local collapseInfo = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+-- Gap between stacked notifications. Applied INSIDE each notification (as top
+-- padding on the outer frame) rather than on the container's UIListLayout, so
+-- removing one collapses its gap with it instead of dropping an external gap
+-- and making the notifications above jump up.
+local STACK_PADDING = 8
+
+local growInfo = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+local fadeInfo = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+-- swipe + fade share a window so the card is visible while it moves
+local swipeInfo = TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+local exitFadeInfo = TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+local collapseInfo = TweenInfo.new(0.45, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut)
 
 -- Auto duration from content length, clamped to a sensible window
 local function autoDuration(content)
@@ -50,6 +56,14 @@ function Notification.new(window, properties)
         ZIndex = 2,
 
         Parent = self.window.notifications,
+    })
+
+    -- Inter-notification gap lives here (not on the stack layout) so it collapses
+    -- with the card and its neighbours don't jump when it's removed.
+    self.window:Create("UIPadding", {
+        PaddingTop = UDim.new(0, STACK_PADDING),
+
+        Parent = self.main,
     })
 
     -- Inner body: the visible card; this is what swipes out to the left on dismiss.
@@ -223,7 +237,8 @@ end
 function Notification:_show()
     -- All sizing done before anything is visible: outer is height 0 and the body
     -- is fully transparent until the grow tween starts, so there's no flicker.
-    local target = self:_measure()
+    -- +STACK_PADDING because the outer's top padding holds the inter-card gap.
+    local target = self:_measure() + STACK_PADDING
     if not self.main.Parent then return end
 
     -- Grow in (slide up out of the stack)

@@ -538,7 +538,9 @@ function Window:Notify(properties)
             VerticalAlignment = Enum.VerticalAlignment.Bottom,
             HorizontalAlignment = Enum.HorizontalAlignment.Center,
             SortOrder = Enum.SortOrder.LayoutOrder,
-            Padding = UDim.new(0, 8),
+            -- No padding here: the gap lives inside each notification so removing
+            -- one doesn't drop an external gap and jolt the stack.
+            Padding = UDim.new(0, 0),
 
             Parent = self.notifications,
         })
