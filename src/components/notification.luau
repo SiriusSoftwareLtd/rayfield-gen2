@@ -10,23 +10,20 @@ local utility = script.Parent.Parent.utility
 -- Variables
 local variables = require(utility.variables)
 
--- Grow-in slide + swipe-out-left on exit, Quint easing per project rule
+-- Timings/easings copied from Rayfield Gen1 (all Exponential, Out).
+local growInfo = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+local fadeLong = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)  -- bg + stroke
+local fadeShort = TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out) -- title/icon/desc/shadow
+-- exit "scale": shrink width + collapse height while it fades
+local shrinkInfo = TweenInfo.new(0.9, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+
 -- Gap between stacked notifications. Applied INSIDE each notification (as top
 -- padding on the outer frame) rather than on the container's UIListLayout, so
 -- removing one collapses its gap with it instead of dropping an external gap
 -- and making the notifications above jump up.
 local STACK_PADDING = 8
 
-local growInfo = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
-local fadeInfo = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
--- exit: shrink a touch (Gen1-style pull-in), then swipe out over a slower window
-local shrinkInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-local swipeInfo = TweenInfo.new(0.55, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
--- fade matches the swipe's slow-start so the card stays visible while it moves
-local exitFadeInfo = TweenInfo.new(0.55, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
-local collapseInfo = TweenInfo.new(0.45, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut)
-
--- Auto duration from content length, clamped to a sensible window
+-- Auto duration from content length, clamped to a sensible window (Gen1-style)
 local function autoDuration(content)
     return math.clamp(#content * 0.06 + 3, 3, 9)
 end
@@ -48,8 +45,7 @@ function Notification.new(window, properties)
     local hasIcon = self.icon ~= nil and self.icon ~= 0 and self.icon ~= ""
 
     -- Outer frame: the stack layout item. Invisible itself; only its height is
-    -- animated (grow in / collapse the gap on exit). The UIListLayout owns its
-    -- Position, which is why the visible card is a separate inner frame we can swipe.
+    -- animated (grow in / collapse the gap on exit).
     self.main = self.window:Create("Frame", {
         Name = "Notification",
         BackgroundTransparency = 1,
@@ -68,8 +64,8 @@ function Notification.new(window, properties)
         Parent = self.main,
     })
 
-    -- Inner body: the visible card. Centered anchor so the UIScale shrinks it
-    -- from the middle on exit; this is also what swipes out on dismiss.
+    -- Inner body: the visible card. Centred so the exit width-shrink pulls in
+    -- symmetrically from both sides.
     self.body = self.window:Create("Frame", {
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         Size = UDim2.new(1, 0, 1, 0),
@@ -83,12 +79,6 @@ function Notification.new(window, properties)
         BackgroundTransparency = 1, -- In = 0
 
         Parent = self.main,
-    })
-
-    self.scale = self.window:Create("UIScale", {
-        Scale = 1,
-
-        Parent = self.body,
     })
 
     self.window:Create("UIGradient", {
@@ -245,6 +235,7 @@ function Notification:_measure()
     return math.max(contentH, self.iconLabel and 24 or 0) + 28
 end
 
+-- Enter: grow the height, then stagger the fades (Gen1 timing).
 function Notification:_show()
     -- All sizing done before anything is visible: outer is height 0 and the body
     -- is fully transparent until the grow tween starts, so there's no flicker.
@@ -252,20 +243,19 @@ function Notification:_show()
     local target = self:_measure() + STACK_PADDING
     if not self.main.Parent then return end
 
-    -- Grow in (slide up out of the stack)
     variables.tweenService:Create(self.main, growInfo, {Size = UDim2.new(1, 0, 0, target)}):Play()
 
-    task.wait(0.12)
-    variables.tweenService:Create(self.body, fadeInfo, {BackgroundTransparency = 0}):Play()
-    variables.tweenService:Create(self.stroke, fadeInfo, {Transparency = 0.95}):Play()
-    variables.tweenService:Create(self.shadow, fadeInfo, {Transparency = 0.6}):Play()
-    variables.tweenService:Create(self.titleLabel, fadeInfo, {TextTransparency = 0}):Play()
+    task.wait(0.15)
+    variables.tweenService:Create(self.body, fadeLong, {BackgroundTransparency = 0}):Play()
+    variables.tweenService:Create(self.titleLabel, fadeShort, {TextTransparency = 0}):Play()
 
     task.wait(0.05)
-    if self.iconLabel then variables.tweenService:Create(self.iconLabel, fadeInfo, {ImageTransparency = 0}):Play() end
+    if self.iconLabel then variables.tweenService:Create(self.iconLabel, fadeShort, {ImageTransparency = 0}):Play() end
 
     task.wait(0.05)
-    if self.descriptionLabel then variables.tweenService:Create(self.descriptionLabel, fadeInfo, {TextTransparency = 0.35}):Play() end
+    if self.descriptionLabel then variables.tweenService:Create(self.descriptionLabel, fadeShort, {TextTransparency = 0.35}):Play() end
+    variables.tweenService:Create(self.stroke, fadeLong, {Transparency = 0.95}):Play()
+    variables.tweenService:Create(self.shadow, fadeShort, {Transparency = 0.6}):Play()
 
     -- Dwell, pausing while hovered
     local elapsed = 0
@@ -277,36 +267,28 @@ function Notification:_show()
     self:_dismiss()
 end
 
+-- Exit: fade out while the card shrinks (width + height) — Gen1's exit.
 function Notification:_dismiss()
     if self._dismissed then return end
     self._dismissed = true
 
     if not self.main.Parent then return end
 
-    -- Phase 1: pull in a touch (Gen1-style) before it leaves
-    variables.tweenService:Create(self.scale, shrinkInfo, {Scale = 0.9}):Play()
+    -- Fade everything out (runs during the shrink -> "goes transparent as it scales")
+    variables.tweenService:Create(self.body, fadeLong, {BackgroundTransparency = 1}):Play()
+    variables.tweenService:Create(self.stroke, fadeLong, {Transparency = 1}):Play()
+    variables.tweenService:Create(self.shadow, fadeShort, {Transparency = 1}):Play()
+    variables.tweenService:Create(self.titleLabel, fadeShort, {TextTransparency = 1}):Play()
+    if self.descriptionLabel then variables.tweenService:Create(self.descriptionLabel, fadeShort, {TextTransparency = 1}):Play() end
+    if self.iconLabel then variables.tweenService:Create(self.iconLabel, fadeShort, {ImageTransparency = 1}):Play() end
 
-    task.wait(0.16)
-    if not self.main.Parent then return end
-
-    -- Phase 2: swipe out to the right (off the edge) while it fades. The card is
-    -- centered (anchor 0.5), so it swipes by offsetting Position.X off-screen.
-    variables.tweenService:Create(self.body, swipeInfo, {Position = UDim2.new(0.5, 360, 0.5, 0)}):Play()
-    variables.tweenService:Create(self.body, exitFadeInfo, {BackgroundTransparency = 1}):Play()
-    variables.tweenService:Create(self.stroke, exitFadeInfo, {Transparency = 1}):Play()
-    variables.tweenService:Create(self.shadow, exitFadeInfo, {Transparency = 1}):Play()
-    variables.tweenService:Create(self.titleLabel, exitFadeInfo, {TextTransparency = 1}):Play()
-    if self.descriptionLabel then variables.tweenService:Create(self.descriptionLabel, exitFadeInfo, {TextTransparency = 1}):Play() end
-    if self.iconLabel then variables.tweenService:Create(self.iconLabel, exitFadeInfo, {ImageTransparency = 1}):Play() end
-
-    task.wait(0.4)
-
-    -- Phase 3: collapse the slot so the stack closes the gap, then remove
-    if not self.main.Parent then return end
-    local collapse = variables.tweenService:Create(self.main, collapseInfo, {Size = UDim2.new(1, 0, 0, 0)})
+    -- Shrink: narrow the card (width -90) and collapse the slot (height 0) together
+    variables.tweenService:Create(self.body, shrinkInfo, {Size = UDim2.new(1, -90, 1, 0)}):Play()
+    local collapse = variables.tweenService:Create(self.main, shrinkInfo, {Size = UDim2.new(1, 0, 0, 0)})
     collapse:Play()
     collapse.Completed:Wait()
 
+    if not self.main.Parent then return end
     self.main:Destroy()
 end
 
