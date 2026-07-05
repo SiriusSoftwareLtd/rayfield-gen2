@@ -1089,7 +1089,7 @@ function Window:_setElementsShown()
                 element.functionContainer.BackgroundTransparency = 0.9
             elseif elementType == 'Statistic' then
                 element.gradientContainer.BackgroundTransparency = 0
-                element.statGlow.Transparency = 0.4
+                element.glowImage.ImageTransparency = 0.6
                 element.valueLabel.TextTransparency = 0
                 element.changeLabel.TextTransparency = 0
             elseif elementType == 'Slider' then
@@ -1246,7 +1246,7 @@ function Window:_firstShow()
 
                 elseif elementType == 'Statistic' then
                     variables.tweenService:Create(element.gradientContainer, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
-                    variables.tweenService:Create(element.statGlow, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = 0.4}):Play()
+                    variables.tweenService:Create(element.glowImage, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.6}):Play()
                     variables.tweenService:Create(element.valueLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
                     variables.tweenService:Create(element.changeLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
                 elseif elementType == 'Slider' then
@@ -1287,7 +1287,7 @@ function Window:_firstShow()
                     element.functionContainer.BackgroundTransparency = 0.9
                 elseif elementType == 'Statistic' then
                     element.gradientContainer.BackgroundTransparency = 0
-                    element.statGlow.Transparency = 0.4
+                    element.glowImage.ImageTransparency = 0.6
                     element.valueLabel.TextTransparency = 0
                     element.changeLabel.TextTransparency = 0
                 elseif elementType == 'Slider' then

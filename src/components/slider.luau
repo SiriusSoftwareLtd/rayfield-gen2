@@ -59,37 +59,15 @@ function Slider.new(tab, properties)
         Parent = self.main,
     }, {Color = 'ElementGradient'})
 
-    -- Additive hover brighten (fill colour comes from the gradient now)
-    self.hoverOverlay = self.window:Create("Frame", {
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-        BackgroundTransparency = 1, -- hover -> 0.94
-        Size = UDim2.fromScale(1, 1),
-        BorderSizePixel = 0,
-        ZIndex = 1,
-
-        Parent = self.main,
-    })
-
-    self.window:Create("UICorner", {
-        Parent = self.hoverOverlay,
-    }, {CornerRadius = 'ElementCornerRadius'})
-
     self.window:Create("UICorner", {
         Parent = self.main,
     }, {CornerRadius = 'ElementCornerRadius'})
 
     self.stroke = self.window:Create("UIStroke", {
-        Color = Color3.fromRGB(255, 255, 255),
         Transparency = 1,
 
         Parent = self.main,
-    }, {Transparency = 'ElementStrokeTransparency'})
-
-    self.window:Create("UIGradient", {
-        Rotation = 270,
-
-        Parent = self.stroke,
-    }, {Color = 'ElementStrokeGradient'})
+    }, {Color = 'ElementStroke', Transparency = 'ElementStrokeTransparency'})
 
     -- Left: title (+ icon) stacked over the value
     self.container = self.window:Create("Frame", {
@@ -285,14 +263,13 @@ function Slider.new(tab, properties)
         Parent = self.track,
     })
 
+    -- Subtle hover on the slider track itself, not the whole element row
     self.window:Connect(self.main.MouseEnter, function()
-        variables.tweenService:Create(self.main, tweenInfo, {BackgroundTransparency = self.window.theme.ElementHoverTransparency}):Play()
-        variables.tweenService:Create(self.hoverOverlay, tweenInfo, {BackgroundTransparency = 0.94}):Play()
+        variables.tweenService:Create(self.track, tweenInfo, {BackgroundColor3 = Color3.fromRGB(60, 60, 60)}):Play()
     end)
 
     self.window:Connect(self.main.MouseLeave, function()
-        variables.tweenService:Create(self.main, tweenInfo, {BackgroundTransparency = self.window.theme.ElementTransparency}):Play()
-        variables.tweenService:Create(self.hoverOverlay, tweenInfo, {BackgroundTransparency = 1}):Play()
+        variables.tweenService:Create(self.track, tweenInfo, {BackgroundColor3 = self.window.theme.SliderBackground}):Play()
     end)
 
     self.window:Connect(self.interact.InputBegan, function(input)
