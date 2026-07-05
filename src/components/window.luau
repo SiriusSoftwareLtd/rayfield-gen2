@@ -4,6 +4,7 @@
 local utility = script.Parent.Parent.utility
 local SignalEngine = require(utility.SignalEngine)
 local filesystem = require(utility.filesystem)
+local image = require(utility.image)
 
 -- Variables
 local variables = require(utility.variables)
@@ -189,7 +190,7 @@ function Window.new(properties)
 
     if self.icon then
         self.topbarIcon = self:Create('ImageLabel', {
-            Image = 'rbxassetid://'..tostring(self.icon),
+            Image = self.icon,
 
             BackgroundTransparency = 1,
             Size = UDim2.fromOffset(32, 32),
@@ -255,7 +256,7 @@ function Window.new(properties)
     })
 
     self.shadowImage = self:Create("ImageLabel", {
-        Image = 'rbxassetid://5587865193',
+        Image = 5587865193,
         ImageColor3 = Color3.fromRGB(255, 255, 255),
         Size = UDim2.fromScale(1.6, 1.3),
         
@@ -1429,7 +1430,7 @@ function Window:Create(className, properties, themeProperties)
 
     if properties then
         for property, value in properties do
-            instance[property] = value
+            image.assign(instance, property, value)
         end
     end
 

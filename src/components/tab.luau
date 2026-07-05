@@ -364,6 +364,15 @@ function Tab:CreateSlider(properties)
     return newElement
 end
 
+-- Dropdown
+function Tab:CreateDropdown(properties)
+    local newElement = require(script.Parent.dropdown).new(self, properties)
+    table.insert(self.elements, newElement)
+    assignOrder(newElement, #self.elements * 10)
+
+    return newElement
+end
+
 
 function Tab:_moveElement(element, targetIndex)
     local idx = table.find(self.elements, element)

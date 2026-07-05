@@ -77,6 +77,29 @@ generalTab:CreateToggle({
     end
 })
 
+generalTab:CreateDropdown({
+    name = 'Theme',
+    flag = 'InterfaceTheme',
+    options = {'Default', 'Pacific', 'Midnight'},
+    value = 'Default',
+    callback = function(value)
+        print('Theme:', value)
+    end
+})
+
+generalTab:CreateDropdown({
+    name = 'Enabled Modules',
+    description = 'Pick any combination of modules to load on startup.',
+    flag = 'EnabledModules',
+    multiSelect = true,
+    options = {'Aimbot', 'ESP', 'Speed', 'Fly'},
+    value = {'ESP'},
+    placeholder = 'None selected',
+    callback = function(value)
+        print('Enabled Modules:', table.concat(value, ', '))
+    end
+})
+
 generalTab:CreateButton({
     name = 'Reset Interface Layout',
     icon = 125823673784681,

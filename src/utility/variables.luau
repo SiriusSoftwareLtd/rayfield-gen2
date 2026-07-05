@@ -9,6 +9,13 @@ local variables = {}
 
 variables.rayfieldHidden = false -- update if hidden.. blah
 
+variables.secureMode = (function()
+    local _getgenv = rawget(_G, "getgenv")
+    if not _getgenv then return false end
+    local ok, val = pcall(function() return _getgenv().RAYFIELD_SECURE end)
+    return ok and val == true
+end)()
+
 variables.coreGui = getService("CoreGui")
 variables.runService = getService("RunService")
 variables.userInputService = getService("UserInputService")

@@ -32,6 +32,8 @@ return {
     ElementContentHoverColor = Color3.fromRGB(255, 255, 255),
     TitlingColor = Color3.fromRGB(255, 255, 255),
 
+    DropdownHighlight = Color3.fromRGB(255, 255, 255),
+
     ErrorColor = Color3.fromRGB(110, 0, 0),
     ErrorStrokeColor = Color3.fromRGB(140, 0, 0)
 }
