@@ -14,8 +14,13 @@ local variables = require(utility.variables)
 local growInfo = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 local fadeLong = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)  -- bg + stroke
 local fadeShort = TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out) -- title/icon/desc/shadow
+-- entry: card slides in from the right as the slot opens
+local swipeInInfo = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 -- exit "scale": shrink width + collapse height while it fades
 local shrinkInfo = TweenInfo.new(0.9, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+
+local OFFSCREEN_RIGHT = UDim2.new(0.5, 360, 0.5, 0)
+local CENTRED = UDim2.new(0.5, 0, 0.5, 0)
 
 -- Gap between stacked notifications. Applied INSIDE each notification (as top
 -- padding on the outer frame) rather than on the container's UIListLayout, so
@@ -69,7 +74,7 @@ function Notification.new(window, properties)
     self.body = self.window:Create("Frame", {
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         Size = UDim2.new(1, 0, 1, 0),
-        Position = UDim2.new(0.5, 0, 0.5, 0),
+        Position = OFFSCREEN_RIGHT, -- starts off to the right; _show slides it in
         AnchorPoint = Vector2.new(0.5, 0.5),
         Active = true, -- receives input for click-to-dismiss
         BorderSizePixel = 0,
@@ -243,19 +248,19 @@ function Notification:_show()
     local target = self:_measure() + STACK_PADDING
     if not self.main.Parent then return end
 
+    -- Open the slot and slide the card in from the right (body starts off-right), fading as it comes
     variables.tweenService:Create(self.main, growInfo, {Size = UDim2.new(1, 0, 0, target)}):Play()
-
-    task.wait(0.15)
+    variables.tweenService:Create(self.body, swipeInInfo, {Position = CENTRED}):Play()
     variables.tweenService:Create(self.body, fadeLong, {BackgroundTransparency = 0}):Play()
     variables.tweenService:Create(self.titleLabel, fadeShort, {TextTransparency = 0}):Play()
+    variables.tweenService:Create(self.stroke, fadeLong, {Transparency = 0.95}):Play()
+    variables.tweenService:Create(self.shadow, fadeShort, {Transparency = 0.6}):Play()
 
     task.wait(0.05)
     if self.iconLabel then variables.tweenService:Create(self.iconLabel, fadeShort, {ImageTransparency = 0}):Play() end
 
     task.wait(0.05)
     if self.descriptionLabel then variables.tweenService:Create(self.descriptionLabel, fadeShort, {TextTransparency = 0.35}):Play() end
-    variables.tweenService:Create(self.stroke, fadeLong, {Transparency = 0.95}):Play()
-    variables.tweenService:Create(self.shadow, fadeShort, {Transparency = 0.6}):Play()
 
     -- Dwell, pausing while hovered
     local elapsed = 0
