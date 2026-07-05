@@ -278,6 +278,8 @@ function Window.new(properties)
 
     -- Shadow
     self.windowShadow = self:Create("UIShadow", {
+        BlurRadius = UDim.new(0, 20),
+
         -- Animations
         Transparency = 1, -- In = 0.6
         ZIndex = -1,
@@ -1081,6 +1083,7 @@ function Window:_setElementsShown()
             if elementType == 'Toggle' then
                 element.indicator.BackgroundTransparency = if element.value then 0 else 0.8
                 element.indicatorStroke.Transparency = if element.value then 0 else 0.7
+                element.indicatorGlow.Transparency = if element.value then 0.4 else 1
                 element.overlay.BackgroundTransparency = 0
                 element.containerStroke.Transparency = 0.85
                 element.functionContainer.BackgroundTransparency = 0.9
@@ -1235,6 +1238,7 @@ function Window:_firstShow()
                 if elementType == 'Toggle' then
                     variables.tweenService:Create(element.indicator, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = element.value and 0 or 0.8}):Play()
                     variables.tweenService:Create(element.indicatorStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = element.value and 0 or 0.7}):Play()
+                    variables.tweenService:Create(element.indicatorGlow, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = element.value and 0.4 or 1}):Play()
                     variables.tweenService:Create(element.overlay, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
                     variables.tweenService:Create(element.containerStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = 0.85}):Play()
                     variables.tweenService:Create(element.functionContainer, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.9}):Play()
@@ -1277,6 +1281,7 @@ function Window:_firstShow()
                 if elementType == 'Toggle' then
                     element.indicator.BackgroundTransparency = if element.value then 0 else 0.8
                     element.indicatorStroke.Transparency = if element.value then 0 else 0.7
+                    element.indicatorGlow.Transparency = if element.value then 0.4 else 1
                     element.overlay.BackgroundTransparency = 0
                     element.containerStroke.Transparency = 0.85
                     element.functionContainer.BackgroundTransparency = 0.9

@@ -87,6 +87,21 @@ function Dropdown.new(tab, properties)
         Parent = self.main,
     }, {Color = 'ElementGradient'})
 
+    -- Additive hover brighten (fill colour comes from the gradient now)
+    self.hoverOverlay = self.window:Create("Frame", {
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BackgroundTransparency = 1, -- hover -> 0.94
+        Size = UDim2.fromScale(1, 1),
+        BorderSizePixel = 0,
+        ZIndex = 1,
+
+        Parent = self.main,
+    })
+
+    self.window:Create("UICorner", {
+        Parent = self.hoverOverlay,
+    }, {CornerRadius = 'ElementCornerRadius'})
+
     self.window:Create("UICorner", {
         Parent = self.main,
     }, {CornerRadius = 'ElementCornerRadius'})
@@ -491,12 +506,14 @@ function Dropdown.new(tab, properties)
         variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeHoverTransparency}):Play()
         variables.tweenService:Create(self.title, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextColor3 = self.window.theme.ElementTextHoverColor}):Play()
         variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = self.window.theme.ElementHoverTransparency}):Play()
+        variables.tweenService:Create(self.hoverOverlay, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.94}):Play()
     end)
 
     self.window:Connect(self.main.MouseLeave, function()
         variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeTransparency}):Play()
         variables.tweenService:Create(self.title, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextColor3 = self.window.theme.ContentColor}):Play()
         variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = self.window.theme.ElementTransparency}):Play()
+        variables.tweenService:Create(self.hoverOverlay, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
     end)
 
 

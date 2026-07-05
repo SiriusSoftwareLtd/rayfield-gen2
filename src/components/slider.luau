@@ -59,6 +59,21 @@ function Slider.new(tab, properties)
         Parent = self.main,
     }, {Color = 'ElementGradient'})
 
+    -- Additive hover brighten (fill colour comes from the gradient now)
+    self.hoverOverlay = self.window:Create("Frame", {
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BackgroundTransparency = 1, -- hover -> 0.94
+        Size = UDim2.fromScale(1, 1),
+        BorderSizePixel = 0,
+        ZIndex = 1,
+
+        Parent = self.main,
+    })
+
+    self.window:Create("UICorner", {
+        Parent = self.hoverOverlay,
+    }, {CornerRadius = 'ElementCornerRadius'})
+
     self.window:Create("UICorner", {
         Parent = self.main,
     }, {CornerRadius = 'ElementCornerRadius'})
@@ -218,6 +233,7 @@ function Slider.new(tab, properties)
     -- Green glow behind the filled progress
     self.window:Create("UIShadow", {
         Color = Color3.fromRGB(23, 153, 110),
+        BlurRadius = UDim.new(0, 20),
         Transparency = 0.4,
         ZIndex = -1,
 
@@ -246,6 +262,7 @@ function Slider.new(tab, properties)
     -- White glow behind the drag handle
     self.window:Create("UIShadow", {
         Color = Color3.fromRGB(255, 255, 255),
+        BlurRadius = UDim.new(0, 10),
         Transparency = 0.7,
         ZIndex = -1,
 
@@ -270,10 +287,12 @@ function Slider.new(tab, properties)
 
     self.window:Connect(self.main.MouseEnter, function()
         variables.tweenService:Create(self.main, tweenInfo, {BackgroundTransparency = self.window.theme.ElementHoverTransparency}):Play()
+        variables.tweenService:Create(self.hoverOverlay, tweenInfo, {BackgroundTransparency = 0.94}):Play()
     end)
 
     self.window:Connect(self.main.MouseLeave, function()
         variables.tweenService:Create(self.main, tweenInfo, {BackgroundTransparency = self.window.theme.ElementTransparency}):Play()
+        variables.tweenService:Create(self.hoverOverlay, tweenInfo, {BackgroundTransparency = 1}):Play()
     end)
 
     self.window:Connect(self.interact.InputBegan, function(input)

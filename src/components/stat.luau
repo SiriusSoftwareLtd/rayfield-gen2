@@ -150,6 +150,7 @@ function Statistic.new(tab, properties)
     -- Accent glow behind the stat (UIShadow, no image)
     self.statGlow = self.window:Create("UIShadow", {
         Color = accents.neutral.glow,
+        BlurRadius = UDim.new(0, 20),
         Transparency = 1, -- In = 0.4
         ZIndex = -1,
 

@@ -51,6 +51,21 @@ function Toggle.new(tab, properties)
         Parent = self.main,
     }, {Color = 'ElementGradient'})
 
+    -- Additive hover brighten (fill colour comes from the gradient now)
+    self.hoverOverlay = self.window:Create("Frame", {
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BackgroundTransparency = 1, -- hover -> 0.94
+        Size = UDim2.fromScale(1, 1),
+        BorderSizePixel = 0,
+        ZIndex = 1,
+
+        Parent = self.main,
+    })
+
+    self.window:Create("UICorner", {
+        Parent = self.hoverOverlay,
+    }, {CornerRadius = 'ElementCornerRadius'})
+
     self.window:Create("UICorner", {
         Parent = self.main,
     }, {CornerRadius = 'ElementCornerRadius'})
@@ -200,7 +215,8 @@ function Toggle.new(tab, properties)
     -- Green glow behind the selector, only while toggled on
     self.indicatorGlow = self.window:Create("UIShadow", {
         Color = Color3.fromRGB(23, 153, 110),
-        Transparency = 0.4,
+        BlurRadius = UDim.new(0, 20),
+        Transparency = 1, -- In = 0.4 (only while on)
         ZIndex = -1,
         Enabled = self.value or false,
 
@@ -354,12 +370,14 @@ function Toggle.new(tab, properties)
         variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeHoverTransparency}):Play()
         variables.tweenService:Create(self.title, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextColor3 = self.window.theme.ElementTextHoverColor}):Play()
         variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = self.window.theme.ElementHoverTransparency}):Play()
+        variables.tweenService:Create(self.hoverOverlay, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.94}):Play()
     end)
 
     self.window:Connect(self.main.MouseLeave, function()
         variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeTransparency}):Play()
         variables.tweenService:Create(self.title, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextColor3 = self.window.theme.ContentColor}):Play()
         variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = self.window.theme.ElementTransparency}):Play()
+        variables.tweenService:Create(self.hoverOverlay, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
     end)
 
     self.window:Connect(self.window.signal, function(command)
@@ -384,7 +402,10 @@ end
 
 function Toggle:_animateIndicator()
     local info = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
-    if self.indicatorGlow then self.indicatorGlow.Enabled = self.value end
+    if self.indicatorGlow then
+        self.indicatorGlow.Enabled = self.value
+        variables.tweenService:Create(self.indicatorGlow, info, {Transparency = self.value and 0.4 or 1}):Play()
+    end
     if self.value then
         variables.tweenService:Create(self.indicator, info, {Position = UDim2.new(1, -28, 0.5, 0), BackgroundColor3 = Color3.fromRGB(23, 153, 110), BackgroundTransparency = 0}):Play()
         variables.tweenService:Create(self.indicatorStroke, info, {Color = Color3.fromRGB(32, 201, 144), Transparency = 0}):Play()
