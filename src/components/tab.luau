@@ -373,7 +373,30 @@ function Tab:_moveElement(element, targetIndex)
 end
 
 function Tab:Remove()
-    -- remove tab
+    local window = self.window
+
+    local idx = table.find(window.tabs, self)
+    if idx then table.remove(window.tabs, idx) end
+
+    -- If this was the active tab, hand selection to the next visible tab
+    if window.selectedTab == self then
+        window.selectedTab = nil
+        for _, tab in ipairs(window.tabs) do
+            if not tab.neglectSelector then
+                tab:Select()
+                break
+            end
+        end
+    end
+
+    -- Tear down the UI; nil the refs so the lingering show/hide signal handler
+    -- and _applyVisual (which guard on self.topbarItem) no-op instead of touching
+    -- a destroyed instance.
+    if self.topbarItem then self.topbarItem:Destroy() end
+    if self.tabPage then self.tabPage:Destroy() end
+    self.topbarItem = nil
+    self.tabPage = nil
+    self.elements = {}
 end
 
 return Tab
