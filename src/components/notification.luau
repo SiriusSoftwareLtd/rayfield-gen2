@@ -19,9 +19,11 @@ local STACK_PADDING = 8
 
 local growInfo = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 local fadeInfo = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
--- swipe + fade share a window so the card is visible while it moves
-local swipeInfo = TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
-local exitFadeInfo = TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+-- exit: shrink a touch (Gen1-style pull-in), then swipe out over a slower window
+local shrinkInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+local swipeInfo = TweenInfo.new(0.55, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+-- fade matches the swipe's slow-start so the card stays visible while it moves
+local exitFadeInfo = TweenInfo.new(0.55, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
 local collapseInfo = TweenInfo.new(0.45, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut)
 
 -- Auto duration from content length, clamped to a sensible window
@@ -66,10 +68,13 @@ function Notification.new(window, properties)
         Parent = self.main,
     })
 
-    -- Inner body: the visible card; this is what swipes out to the left on dismiss.
+    -- Inner body: the visible card. Centered anchor so the UIScale shrinks it
+    -- from the middle on exit; this is also what swipes out on dismiss.
     self.body = self.window:Create("Frame", {
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         Size = UDim2.new(1, 0, 1, 0),
+        Position = UDim2.new(0.5, 0, 0.5, 0),
+        AnchorPoint = Vector2.new(0.5, 0.5),
         Active = true, -- receives input for click-to-dismiss
         BorderSizePixel = 0,
         ZIndex = 2,
@@ -78,6 +83,12 @@ function Notification.new(window, properties)
         BackgroundTransparency = 1, -- In = 0
 
         Parent = self.main,
+    })
+
+    self.scale = self.window:Create("UIScale", {
+        Scale = 1,
+
+        Parent = self.body,
     })
 
     self.window:Create("UIGradient", {
@@ -272,8 +283,15 @@ function Notification:_dismiss()
 
     if not self.main.Parent then return end
 
-    -- Swipe the card out to the right (off the nearest edge) while it fades
-    variables.tweenService:Create(self.body, swipeInfo, {Position = UDim2.new(0, 340, 0, 0)}):Play()
+    -- Phase 1: pull in a touch (Gen1-style) before it leaves
+    variables.tweenService:Create(self.scale, shrinkInfo, {Scale = 0.9}):Play()
+
+    task.wait(0.16)
+    if not self.main.Parent then return end
+
+    -- Phase 2: swipe out to the right (off the edge) while it fades. The card is
+    -- centered (anchor 0.5), so it swipes by offsetting Position.X off-screen.
+    variables.tweenService:Create(self.body, swipeInfo, {Position = UDim2.new(0.5, 360, 0.5, 0)}):Play()
     variables.tweenService:Create(self.body, exitFadeInfo, {BackgroundTransparency = 1}):Play()
     variables.tweenService:Create(self.stroke, exitFadeInfo, {Transparency = 1}):Play()
     variables.tweenService:Create(self.shadow, exitFadeInfo, {Transparency = 1}):Play()
@@ -281,9 +299,9 @@ function Notification:_dismiss()
     if self.descriptionLabel then variables.tweenService:Create(self.descriptionLabel, exitFadeInfo, {TextTransparency = 1}):Play() end
     if self.iconLabel then variables.tweenService:Create(self.iconLabel, exitFadeInfo, {ImageTransparency = 1}):Play() end
 
-    task.wait(0.28)
+    task.wait(0.4)
 
-    -- Collapse the outer frame so the stack closes the gap, then remove
+    -- Phase 3: collapse the slot so the stack closes the gap, then remove
     if not self.main.Parent then return end
     local collapse = variables.tweenService:Create(self.main, collapseInfo, {Size = UDim2.new(1, 0, 0, 0)})
     collapse:Play()
