@@ -2,15 +2,18 @@ local Notification = {}
 Notification.__index = Notification
 Notification.__type = "Notification"
 
+local TextService = game:GetService("TextService")
+
 -- Utility
 local utility = script.Parent.Parent.utility
 
 -- Variables
 local variables = require(utility.variables)
-local image = require(utility.image)
 
-local enterInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-local exitInfo = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+-- Grow-in / collapse-out slide (old Rayfield feel), Quint easing per project rule
+local growInfo = TweenInfo.new(0.55, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+local fadeInfo = TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+local exitFadeInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 local collapseInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
 -- Auto duration from content length, clamped to a sensible window
@@ -34,12 +37,13 @@ function Notification.new(window, properties)
 
     local hasIcon = self.icon ~= nil and self.icon ~= 0 and self.icon ~= ""
 
+    -- Fixed-height frame (height is animated); starts collapsed with transparent
+    -- content, so the pre-grow overflow is never visible (no clipping needed).
     self.main = self.window:Create("Frame", {
         Name = "Notification",
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         Size = UDim2.new(1, 0, 0, 0),
-        AutomaticSize = Enum.AutomaticSize.Y,
-        Active = true, -- so it can receive input for click-to-dismiss
+        Active = true, -- can receive input for click-to-dismiss
         BorderSizePixel = 0,
         ZIndex = 2,
 
@@ -71,9 +75,8 @@ function Notification.new(window, properties)
 
     self.shadow = self.window:CreateGlow(self.main, Color3.fromRGB(0, 0, 0), 20, 1) -- In = 0.6
 
+    -- Horizontal insets; vertical padding comes from centering the row in the grown height
     self.window:Create("UIPadding", {
-        PaddingTop = UDim.new(0, 14),
-        PaddingBottom = UDim.new(0, 14),
         PaddingLeft = UDim.new(0, 20),
         PaddingRight = UDim.new(0, 20),
 
@@ -182,18 +185,48 @@ function Notification.new(window, properties)
     return self
 end
 
+-- Height the notification needs, measured without rendering (so nothing flickers
+-- into the stack before it's ready to animate).
+function Notification:_measure()
+    local colWidth = self.iconLabel and 222 or 260
+    local function textHeight(text, font, size)
+        local params = Instance.new("GetTextBoundsParams")
+        params.Text = text
+        params.Font = font
+        params.Size = size
+        params.Width = colWidth
+        local ok, bounds = pcall(TextService.GetTextBoundsAsync, TextService, params)
+        return ok and bounds.Y or size
+    end
+
+    local contentH = textHeight(self.title, self.window.theme.TitleFont, 16)
+    if self.descriptionLabel then
+        contentH = contentH + 4 + textHeight(self.content, self.window.theme.Font, 15)
+    end
+
+    return math.max(contentH, self.iconLabel and 24 or 0) + 28
+end
+
 function Notification:_show()
-    local w = self.window
-    variables.tweenService:Create(self.main, enterInfo, {BackgroundTransparency = 0}):Play()
-    variables.tweenService:Create(self.titleLabel, enterInfo, {TextTransparency = 0}):Play()
+    -- All sizing done before anything is visible: frame is height 0 + fully
+    -- transparent until the grow tween starts, so there's no flicker.
+    local target = self:_measure()
+    if not self.main.Parent then return end
+
+    -- Grow in (slide up out of the stack)
+    variables.tweenService:Create(self.main, growInfo, {Size = UDim2.new(1, 0, 0, target)}):Play()
+
+    task.wait(0.12)
+    variables.tweenService:Create(self.main, fadeInfo, {BackgroundTransparency = 0}):Play()
+    variables.tweenService:Create(self.stroke, fadeInfo, {Transparency = 0.95}):Play()
+    variables.tweenService:Create(self.shadow, fadeInfo, {Transparency = 0.6}):Play()
+    variables.tweenService:Create(self.titleLabel, fadeInfo, {TextTransparency = 0}):Play()
 
     task.wait(0.05)
-    if self.iconLabel then variables.tweenService:Create(self.iconLabel, enterInfo, {ImageTransparency = 0}):Play() end
+    if self.iconLabel then variables.tweenService:Create(self.iconLabel, fadeInfo, {ImageTransparency = 0}):Play() end
 
     task.wait(0.05)
-    if self.descriptionLabel then variables.tweenService:Create(self.descriptionLabel, enterInfo, {TextTransparency = 0.35}):Play() end
-    variables.tweenService:Create(self.stroke, enterInfo, {Transparency = 0.95}):Play()
-    variables.tweenService:Create(self.shadow, enterInfo, {Transparency = 0.6}):Play()
+    if self.descriptionLabel then variables.tweenService:Create(self.descriptionLabel, fadeInfo, {TextTransparency = 0.35}):Play() end
 
     -- Dwell, pausing while hovered
     local elapsed = 0
@@ -211,18 +244,17 @@ function Notification:_dismiss()
 
     if not self.main.Parent then return end
 
-    variables.tweenService:Create(self.main, exitInfo, {BackgroundTransparency = 1}):Play()
-    variables.tweenService:Create(self.stroke, exitInfo, {Transparency = 1}):Play()
-    variables.tweenService:Create(self.shadow, exitInfo, {Transparency = 1}):Play()
-    variables.tweenService:Create(self.titleLabel, exitInfo, {TextTransparency = 1}):Play()
-    if self.descriptionLabel then variables.tweenService:Create(self.descriptionLabel, exitInfo, {TextTransparency = 1}):Play() end
-    if self.iconLabel then variables.tweenService:Create(self.iconLabel, exitInfo, {ImageTransparency = 1}):Play() end
+    -- Fade out first, then collapse so the overflow never shows during the slide-out
+    variables.tweenService:Create(self.main, exitFadeInfo, {BackgroundTransparency = 1}):Play()
+    variables.tweenService:Create(self.stroke, exitFadeInfo, {Transparency = 1}):Play()
+    variables.tweenService:Create(self.shadow, exitFadeInfo, {Transparency = 1}):Play()
+    variables.tweenService:Create(self.titleLabel, exitFadeInfo, {TextTransparency = 1}):Play()
+    if self.descriptionLabel then variables.tweenService:Create(self.descriptionLabel, exitFadeInfo, {TextTransparency = 1}):Play() end
+    if self.iconLabel then variables.tweenService:Create(self.iconLabel, exitFadeInfo, {ImageTransparency = 1}):Play() end
 
     task.wait(0.2)
 
-    -- Collapse the row so the stack closes the gap, then remove
     if not self.main.Parent then return end
-    self.main.AutomaticSize = Enum.AutomaticSize.None
     local collapse = variables.tweenService:Create(self.main, collapseInfo, {Size = UDim2.new(1, 0, 0, 0)})
     collapse:Play()
     collapse.Completed:Wait()

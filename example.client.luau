@@ -24,8 +24,29 @@ window:CreateTag({
 task.delay(4, function()
     window:Notify({
         title = 'Welcome back',
-        content = 'Rayfield Gen2 loaded. Notifications support an icon, auto-dismiss, hover-to-pause and click-to-dismiss.',
+        content = 'Rayfield Gen2 loaded. Hover to pause, click to dismiss.',
         icon = 93364949241311,
+    })
+
+    task.wait(1.2)
+    window:Notify({
+        title = 'Auto-saved',
+        content = 'Your configuration was saved.',
+        icon = 125823673784681,
+        duration = 5,
+    })
+
+    task.wait(1.2)
+    window:Notify({
+        title = 'No icon here',
+        content = 'Notifications work fine without an icon too, and the text column stretches to fill the width.',
+    })
+
+    task.wait(1.2)
+    window:Notify({
+        title = 'Longer one',
+        content = 'This is a longer notification to show wrapping and how the frame auto-sizes to fit multiple lines while the stack reflows underneath it.',
+        icon = 85925158736685,
     })
 end)
 
