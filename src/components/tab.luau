@@ -360,6 +360,15 @@ function Tab:CreateDropdown(properties)
     return newElement
 end
 
+-- Row (packs up to 3 compact elements side by side; add to it via row:CreateX)
+function Tab:CreateRow(properties)
+    local newElement = require(script.Parent.row).new(self, properties)
+    table.insert(self.elements, newElement)
+    assignOrder(newElement, #self.elements * 10)
+
+    return newElement
+end
+
 
 function Tab:_moveElement(element, targetIndex)
     local idx = table.find(self.elements, element)

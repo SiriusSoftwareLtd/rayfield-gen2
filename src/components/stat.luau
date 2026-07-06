@@ -7,6 +7,7 @@ local utility = script.Parent.Parent.utility
 
 -- Variables
 local variables = require(utility.variables)
+local odometer = require(utility.odometer)
 
 -- Accent gradients per direction (fill drives the card + glow, stroke is the brighter edge)
 local accents = {
@@ -24,6 +25,13 @@ local accents = {
         stroke = ColorSequence.new(Color3.fromRGB(0, 213, 156), Color3.fromRGB(0, 189, 135)),
     },
 }
+
+local accentTransparency = NumberSequence.new({
+    NumberSequenceKeypoint.new(0, 0.85),
+    NumberSequenceKeypoint.new(1, 0),
+})
+
+local compactHeight = 41
 
 local function formatPct(pct)
     if pct > 0 then
@@ -79,14 +87,33 @@ function Statistic.new(tab, properties)
         prefix = properties.prefix or properties.Prefix or "",
         suffix = properties.suffix or properties.Suffix or "",
 
+        -- 41px single-readout card. config opt-in, forced on in a row. only room for
+        -- one number, so `display` picks value or % change.
+        compact = properties.compact or properties.Compact or tab.compact or false,
+        display = (properties.display or properties.Display or "value"), -- "value" | "change"
+
         _initialValue = nil,
-        _displayedValue = nil,
-        _valueAnimTask = nil,
-        _displayedPct = nil,
-        _pctAnimTask = nil,
+        _lastChange = 0,
     }, Statistic)
 
-    self.main = self.window:Create("Frame", {
+    if self.compact then
+        self:_buildCompact()
+    else
+        self:_buildFull()
+    end
+
+    if self.description and not self.compact then
+        self.descriptor = require(script.Parent.descriptor).new(self.tab, { description = self.description })
+    end
+
+    return self
+end
+
+-- full 90px card: title, value bottom-left, % change bottom-right
+function Statistic:_buildFull()
+    local window = self.window
+
+    self.main = window:Create("Frame", {
         Size = UDim2.new(1, -20, 0, 90),
         BorderSizePixel = 0,
         Name = self.name,
@@ -99,31 +126,27 @@ function Statistic.new(tab, properties)
         Parent = self.tab.tabPage,
     }, {BackgroundTransparency = 'ElementTransparency'})
 
-    self.window:Create("UICorner", {
+    window:Create("UICorner", {
         Parent = self.main,
     }, {CornerRadius = 'ElementCornerRadius'})
 
-    self.stroke = self.window:Create("UIStroke", {
+    self.stroke = window:Create("UIStroke", {
         Transparency = 1, -- Animation In = 0
         Color = Color3.fromRGB(255, 255, 255),
 
         Parent = self.main,
     }, {Transparency = 'ElementStrokeTransparency'})
 
-    self.strokeGradient = self.window:Create("UIGradient", {
+    self.strokeGradient = window:Create("UIGradient", {
         Rotation = 2,
         Offset = Vector2.new(0, 0.5),
         Color = accents.neutral.stroke,
-        Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.85),
-            NumberSequenceKeypoint.new(1, 0),
-          }),
-
+        Transparency = accentTransparency,
 
         Parent = self.stroke
     })
 
-    self.titleContainer = self.window:Create("Frame", {
+    self.titleContainer = window:Create("Frame", {
         Size = UDim2.new(1, -40, 0, 32),
         Position = UDim2.fromOffset(20, 15),
         BorderSizePixel = 0,
@@ -134,7 +157,7 @@ function Statistic.new(tab, properties)
         Parent = self.main,
     })
 
-    self.gradientContainer = self.window:Create("Frame", {
+    self.gradientContainer = window:Create("Frame", {
         Size = UDim2.fromScale(1, 1),
         Position = UDim2.fromOffset(0, 0),
         BorderSizePixel = 0,
@@ -145,7 +168,7 @@ function Statistic.new(tab, properties)
         Parent = self.main,
     })
 
-    self.glowContainer = self.window:Create("Frame", {
+    self.glowContainer = window:Create("Frame", {
         Size = UDim2.new(1, 35, 1, 35),
         Position = UDim2.fromScale(0.5, 0.5),
         AnchorPoint = Vector2.new(0.5, 0.5),
@@ -156,7 +179,7 @@ function Statistic.new(tab, properties)
         Parent = self.main,
     })
 
-    self.glowImage = self.window:Create("ImageLabel", {
+    self.glowImage = window:Create("ImageLabel", {
         Image = 'rbxassetid://5587865193',
         ImageColor3 = Color3.fromRGB(255, 255, 255),
         Size = UDim2.fromScale(1.15, 1),
@@ -166,15 +189,13 @@ function Statistic.new(tab, properties)
         BackgroundTransparency = 1,
         ZIndex = 4,
 
-        -- Animation
         ImageTransparency = 1, -- In = 0.6
 
         Parent = self.glowContainer
     })
 
-    self.title = self.window:Create("TextLabel", {
-        -- Configurables
-        Text = self.name, -- tab name
+    self.title = window:Create("TextLabel", {
+        Text = self.name,
 
         Size = UDim2.fromOffset(300, 19),
         BorderSizePixel = 0,
@@ -185,47 +206,36 @@ function Statistic.new(tab, properties)
         LayoutOrder = 1,
         ZIndex = 10,
 
-        -- Animation
         TextTransparency = 1, -- In = 0
 
         Parent = self.titleContainer
     }, {TextColor3 = 'ContentColor', FontFace = 'TitleFont'})
 
-    self.mainGradient = self.window:Create("UIGradient", {
+    self.mainGradient = window:Create("UIGradient", {
         Rotation = 2,
         Offset = Vector2.new(0, 0.5),
         Color = accents.neutral.fill,
-        Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.85),
-            NumberSequenceKeypoint.new(1, 0),
-          }),
-
+        Transparency = accentTransparency,
 
         Parent = self.gradientContainer
     })
 
-    self.glowGradient = self.window:Create("UIGradient", {
+    self.glowGradient = window:Create("UIGradient", {
         Rotation = 2,
         Offset = Vector2.new(0, 0.5),
         Color = accents.neutral.fill,
-        Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.85),
-            NumberSequenceKeypoint.new(1, 0),
-          }),
+        Transparency = accentTransparency,
 
         Parent = self.glowImage
     })
 
-    self.window:Create("UICorner", {
+    window:Create("UICorner", {
         Parent = self.gradientContainer,
     }, {CornerRadius = 'ElementCornerRadius'})
 
     if self.icon then
-        self.iconLabel = self.window:Create("ImageLabel", {
-            -- Configurables
+        self.iconLabel = window:Create("ImageLabel", {
             Image = 'rbxassetid://'..tostring(self.icon),
-
-            -- Theming
             ImageColor3 = Color3.fromRGB(255, 255, 255),
 
             Size = UDim2.fromOffset(32, 32),
@@ -233,14 +243,13 @@ function Statistic.new(tab, properties)
             BackgroundTransparency = 1,
             ZIndex = 10,
 
-            -- Animation
             ImageTransparency = 1, -- In = 0
 
             Parent = self.titleContainer
         }, {ImageColor3 = 'ContentColor'})
     end
 
-    self.containerLayout = self.window:Create("UIListLayout", {
+    self.containerLayout = window:Create("UIListLayout", {
         Padding = UDim.new(0, 8),
         FillDirection = Enum.FillDirection.Horizontal,
         VerticalAlignment = Enum.VerticalAlignment.Center,
@@ -250,72 +259,232 @@ function Statistic.new(tab, properties)
         Parent = self.titleContainer
     })
 
-    self.valueLabel = self.window:Create("TextLabel", {
-        -- Configurables
-        Text = self.prefix .. formatValue(self.value) .. self.suffix,
-
+    -- Value (bottom-left) + change (bottom-right) odometer readouts.
+    self.valueHost = window:Create("Frame", {
         AnchorPoint = Vector2.new(0, 1),
         Position = UDim2.new(0, 20, 1, -15),
         Size = UDim2.fromOffset(200, 20),
-        BorderSizePixel = 0,
         BackgroundTransparency = 1,
-        TextSize = 20,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        TextWrapped = true,
-        LayoutOrder = 1,
+        BorderSizePixel = 0,
         ZIndex = 10,
 
-        -- Animation
-        TextTransparency = 1, -- In = 0
-
         Parent = self.main
-    }, {TextColor3 = 'ContentColor', FontFace = 'Font'})
+    })
 
-    self.changeLabel = self.window:Create("TextLabel", {
-        -- Configurables
-        Text = '0%',
-
+    self.changeHost = window:Create("Frame", {
         AnchorPoint = Vector2.new(1, 1),
         Position = UDim2.new(1, -20, 1, -15),
         Size = UDim2.fromOffset(200, 15),
-        BorderSizePixel = 0,
         BackgroundTransparency = 1,
-        TextSize = 15,
-        TextXAlignment = Enum.TextXAlignment.Right,
-        TextWrapped = true,
-        RichText = true,
-        LayoutOrder = 1,
+        BorderSizePixel = 0,
         ZIndex = 10,
 
-        -- Animation
-        TextTransparency = 1, -- In = 0
-
         Parent = self.main
-    }, {TextColor3 = 'ContentColor', FontFace = 'Font'})
+    })
 
-    -- Function
+    self.valueOdo = odometer.new(window, self.valueHost, {
+        textSize = 20,
+        alignment = Enum.HorizontalAlignment.Left,
+        transparency = 1, -- revealed to 0 on show
+    })
+    self.valueOdo:snap(self:_formatValue(self.value))
 
-    self.window:Connect(self.window.signal, function(command)
-        if command == 'hide' then
+    self.changeOdo = odometer.new(window, self.changeHost, {
+        textSize = 15,
+        alignment = Enum.HorizontalAlignment.Right,
+        transparency = 1,
+    })
+    self.changeOdo:snap(self:_formatChange(0))
 
-        elseif command == 'show' then
-            task.wait(0.7)
-            variables.tweenService:Create(self.stroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeTransparency}):Play()
-            variables.tweenService:Create(self.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
-            variables.tweenService:Create(self.gradientContainer, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
-            variables.tweenService:Create(self.glowImage, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.6}):Play()
-            variables.tweenService:Create(self.main, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
-            variables.tweenService:Create(self.valueLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
-            variables.tweenService:Create(self.changeLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
-            if self.icon then variables.tweenService:Create(self.iconLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play() end
-        end
-    end)
+    self._accentGradients = { self.strokeGradient, self.mainGradient, self.glowGradient }
+end
 
-    if self.description then
-        self.descriptor = require(script.Parent.descriptor).new(self.tab, { description = self.description })
+-- compact 41px card: icon+title left, one readout right. accent gradient sits on
+-- the card (the flexed child), not a separate overlay
+function Statistic:_buildCompact()
+    local window = self.window
+
+    -- in a row it's content-sized and flexes; standalone it's full-width, no flex item
+    local inRow = self.tab.compact or false
+
+    self.main = window:Create("Frame", {
+        Name = self.name,
+        Size = if inRow then UDim2.fromOffset(0, compactHeight) else UDim2.new(1, -20, 0, compactHeight),
+        AutomaticSize = if inRow then Enum.AutomaticSize.X else Enum.AutomaticSize.None,
+        ClipsDescendants = true,
+        BackgroundColor3 = Color3.fromRGB(25, 25, 25),
+        BorderSizePixel = 0,
+        ZIndex = 5,
+
+        BackgroundTransparency = 1, -- In = ElementTransparency
+
+        Parent = self.tab.tabPage,
+    }, {BackgroundTransparency = 'ElementTransparency'})
+
+    window:Create("UICorner", {
+        Parent = self.main,
+    }, {CornerRadius = 'ElementCornerRadius'})
+
+    self.stroke = window:Create("UIStroke", {
+        Transparency = 1, -- In = ElementStrokeTransparency
+        Color = Color3.fromRGB(255, 255, 255),
+
+        Parent = self.main,
+    }, {Transparency = 'ElementStrokeTransparency'})
+
+    self.strokeGradient = window:Create("UIGradient", {
+        Rotation = 2,
+        Offset = Vector2.new(0, 0.5),
+        Color = accents.neutral.stroke,
+        Transparency = accentTransparency,
+
+        Parent = self.stroke,
+    })
+
+    if inRow then
+        window:Create("UIFlexItem", {
+            FlexMode = Enum.UIFlexMode.Fill,
+            Parent = self.main,
+        })
     end
 
-    return self
+    window:Create("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        HorizontalFlex = Enum.UIFlexAlignment.Fill,
+
+        Parent = self.main,
+    })
+
+    -- accent surface + content: white base + accent gradient, title left, readout right
+    self.card = window:Create("Frame", {
+        AutomaticSize = Enum.AutomaticSize.X,
+        Size = UDim2.fromOffset(0, compactHeight),
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BorderSizePixel = 0,
+        ZIndex = 5,
+
+        BackgroundTransparency = 1, -- In = 0
+
+        Parent = self.main,
+    })
+
+    window:Create("UICorner", {
+        Parent = self.card,
+    }, {CornerRadius = 'ElementCornerRadius'})
+
+    self.mainGradient = window:Create("UIGradient", {
+        Rotation = 2,
+        Offset = Vector2.new(0, 0.5),
+        Color = accents.neutral.fill,
+        Transparency = accentTransparency,
+
+        Parent = self.card,
+    })
+
+    window:Create("UIPadding", {
+        PaddingLeft = UDim.new(0, 15),
+        PaddingRight = UDim.new(0, 15),
+
+        Parent = self.card,
+    })
+
+    window:Create("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        HorizontalFlex = Enum.UIFlexAlignment.SpaceBetween,
+        Padding = UDim.new(0, 10),
+
+        Parent = self.card,
+    })
+
+    -- icon + title (left)
+    self.titleContainer = window:Create("Frame", {
+        AutomaticSize = Enum.AutomaticSize.X,
+        Size = UDim2.fromOffset(0, 16),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        LayoutOrder = 0,
+        ZIndex = 6,
+
+        Parent = self.card,
+    })
+
+    -- title gives up room to the readout when tight
+    window:Create("UIFlexItem", {
+        FlexMode = Enum.UIFlexMode.Shrink,
+        Parent = self.titleContainer,
+    })
+
+    window:Create("UIListLayout", {
+        Padding = UDim.new(0, 6),
+        FillDirection = Enum.FillDirection.Horizontal,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        HorizontalAlignment = Enum.HorizontalAlignment.Left,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+
+        Parent = self.titleContainer,
+    })
+
+    if self.icon then
+        self.iconLabel = window:Create("ImageLabel", {
+            Image = 'rbxassetid://'..tostring(self.icon),
+            ImageColor3 = Color3.fromRGB(255, 255, 255),
+            Size = UDim2.fromOffset(20, 20), -- smaller than the full 32
+            BorderSizePixel = 0,
+            BackgroundTransparency = 1,
+            LayoutOrder = 0,
+            ZIndex = 6,
+
+            ImageTransparency = 1, -- In = 0
+
+            Parent = self.titleContainer,
+        }, {ImageColor3 = 'ContentColor'})
+    end
+
+    self.title = window:Create("TextLabel", {
+        Text = self.name,
+        Size = UDim2.fromOffset(0, 16),
+        AutomaticSize = Enum.AutomaticSize.X,
+        BorderSizePixel = 0,
+        BackgroundTransparency = 1,
+        TextSize = 16,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextTruncate = Enum.TextTruncate.AtEnd,
+        LayoutOrder = 1,
+        ZIndex = 6,
+
+        TextTransparency = 1, -- In = 0
+
+        Parent = self.titleContainer,
+    }, {TextColor3 = 'ContentColor', FontFace = 'Font'}) -- Medium, like the other row elements
+
+    -- grows to its text, shrinks + ellipsizes when tight
+    window:Create("UIFlexItem", {
+        FlexMode = Enum.UIFlexMode.Shrink,
+        Parent = self.title,
+    })
+
+    -- single readout (right)
+    self.readoutHost = window:Create("Frame", {
+        AutomaticSize = Enum.AutomaticSize.X,
+        Size = UDim2.fromOffset(0, 18),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        LayoutOrder = 1,
+        ZIndex = 6,
+
+        Parent = self.card,
+    })
+
+    self.readoutOdo = odometer.new(window, self.readoutHost, {
+        textSize = 17,
+        alignment = Enum.HorizontalAlignment.Right,
+        transparency = 1,
+    })
+    self.readoutOdo:snap(self.display == "change" and self:_formatChange(0) or self:_formatValue(self.value))
+
+    self._accentGradients = { self.strokeGradient, self.mainGradient }
 end
 
 
@@ -323,13 +492,13 @@ function Statistic:_setAccent(key, direction)
     local accent = accents[key]
     self.strokeGradient.Color = accent.stroke
     self.mainGradient.Color = accent.fill
-    self.glowGradient.Color = accent.fill
+    if self.glowGradient then self.glowGradient.Color = accent.fill end
 
     -- Subtle rotation + offset shift to give the gradient a bit of life
     local rotation = if direction == 1 then 14 elseif direction == -1 then -10 else 2
     local offset = if direction == 1 then Vector2.new(0.04, 0.5) elseif direction == -1 then Vector2.new(-0.04, 0.5) else Vector2.new(0, 0.5)
     local gradientTweenInfo = TweenInfo.new(0.6, Enum.EasingStyle.Exponential)
-    for _, gradient in { self.strokeGradient, self.mainGradient, self.glowGradient } do
+    for _, gradient in self._accentGradients do
         variables.tweenService:Create(gradient, gradientTweenInfo, { Rotation = rotation, Offset = offset }):Play()
     end
 end
@@ -343,6 +512,48 @@ function Statistic:_formatChange(delta)
         return formatChange(delta)
     else
         return formatPct(delta)
+    end
+end
+
+-- full: roll value + change independently
+function Statistic:_updateFullReadouts(value, previousValue, targetChange, noChange, infinityText, hasNoHistory)
+    if self.numberEasing and not hasNoHistory then
+        self.valueOdo:to(self:_formatValue(value), value >= previousValue)
+    else
+        self.valueOdo:snap(self:_formatValue(value))
+    end
+
+    if infinityText then
+        self.changeOdo:snap(infinityText)
+        self._lastChange = 0
+    elseif self.numberEasing and not noChange then
+        self.changeOdo:to(self:_formatChange(targetChange), targetChange >= self._lastChange)
+        self._lastChange = targetChange
+    else
+        self.changeOdo:snap(self:_formatChange(targetChange or 0))
+        self._lastChange = targetChange or 0
+    end
+end
+
+-- compact: roll the one readout
+function Statistic:_updateCompactReadout(value, previousValue, targetChange, noChange, infinityText, hasNoHistory)
+    if self.display == "change" then
+        if infinityText then
+            self.readoutOdo:snap(infinityText)
+            self._lastChange = 0
+        elseif self.numberEasing and not noChange then
+            self.readoutOdo:to(self:_formatChange(targetChange), targetChange >= self._lastChange)
+            self._lastChange = targetChange
+        else
+            self.readoutOdo:snap(self:_formatChange(targetChange or 0))
+            self._lastChange = targetChange or 0
+        end
+    else -- "value"
+        if self.numberEasing and not hasNoHistory then
+            self.readoutOdo:to(self:_formatValue(value), value >= previousValue)
+        else
+            self.readoutOdo:snap(self:_formatValue(value))
+        end
     end
 end
 
@@ -384,59 +595,10 @@ function Statistic:Set(value)
 
     self:_setAccent(accentKey, direction)
 
-    -- Cancel any in-progress animations
-    if self._valueAnimTask then
-        task.cancel(self._valueAnimTask)
-        self._valueAnimTask = nil
-    end
-    if self._pctAnimTask then
-        task.cancel(self._pctAnimTask)
-        self._pctAnimTask = nil
-    end
-
-    -- Animate value label
-    if self.numberEasing and not hasNoHistory then
-        local startVal = if self._displayedValue ~= nil then self._displayedValue else previousValue
-        local startTime = tick()
-
-        self._valueAnimTask = task.spawn(function()
-            repeat
-                local alpha = math.min((tick() - startTime) / 0.5, 1)
-                local current = startVal + (value - startVal) * (1 - (1 - alpha) ^ 3)
-                self._displayedValue = current
-                self.valueLabel.Text = self:_formatValue(math.round(current))
-                task.wait()
-            until alpha >= 1
-            self._displayedValue = value
-            self.valueLabel.Text = self:_formatValue(value)
-        end)
+    if self.compact then
+        self:_updateCompactReadout(value, previousValue, targetChange, noChange, infinityText, hasNoHistory)
     else
-        self._displayedValue = value
-        self.valueLabel.Text = self:_formatValue(value)
-    end
-
-    -- Animate change label
-    if infinityText then
-        self.changeLabel.Text = infinityText
-        self._displayedPct = nil
-    elseif self.numberEasing and not noChange then
-        local startChange = if self._displayedPct ~= nil then self._displayedPct else 0
-        local startTime = tick()
-
-        self._pctAnimTask = task.spawn(function()
-            repeat
-                local alpha = math.min((tick() - startTime) / 0.5, 1)
-                local current = startChange + (targetChange - startChange) * (1 - (1 - alpha) ^ 3)
-                self._displayedPct = current
-                self.changeLabel.Text = self:_formatChange(current)
-                task.wait()
-            until alpha >= 1
-            self._displayedPct = targetChange
-            self.changeLabel.Text = self:_formatChange(targetChange)
-        end)
-    else
-        self._displayedPct = targetChange
-        self.changeLabel.Text = self:_formatChange(targetChange or 0)
+        self:_updateFullReadouts(value, previousValue, targetChange, noChange, infinityText, hasNoHistory)
     end
 end
 
@@ -444,19 +606,37 @@ function Statistic:ResetBaseline(newBaseline)
     local baseline = if typeof(newBaseline) == "number" then newBaseline else self.value
     self._initialValue = baseline
     self.value = baseline
-    self._displayedPct = 0
-    self.changeLabel.Text = self:_formatChange(0)
+    self._lastChange = 0
+
+    -- change-display card resets to 0; a value card is unaffected
+    if self.compact then
+        if self.display == "change" then self.readoutOdo:snap(self:_formatChange(0)) end
+    else
+        self.changeOdo:snap(self:_formatChange(0))
+    end
+
     self:_setAccent('neutral', 0)
 end
 
 
 function Statistic:_setShown(animate)
     local w = self.window
+
+    if self.compact then
+        w:_reveal(self.main, {BackgroundTransparency = self.window.theme.ElementTransparency or 0}, animate)
+        w:_reveal(self.stroke, {Transparency = self.window.theme.ElementStrokeTransparency}, animate)
+        w:_reveal(self.card, {BackgroundTransparency = 0}, animate)
+        w:_reveal(self.title, {TextTransparency = 0}, animate)
+        if self.iconLabel then w:_reveal(self.iconLabel, {ImageTransparency = 0}, animate) end
+        self.readoutOdo:reveal(0, animate)
+        return
+    end
+
     w:_revealCommon(self, animate)
     w:_reveal(self.gradientContainer, {BackgroundTransparency = 0}, animate)
     w:_reveal(self.glowImage, {ImageTransparency = 0.6}, animate)
-    w:_reveal(self.valueLabel, {TextTransparency = 0}, animate)
-    w:_reveal(self.changeLabel, {TextTransparency = 0}, animate)
+    self.valueOdo:reveal(0, animate)
+    self.changeOdo:reveal(0, animate)
 end
 
 function Statistic:MoveTo(index)

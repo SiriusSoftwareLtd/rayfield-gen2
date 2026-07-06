@@ -438,11 +438,13 @@ function Window.new(properties)
 
     self.settings = {
         toggleKeybind = Enum.KeyCode.K,
+        mouseOverride = true, -- free the cursor while the menu is open (for FPS games that lock it)
     }
 
     self:LoadSettings()
     self:_buildRestoreButton()
     self:_bindKeybind()
+    self:_bindMouseOverride()
     self:_buildSettingsUI()
     self:_buildLicense()
 
@@ -819,6 +821,32 @@ function Window:_bindKeybind()
     end)
 end
 
+function Window:_bindMouseOverride()
+    local uis = variables.userInputService
+
+    local function active()
+        return self.settings.mouseOverride and not self.hidden and not self.minimised
+    end
+
+    local function free()
+        if not active() then return end
+        if uis.MouseBehavior ~= Enum.MouseBehavior.Default then
+            uis.MouseBehavior = Enum.MouseBehavior.Default
+        end
+        if not uis.MouseIconEnabled then
+            uis.MouseIconEnabled = true
+        end
+    end
+
+    -- react to the game re-locking instead of racing it each frame. it sets LockCenter, we set
+    -- it back, so we always get the last word. same deal if it hides the mouse icon.
+    self:Connect(uis:GetPropertyChangedSignal("MouseBehavior"), free)
+    self:Connect(uis:GetPropertyChangedSignal("MouseIconEnabled"), free)
+
+    -- also free it right when the menu opens, in case the game isnt actively touching it
+    self:Connect(variables.runService.RenderStepped, free)
+end
+
 function Window:_buildSettingsUI()
     self.rfSettings:CreateSection({ name = 'General' })
 
@@ -827,6 +855,17 @@ function Window:_buildSettingsUI()
         icon = 100604009889706,
         callback = function()
             print('Rayfield: Keybind changing will be available with the Keybind element.')
+        end
+    })
+
+    self.rfSettings:CreateToggle({
+        name = 'Unlock cursor while open',
+        description = 'Unlocks the cursor while the menu is open so you can configure in FPS games that lock it.',
+        value = self.settings.mouseOverride,
+        forgetState = true, -- lives in settings.rfld, not the user's config
+        callback = function(state)
+            self.settings.mouseOverride = state
+            self:SaveSettings()
         end
     })
 
@@ -1043,6 +1082,7 @@ function Window:SaveSettings()
 
     local data = {
         toggleKeybind = { tostring(self.settings.toggleKeybind.EnumType), self.settings.toggleKeybind.Value },
+        mouseOverride = self.settings.mouseOverride,
     }
 
     local ok, encoded = pcall(variables.httpService.JSONEncode, variables.httpService, data)
@@ -1090,6 +1130,10 @@ function Window:LoadSettings()
         pcall(function()
             self.settings.toggleKeybind = Enum[parsed.toggleKeybind[1]]:FromValue(parsed.toggleKeybind[2])
         end)
+    end
+
+    if type(parsed.mouseOverride) == 'boolean' then
+        self.settings.mouseOverride = parsed.mouseOverride
     end
 
     return true

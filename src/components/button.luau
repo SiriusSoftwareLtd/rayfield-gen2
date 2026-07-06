@@ -8,6 +8,9 @@ local utility = script.Parent.Parent.utility
 -- Variables
 local variables = require(utility.variables)
 
+-- Compact (row) sizing.
+local compactHeight = 41
+
 function Button.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
 
@@ -17,10 +20,71 @@ function Button.new(tab, properties)
         name = properties.name or properties.Name or "Button",
         icon = properties.icon or properties.Icon,
         description = properties.description or properties.Description,
+        compact = tab.compact or false, -- true when the host is a Row
 
         callback = properties.callback or properties.Callback or function() end
     }, Button)
 
+    if self.compact then
+        self:_buildCompact()
+    else
+        self:_buildFull()
+    end
+
+    -- Descriptions don't belong on a compact row element.
+    if self.description and not self.compact then
+        self.descriptor = require(script.Parent.descriptor).new(self.tab, { description = self.description })
+    end
+
+    return self
+end
+
+-- callback + red error-flash, shared by both layouts
+function Button:_runCallback()
+    task.spawn(function()
+        local success, result = pcall(function()
+            self.callback()
+        end)
+
+        if not success then
+            -- LOG ERROR IN WORKSPACE FILE. e.g logs.rfld
+            variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = self.window.theme.ErrorColor}):Play()
+            variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = self.window.theme.ErrorStrokeColor}):Play()
+            self.title.Text = 'Error, log recorded in console.'
+
+            warn(`Rayfield encountered an error, with the callback for a {self.__type} component named '{self.name}':`)
+            print(result)
+
+            task.wait(1)
+
+            self.title.Text = self.name
+            variables.tweenService:Create(self.main, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+            variables.tweenService:Create(self.stroke, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = self.window.theme.ElementStroke}):Play()
+        end
+    end)
+end
+
+-- hover: brighten stroke + title (+ overlay if there is one)
+function Button:_wireHover()
+    self.window:Connect(self.main.MouseEnter, function()
+        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeHoverTransparency, Color = self.window.theme.ElementStrokeHover}):Play()
+        variables.tweenService:Create(self.title, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextColor3 = self.window.theme.ElementTextHoverColor}):Play()
+        if self.hoverOverlay then
+            variables.tweenService:Create(self.hoverOverlay, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.97}):Play()
+        end
+    end)
+
+    self.window:Connect(self.main.MouseLeave, function()
+        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeTransparency, Color = self.window.theme.ElementStroke}):Play()
+        variables.tweenService:Create(self.title, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextColor3 = self.window.theme.ContentColor}):Play()
+        if self.hoverOverlay then
+            variables.tweenService:Create(self.hoverOverlay, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+        end
+    end)
+end
+
+-- full-width: title/icon left, width-bounce on press
+function Button:_buildFull()
     self.main = self.window:Create("Frame", {
         Size = UDim2.new(1, -20, 0, 43),
         BorderSizePixel = 0,
@@ -35,7 +99,7 @@ function Button.new(tab, properties)
 
     self.stroke = self.window:StyleElementBody(self.main)
     self.hoverOverlay = self.window:CreateHoverOverlay(self.main)
-    
+
     self.container = self.window:Create("Frame", {
         BorderSizePixel = 0,
 
@@ -59,7 +123,7 @@ function Button.new(tab, properties)
         self.iconLabel = self.window:Create("ImageLabel", {
             -- Configurables
             Image = 'rbxassetid://'..tostring(self.icon),
-            
+
             -- Theming
             ImageColor3 = Color3.fromRGB(255, 255, 255),
 
@@ -69,7 +133,7 @@ function Button.new(tab, properties)
 
             -- Animations
             ImageTransparency = 1, -- In = 0
-       
+
             Parent = self.container
         }, {ImageColor3 = 'ContentColor'})
     end
@@ -89,7 +153,7 @@ function Button.new(tab, properties)
 
         -- Animation
         TextTransparency = 1, -- In = 0
-    
+
         Parent = self.container
     }, {TextColor3 = 'ContentColor', FontFace = 'Font'})
 
@@ -104,71 +168,139 @@ function Button.new(tab, properties)
         Parent = self.main,
     })
 
-    -- Function
-    -- add callback errors and task spawn blah blah
-    self.window:Connect(self.interact.MouseButton1Click, function() 
+    self:_wireHover()
 
+    -- press: ghost the stroke + squeeze the width around the callback
+    self.window:Connect(self.interact.MouseButton1Click, function()
         variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = 1}):Play()
         variables.tweenService:Create(self.main, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(1, -26, 0, 43)}):Play()
-  
-        task.spawn(function() 
-            local success, result = pcall(function()
-                self.callback()
-            end) 
 
-            if not success then
-                -- LOG ERROR IN WORKSPACE FILE. e.g logs.rfld 
-
-                variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = self.window.theme.ErrorColor}):Play()
-                variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = self.window.theme.ErrorStrokeColor}):Play()
-                self.title.Text = 'Error, log recorded in console.'
-
-                warn(`Rayfield encountered an error, with the callback for a {self.__type} component named '{self.name}':`)
-                print(result)
-
-                task.wait(1)
-
-                self.title.Text = self.name
-                variables.tweenService:Create(self.main, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
-                variables.tweenService:Create(self.stroke, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = self.window.theme.ElementStroke}):Play()
-            end
-        end)
+        self:_runCallback()
 
         task.wait(0.11)
 
         variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(1, -20, 0, 43)}):Play()
         variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeTransparency}):Play()
     end)
+end
 
-    self.window:Connect(self.main.MouseEnter, function()
-        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeHoverTransparency, Color = self.window.theme.ElementStrokeHover}):Play()
-        variables.tweenService:Create(self.title, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextColor3 = self.window.theme.ElementTextHoverColor}):Play()
-        variables.tweenService:Create(self.hoverOverlay, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.97}):Play()
-    end)
+-- compact (row): content-sized, centred icon+title, no width-bounce
+function Button:_buildCompact()
+    local window = self.window
 
-    self.window:Connect(self.main.MouseLeave, function()
-        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeTransparency, Color = self.window.theme.ElementStroke}):Play()
-        variables.tweenService:Create(self.title, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextColor3 = self.window.theme.ContentColor}):Play()
-        variables.tweenService:Create(self.hoverOverlay, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
-    end)
+    self.main = window:Create("Frame", {
+        Name = self.name,
+        Size = UDim2.fromOffset(0, compactHeight),
+        AutomaticSize = Enum.AutomaticSize.X,
+        ClipsDescendants = true, -- overflow guard
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BorderSizePixel = 0,
 
-    self.window:Connect(self.window.signal, function(command)
-        if command == 'hide' then
+        BackgroundTransparency = 1, -- In = ElementTransparency
 
-        elseif command == 'show' then
-            task.wait(0.7)
-            variables.tweenService:Create(self.stroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeTransparency}):Play()
-            variables.tweenService:Create(self.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play()
-            variables.tweenService:Create(self.main, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
-            if self.icon then variables.tweenService:Create(self.iconLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play() end
-        end
-    end)
+        Parent = self.tab.tabPage,
+    }, {BackgroundTransparency = 'ElementTransparency'})
 
-    if self.description then
-        self.descriptor = require(script.Parent.descriptor).new(self.tab, { description = self.description })
+    self.stroke = window:StyleElementBody(self.main)
+
+    -- share the row width (grow + shrink)
+    window:Create("UIFlexItem", {
+        FlexMode = Enum.UIFlexMode.Fill,
+        Parent = self.main,
+    })
+
+    -- main flows + fills the interact
+    window:Create("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        HorizontalFlex = Enum.UIFlexAlignment.Fill,
+
+        Parent = self.main,
+    })
+
+    -- clickable wrapper, doubles as the hover-brighten surface
+    self.interact = window:Create("TextButton", {
+        Text = "",
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BackgroundTransparency = 1, -- hover fades to 0.97
+        AutomaticSize = Enum.AutomaticSize.X,
+        Size = UDim2.fromOffset(0, compactHeight),
+        BorderSizePixel = 0,
+        TextTransparency = 1,
+
+        Parent = self.main,
+    })
+    self.hoverOverlay = self.interact
+
+    window:Create("UICorner", {
+        Parent = self.interact,
+    }, {CornerRadius = 'ElementCornerRadius'})
+
+    window:Create("UIPadding", {
+        PaddingLeft = UDim.new(0, 16),
+        PaddingRight = UDim.new(0, 16),
+
+        Parent = self.interact,
+    })
+
+    window:Create("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        HorizontalAlignment = Enum.HorizontalAlignment.Center,
+        Padding = UDim.new(0, 6),
+
+        Parent = self.interact,
+    })
+
+    if self.icon then
+        self.iconLabel = window:Create("ImageLabel", {
+            Image = 'rbxassetid://'..tostring(self.icon),
+            ImageColor3 = Color3.fromRGB(255, 255, 255),
+            Size = UDim2.fromOffset(16, 16),
+            BorderSizePixel = 0,
+            BackgroundTransparency = 1,
+            LayoutOrder = 0,
+
+            ImageTransparency = 1, -- In = 0
+
+            Parent = self.interact,
+        }, {ImageColor3 = 'ContentColor'})
     end
 
-    return self
+    self.title = window:Create("TextLabel", {
+        Text = self.name,
+        Size = UDim2.fromOffset(0, 16),
+        AutomaticSize = Enum.AutomaticSize.X,
+        BorderSizePixel = 0,
+        BackgroundTransparency = 1,
+        TextSize = 16,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextTruncate = Enum.TextTruncate.AtEnd,
+        LayoutOrder = 1,
+
+        TextTransparency = 1, -- In = 0
+
+        Parent = self.interact,
+    }, {TextColor3 = 'ContentColor', FontFace = 'Font'})
+
+    -- grows to its text, shrinks + ellipsizes when the row's tight
+    window:Create("UIFlexItem", {
+        FlexMode = Enum.UIFlexMode.Shrink,
+        Parent = self.title,
+    })
+
+    self:_wireHover()
+
+    -- press: ghost the stroke around the callback
+    self.window:Connect(self.interact.MouseButton1Click, function()
+        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = 1}):Play()
+
+        self:_runCallback()
+
+        task.wait(0.11)
+
+        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeTransparency}):Play()
+    end)
 end
 
 

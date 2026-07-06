@@ -149,6 +149,30 @@ generalTab:CreateButton({
     end
 })
 
+generalTab:CreateSection({ name = 'Row' })
+
+local row = generalTab:CreateRow()
+
+row:CreateButton({
+    name = 'Save',
+    icon = 125823673784681,
+    callback = function() print('Row button: Save') end,
+})
+
+local rowToggle = row:CreateToggle({
+    name = 'ESP',
+    flag = 'RowESP',
+    value = true,
+    callback = function(v) print('Row toggle ESP:', v) end,
+})
+
+local rowStat = row:CreateStat({
+    name = 'Kills',
+    icon = 85925158736685,
+    value = 128,
+    display = 'value',
+})
+
 
 -- stats
 local statsTab = window:CreateTab({
@@ -167,12 +191,25 @@ local revenue = statsTab:CreateStat({
     changeBaseline = 'previous',
 })
 
+-- Compact stat outside a row (config opt-in) — shows just the % change.
+local compactStat = statsTab:CreateStat({
+    name = 'Win Rate',
+    icon = 117942554423479,
+    compact = true,
+    display = 'change',
+    value = 50,
+    changeMode = 'percentage',
+})
+
 statsTab:CreateSection({ name = 'Quick Actions' })
 
 statsTab:CreateButton({
     name = 'Simulate Sale',
     callback = function()
         revenue:Set(revenue.value + math.random(500, 3000))
+        compactStat:Set(compactStat.value + math.random(1, 9))
+        rowStat:Set(rowStat.value + math.random(1, 20)) -- bump the row's mini stat
+        rowToggle:Set(not rowToggle.value)              -- flip the row's switch
     end
 })
 
@@ -181,6 +218,7 @@ statsTab:CreateButton({
     description = 'Clears the change indicator and starts fresh from the current value.',
     callback = function()
         revenue:ResetBaseline()
+        compactStat:ResetBaseline()
     end
 })
 
