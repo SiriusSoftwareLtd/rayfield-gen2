@@ -82,9 +82,7 @@ function Dropdown.new(tab, properties)
     self.value = prunedValue
 
     -- Register as a saveable control if flagged
-    if self.flag and self.flag ~= "" and not self.forgetState then
-        self.window.controls[self.flag] = self
-    end
+    self.window:_registerControl(self)
 
     -- Outer wrapper: transparent, just holds the two cards and animates its height
     -- open <-> closed. Clips so the options card is hidden while collapsed.
@@ -698,7 +696,7 @@ function Dropdown:_open()
     if self._isOpen then return end
     self._isOpen = true
 
-    if self._outsideClickConn then self._outsideClickConn:Disconnect() end
+    if self._outsideClickConn then self.window:Disconnect(self._outsideClickConn) end
     self._outsideClickConn = self.window:Connect(variables.userInputService.InputBegan, function(input)
         if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
 
@@ -727,7 +725,7 @@ function Dropdown:_close()
     self._isOpen = false
 
     if self._outsideClickConn then
-        self._outsideClickConn:Disconnect()
+        self.window:Disconnect(self._outsideClickConn)
         self._outsideClickConn = nil
     end
 
@@ -763,10 +761,16 @@ function Dropdown:Refresh(newOptions)
     for _, opt in self.options do
         local data = self._buildOption(opt)
         table.insert(self._optionFrames, data)
+        -- fresh frames default to the closed look, so paint the open state if the
+        -- panel is already open (otherwise they'd sit blank until hovered)
+        if self._isOpen then
+            self._renderOptionState(data, false)
+        end
     end
 
     self._updateSelectedLabel()
-    self:_updateCorners()
+    -- reconcile with any active search (also refreshes corners); empty query shows all
+    self:_applyFilter(if self._searchOpen then self.searchInput.Text else "")
 end
 
 

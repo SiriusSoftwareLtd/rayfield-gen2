@@ -203,13 +203,17 @@ function Notification.new(window, properties)
     self.window._notificationCount = (self.window._notificationCount or 0) + 1
     self.main.LayoutOrder = self.window._notificationCount
 
-    self.window:Connect(self.body.MouseEnter, function() self._hovered = true end)
-    self.window:Connect(self.body.MouseLeave, function() self._hovered = false end)
-    self.window:Connect(self.body.InputBegan, function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            self:_dismiss()
-        end
-    end)
+    -- tracked so _dismiss can drop them; notifications come and go so we cant let their
+    -- connections/instances sit in the window lists until Unload
+    self._connections = {
+        self.window:Connect(self.body.MouseEnter, function() self._hovered = true end),
+        self.window:Connect(self.body.MouseLeave, function() self._hovered = false end),
+        self.window:Connect(self.body.InputBegan, function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                self:_dismiss()
+            end
+        end),
+    }
 
     task.spawn(function()
         self:_show()
@@ -294,7 +298,11 @@ function Notification:_dismiss()
     collapse.Completed:Wait()
 
     if not self.main.Parent then return end
-    self.main:Destroy()
+
+    for _, connection in self._connections do
+        self.window:Disconnect(connection)
+    end
+    self.window:DestroySubtree(self.main)
 end
 
 return Notification

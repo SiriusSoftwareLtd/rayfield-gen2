@@ -63,6 +63,9 @@ function Drag.new(window, properties)
 	local dragging = false
 	local relative = nil
 
+	-- main.Position offsets live in a space shifted from AbsolutePosition by the gui inset,
+	-- even though the ScreenGui ignores inset. so the drag target has to add the inset back
+	-- or the window lands ~inset px too high (measured in play: without it, jumps up ~58px).
 	local offset = Vector2.zero
 	local screenGui = self.window.screenGui
 
@@ -89,6 +92,7 @@ function Drag.new(window, properties)
 		if inputType == "MouseButton1" or inputType == "Touch" then
 			dragging = true
 
+			-- refetch in case the inset changed (e.g. topbar toggled) since construction
 			if screenGui and screenGui.IgnoreGuiInset then
 				offset = variables.guiService:GetGuiInset()
 			end
@@ -117,7 +121,7 @@ function Drag.new(window, properties)
 		local mouseLocation = variables.userInputService and variables.userInputService:GetMouseLocation() or Vector2.new(0, 0)
 		local validRelative = relative or Vector2.new(0, 0)
 		local validOffset = offset or Vector2.new(0, 0)
-	
+
 		return mouseLocation + validRelative + validOffset
 	end
 	

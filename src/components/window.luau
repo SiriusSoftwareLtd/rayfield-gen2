@@ -19,6 +19,21 @@ Window.__index = Window
 -- Default entrance-reveal tween (elements override with their own where needed)
 local REVEAL_INFO = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 
+-- Resolve a theme arg (table or name) to a fresh table. We copy so ChangeTheme never
+-- mutates the required theme module, which require() caches and shares between windows.
+local function resolveTheme(value)
+    local source = if typeof(value) == 'table' then value
+        elseif typeof(value) == 'string' and themes:FindFirstChild(string.lower(value))
+        then require(themes[string.lower(value)])
+        else require(themes['default'])
+
+    local copy = {}
+    for name, entry in source do
+        copy[name] = entry
+    end
+    return copy
+end
+
 function Window.new(properties)
     properties = if typeof(properties) == "table" then properties else {}
 
@@ -37,11 +52,7 @@ function Window.new(properties)
         tabs = {},
         tags = {},
         selectedTab = nil,
-        theme = if typeof(properties.theme or properties.Theme) == 'table'
-        then (properties.theme or properties.Theme)
-        elseif typeof(properties.theme or properties.Theme) == 'string' and themes:FindFirstChild(string.lower(properties.theme or properties.Theme))
-        then require(themes[string.lower((properties.theme or properties.Theme))])
-        else require(themes['default']),
+        theme = resolveTheme(properties.theme or properties.Theme),
 
         signal = SignalEngine.new(),
         
@@ -414,7 +425,6 @@ function Window.new(properties)
         linkedTab = self.rfSettings,
 
         callback = function()
-            print('navigating to settings')
             self.rfSettings:Select()
         end
     })
@@ -425,7 +435,7 @@ function Window.new(properties)
         order = 4,
 
         callback = function()
-            print('search')
+            -- TODO: search isn't wired up yet
         end
     })
 
@@ -472,10 +482,7 @@ function Window:ChangeTheme(theme)
     --assert(typeof(theme) == "table", "Invalid argument #1 (theme table expected)")
     -- ^ gonna be accepting strings and checking with a theme dict
 
-    theme = if typeof(theme) == 'table' then theme
-        elseif typeof(theme) == 'string' and themes:FindFirstChild(string.lower(theme))
-        then require(themes[string.lower(theme)])
-        else require(themes['default'])
+    theme = resolveTheme(theme)
 
     for name, value in theme do
         self.theme[name] = value
@@ -521,6 +528,25 @@ function Window:CreateTag(properties)
     local newTag = require(script.Parent.tag).new(self, properties)
     table.insert(self.tags, newTag)
     return newTag
+end
+
+-- Register a saveable control under its flag. Keeps flags unique so two same-named
+-- elements dont clobber each other's saved value. Updates control.flag to the key we
+-- actually stored under and returns it.
+function Window:_registerControl(control)
+    if not control.flag or control.flag == "" or control.forgetState then return end
+
+    local flag = control.flag
+    if self.controls[flag] then
+        local n = 2
+        while self.controls[flag .. n] do n += 1 end
+        flag = flag .. n
+        warn("Rayfield: duplicate config flag '" .. control.flag .. "', saving this one as '" .. flag .. "'")
+    end
+
+    control.flag = flag
+    self.controls[flag] = control
+    return flag
 end
 
 function Window:Notify(properties)
@@ -1385,7 +1411,7 @@ function Window:Load()
     for flag, control in self.controls do
         local value = parsed[flag]
         if value ~= nil or control._canBeNil then
-            if control.__type == "ColorPicker" then
+            if control.__type == "ColorPicker" and value ~= nil then
                 value = Color3.fromHex(value)
             end
             if control.__type == "Keybind" and value ~= nil then
@@ -1540,6 +1566,37 @@ function Window:Connect(signal, callback)
     local connection = signal:Connect(callback)
     table.insert(self.connections, connection)
     return connection
+end
+
+-- Disconnect a connection from Window:Connect and drop it from the tracked list.
+-- Transient UI (dropdown popups, removed tabs) calls this so open/close churn doesnt
+-- pile up dead entries that only get cleared at Unload.
+function Window:Disconnect(connection)
+    if not connection then return end
+    local index = table.find(self.connections, connection)
+    if index then table.remove(self.connections, index) end
+    connection:Disconnect()
+end
+
+-- Destroy a subtree and forget every tracked instance inside it. Transient elements
+-- (notifications) use this instead of a bare Destroy so self.instances doesnt grow
+-- for the whole session.
+function Window:DestroySubtree(root)
+    if not root then return end
+
+    local inSubtree = {[root] = true}
+    for _, descendant in root:GetDescendants() do
+        inSubtree[descendant] = true
+    end
+    for i = #self.instances, 1, -1 do
+        local instance = self.instances[i]
+        if inSubtree[instance] then
+            table.remove(self.instances, i)
+            self.themeProperties[instance] = nil
+        end
+    end
+
+    root:Destroy()
 end
 
 function Window:Unload()

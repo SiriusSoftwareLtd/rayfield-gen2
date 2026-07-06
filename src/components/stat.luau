@@ -47,7 +47,7 @@ local function formatValue(value)
     if typeof(value) ~= "number" then
         return tostring(value)
     end
-    local s = tostring(math.abs(math.floor(value)))
+    local s = tostring(math.floor(math.abs(value)))
     local result = s:reverse():gsub("%d%d%d", "%0,"):reverse()
     if result:sub(1, 1) == "," then result = result:sub(2) end
     return if value < 0 then "-" .. result else result
@@ -76,6 +76,9 @@ function Statistic.new(tab, properties)
         callback = properties.callback or properties.Callback or function() end,
 
         value = if (properties.value or properties.Value) ~= nil then (properties.value or properties.Value) else 0,
+        -- did we start with a real value, or is the displayed number just a placeholder?
+        -- the first Set on a placeholder establishes the baseline instead of showing a change
+        _hasValue = (properties.value or properties.Value) ~= nil,
 
         numberEasing = if (properties.numberEasing ~= nil) then properties.numberEasing
         elseif (properties.NumberEasing ~= nil) then properties.NumberEasing
@@ -92,7 +95,7 @@ function Statistic.new(tab, properties)
         compact = properties.compact or properties.Compact or tab.compact or false,
         display = (properties.display or properties.Display or "value"), -- "value" | "change"
 
-        _initialValue = nil,
+        _initialValue = if (properties.value or properties.Value) ~= nil then (properties.value or properties.Value) else nil,
         _lastChange = 0,
     }, Statistic)
 
@@ -561,8 +564,9 @@ function Statistic:Set(value)
     assert(typeof(value) == "number", "Statistic:Set() - value must be a number, got " .. typeof(value))
 
     local previousValue = self.value
-    local hasNoHistory = (previousValue == false or previousValue == nil)
+    local hasNoHistory = not self._hasValue
     self.value = value
+    self._hasValue = true
 
     if hasNoHistory then
         self._initialValue = value
@@ -606,6 +610,7 @@ function Statistic:ResetBaseline(newBaseline)
     local baseline = if typeof(newBaseline) == "number" then newBaseline else self.value
     self._initialValue = baseline
     self.value = baseline
+    self._hasValue = true
     self._lastChange = 0
 
     -- change-display card resets to 0; a value card is unaffected

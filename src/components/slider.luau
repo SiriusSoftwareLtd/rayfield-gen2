@@ -45,16 +45,26 @@ function Slider.new(tab, properties)
         dragging = false,
     }, Slider)
 
+    -- keep range ascending and increment positive so the clamp/snap math stays sane
+    if self.range[1] > self.range[2] then
+        self.range = {self.range[2], self.range[1]}
+    end
+    if self.increment <= 0 then
+        self.increment = 1
+    end
+
     self.value = if (properties.value or properties.Value) ~= nil then (properties.value or properties.Value)
         elseif (properties.currentValue or properties.CurrentValue) ~= nil then (properties.currentValue or properties.CurrentValue)
         else self.range[1]
 
+    -- snap + clamp the starting value the same way Set does, so the stored value
+    -- and the bar never disagree (and a bad initial value can't be saved)
+    self.value = math.clamp(math.round(self.value / self.increment) * self.increment, self.range[1], self.range[2])
+
     self._decimals = decimalsOf(self.increment)
 
     self.flag = properties.flag or properties.Flag or (not self.forgetState and functions.deriveFlagFromName(self.name) or nil)
-    if self.flag and self.flag ~= "" and not self.forgetState then
-        self.window.controls[self.flag] = self
-    end
+    self.window:_registerControl(self)
 
     self.main = self.window:Create("Frame", {
         Size = UDim2.new(1, -20, 0, 65),

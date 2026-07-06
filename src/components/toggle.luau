@@ -34,9 +34,7 @@ function Toggle.new(tab, properties)
     }, Toggle)
 
     -- register as a saveable control if flagged (works in a row too)
-    if self.flag and self.flag ~= "" and not self.forgetState then
-        self.window.controls[self.flag] = self
-    end
+    self.window:_registerControl(self)
 
     if self.compact then
         self:_buildCompact()
@@ -565,18 +563,35 @@ function Toggle:Set(value, skipCallback)
 
     if not skipCallback then
         task.spawn(self.callback, self.value)
+
+        -- persist like a click does; skipped on load (Load passes skipCallback)
+        if self.flag and not self.forgetState and self.window.configuration.autoSave then
+            task.spawn(self.window.Save, self.window)
+        end
     end
 end
 
 function Toggle:Lock(message)
     self.locked = true
     if self.lockLabel and message then self.lockLabel.Text = message end
-    if self.elementLock then self.elementLock.Visible = true end
+    if self.elementLock then
+        self.elementLock.Visible = true
+    elseif self.title then
+        -- compact/row toggles have no overlay (no room in the flex row), so swap the
+        -- title to the lock message. clicks are already blocked by self.locked.
+        self._unlockedTitle = self._unlockedTitle or self.title.Text
+        self.title.Text = message or "Locked"
+    end
 end
 
 function Toggle:Unlock()
     self.locked = false
-    if self.elementLock then self.elementLock.Visible = false end
+    if self.elementLock then
+        self.elementLock.Visible = false
+    elseif self.title and self._unlockedTitle then
+        self.title.Text = self._unlockedTitle
+        self._unlockedTitle = nil
+    end
 end
 
 return Toggle

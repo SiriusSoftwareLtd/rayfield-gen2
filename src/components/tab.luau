@@ -30,7 +30,8 @@ function Tab.new(window, properties)
         neglectSelector = properties.neglectSelector or properties.NeglectSelector or false,
         customOrder = properties.customOrder or properties.CustomOrder or 0, -- make this maybe not 0.
 
-        elements = {}
+        elements = {},
+        connections = {}, -- tracked so Remove can drop them without waiting for Unload
     }, Tab)
 
     -- fix this message.
@@ -207,26 +208,26 @@ function Tab.new(window, properties)
     })
 
     if not self.neglectSelector then
-        self.window:Connect(self.topbarItemInteract.MouseButton1Click, function()
+        table.insert(self.connections, self.window:Connect(self.topbarItemInteract.MouseButton1Click, function()
            self:Select()
-        end)
+        end))
 
-        self.window:Connect(self.topbarItemInteract.MouseEnter, function()
+        table.insert(self.connections, self.window:Connect(self.topbarItemInteract.MouseEnter, function()
             if self.window.selectedTab ~= self then
                 self:_applyVisual('hover', hoverTweenInfo)
             end
-        end)
+        end))
 
-        self.window:Connect(self.topbarItemInteract.MouseLeave, function()
+        table.insert(self.connections, self.window:Connect(self.topbarItemInteract.MouseLeave, function()
             if self.window.selectedTab ~= self then
                 self:_applyVisual('unselected', hoverTweenInfo)
             end
-        end)
+        end))
     end
 
     -- Auto-select is handled by Window:CreateTab after insertion
 
-    self.window:Connect(self.window.signal, function(command)
+    table.insert(self.connections, self.window:Connect(self.window.signal, function(command)
         if command == 'hide' then
             if not self.neglectSelector and self.topbarItem then
                 self.topbarItem.Visible = false
@@ -238,7 +239,7 @@ function Tab.new(window, properties)
                 self:_applyVisual(if self.window.selectedTab == self then 'selected' else 'unselected', selectTweenInfo)
             end
         end
-    end)
+    end))
 
     return self
 end
@@ -301,23 +302,29 @@ local function assignOrder(element, order)
     end
 end
 
+-- shared tail for every CreateX: track it, order it, and reveal it if the window is
+-- already open. without this, elements added after Window:Show stay fully transparent
+-- until the next hide -> show cycle (the old signal-based reveal never fires).
+function Tab:_register(element)
+    table.insert(self.elements, element)
+    assignOrder(element, #self.elements * 10)
+
+    if not self.window.hidden then
+        element:_setShown(true)
+    end
+
+    return element
+end
+
 -- Button
 function Tab:CreateButton(properties)
-    local newElement = require(script.Parent.button).new(self, properties)
-    table.insert(self.elements, newElement)
-    assignOrder(newElement, #self.elements * 10)
-
-    return newElement
+    return self:_register(require(script.Parent.button).new(self, properties))
 end
 
 
 -- Switch/Toggle
 function Tab:CreateToggle(properties)
-    local newElement = require(script.Parent.toggle).new(self, properties)
-    table.insert(self.elements, newElement)
-    assignOrder(newElement, #self.elements * 10)
-
-    return newElement
+    return self:_register(require(script.Parent.toggle).new(self, properties))
 end
 
 function Tab:CreateSwitch(properties)
@@ -326,47 +333,27 @@ end
 
 -- Section
 function Tab:CreateSection(properties)
-    local newElement = require(script.Parent.section).new(self, properties)
-    table.insert(self.elements, newElement)
-    assignOrder(newElement, #self.elements * 10)
-
-    return newElement
+    return self:_register(require(script.Parent.section).new(self, properties))
 end
 
 -- Stat
 function Tab:CreateStat(properties)
-    local newElement = require(script.Parent.stat).new(self, properties)
-    table.insert(self.elements, newElement)
-    assignOrder(newElement, #self.elements * 10)
-
-    return newElement
+    return self:_register(require(script.Parent.stat).new(self, properties))
 end
 
 -- Slider
 function Tab:CreateSlider(properties)
-    local newElement = require(script.Parent.slider).new(self, properties)
-    table.insert(self.elements, newElement)
-    assignOrder(newElement, #self.elements * 10)
-
-    return newElement
+    return self:_register(require(script.Parent.slider).new(self, properties))
 end
 
 -- Dropdown
 function Tab:CreateDropdown(properties)
-    local newElement = require(script.Parent.dropdown).new(self, properties)
-    table.insert(self.elements, newElement)
-    assignOrder(newElement, #self.elements * 10)
-
-    return newElement
+    return self:_register(require(script.Parent.dropdown).new(self, properties))
 end
 
 -- Row (packs up to 3 compact elements side by side; add to it via row:CreateX)
 function Tab:CreateRow(properties)
-    local newElement = require(script.Parent.row).new(self, properties)
-    table.insert(self.elements, newElement)
-    assignOrder(newElement, #self.elements * 10)
-
-    return newElement
+    return self:_register(require(script.Parent.row).new(self, properties))
 end
 
 
@@ -401,8 +388,13 @@ function Tab:Remove()
     -- Tear down the UI; nil the refs so the lingering show/hide signal handler
     -- and _applyVisual (which guard on self.topbarItem) no-op instead of touching
     -- a destroyed instance.
-    if self.topbarItem then self.topbarItem:Destroy() end
-    if self.tabPage then self.tabPage:Destroy() end
+    for _, connection in self.connections do
+        window:Disconnect(connection)
+    end
+    self.connections = {}
+
+    if self.topbarItem then window:DestroySubtree(self.topbarItem) end
+    if self.tabPage then window:DestroySubtree(self.tabPage) end
     self.topbarItem = nil
     self.tabPage = nil
     self.elements = {}
