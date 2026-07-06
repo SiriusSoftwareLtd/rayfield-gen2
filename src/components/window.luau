@@ -1441,6 +1441,36 @@ function Window:StyleElementBody(main)
     }, {Color = 'ElementStroke', Transparency = 'ElementStrokeTransparency'})
 end
 
+-- Like StyleElementBody but with a gradient stroke (subtle sheen) instead of a flat one.
+-- White stroke base tinted by the ElementStrokeGradient. Used by the dropdown's header +
+-- options cards. Returns the stroke.
+function Window:StyleElementPanel(frame)
+    self:Create("UIGradient", {
+        Rotation = 270,
+
+        Parent = frame,
+    }, {Color = 'ElementGradient'})
+
+    self:Create("UICorner", {
+        Parent = frame,
+    }, {CornerRadius = 'ElementCornerRadius'})
+
+    local stroke = self:Create("UIStroke", {
+        Color = Color3.fromRGB(255, 255, 255),
+        Transparency = 1, -- In = ElementStrokeTransparency
+
+        Parent = frame,
+    })
+
+    self:Create("UIGradient", {
+        Rotation = 270,
+
+        Parent = stroke,
+    }, {Color = 'ElementStrokeGradient'})
+
+    return stroke
+end
+
 -- Reveal a single instance: instantly set props when animate is false, else tween them with info.
 function Window:_reveal(instance, props, animate, info)
     if not instance then return end

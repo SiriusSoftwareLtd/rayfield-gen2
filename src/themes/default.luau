@@ -14,6 +14,13 @@ return {
         ColorSequenceKeypoint.new(0.9999, Color3.fromRGB(35, 35, 35)),
         ColorSequenceKeypoint.new(1, Color3.fromRGB(35, 35, 35)),
     }),
+    -- Subtle sheen tint for gradient strokes (dropdown cards). Kept lighter than the fill so
+    -- the edge still reads low in the window, where the bg gradient is itself ~35.
+    ElementStrokeGradient = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(48, 48, 48)),
+        ColorSequenceKeypoint.new(0.9999, Color3.fromRGB(58, 58, 58)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(48, 48, 48)),
+    }),
     DividerColor = Color3.fromRGB(255, 255, 255),
     TabColor = Color3.fromRGB(255, 255, 255),
     TabBackground = ColorSequence.new(Color3.fromRGB(50, 50, 50), Color3.fromRGB(35, 35, 35)),

@@ -76,43 +76,32 @@ function Dropdown.new(tab, properties)
         self.window.controls[self.flag] = self
     end
 
+    -- Outer wrapper: transparent, just holds the two cards and animates its height
+    -- open <-> closed. Clips so the options card is hidden while collapsed.
     self.main = self.window:Create("Frame", {
         Size = UDim2.new(1, -20, 0, 41),
         BorderSizePixel = 0,
         Name = self.name,
         ClipsDescendants = true,
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-
         BackgroundTransparency = 1,
 
         Parent = self.tab.tabPage,
-    }, {BackgroundTransparency = 'ElementTransparency'})
+    })
 
-    self.stroke = self.window:StyleElementBody(self.main)
-    self.hoverOverlay = self.window:CreateHoverOverlay(self.main)
-
+    -- Header card: the always-visible pill (icon + title + selected value + chevron)
     self.top = self.window:Create("Frame", {
         Size = UDim2.new(1, 0, 0, 41),
         Position = UDim2.fromScale(0, 0),
         BorderSizePixel = 0,
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         BackgroundTransparency = 1,
-        ZIndex = 2,
+        ZIndex = 1,
 
         Parent = self.main,
-    })
+    }, {BackgroundTransparency = 'ElementTransparency'})
 
-    self.window:Create("UICorner", {
-        CornerRadius = UDim.new(0, 12),
-        Parent = self.top,
-    })
-
-    self.topStroke = self.window:Create("UIStroke", {
-        Color = Color3.fromRGB(255, 255, 255),
-        Transparency = 1,
-
-        Parent = self.top,
-    })
+    self.stroke = self.window:StyleElementPanel(self.top)
+    self.hoverOverlay = self.window:CreateHoverOverlay(self.top)
 
     self.container = self.window:Create("Frame", {
         BorderSizePixel = 0,
@@ -207,6 +196,7 @@ function Dropdown.new(tab, properties)
         Parent = self.top,
     }, {ImageColor3 = 'ContentColor'})
 
+    -- Covers only the header, so option clicks in the open panel below don't hit it.
     self.interact = self.window:Create("TextButton", {
         BackgroundTransparency = 1,
         Size = UDim2.new(1, 0, 0, 41),
@@ -220,16 +210,23 @@ function Dropdown.new(tab, properties)
         Parent = self.main,
     })
 
-    self.listContainer = self.window:Create("Frame", {
-        AnchorPoint = Vector2.new(0, 1),
-        Position = UDim2.fromScale(0, 1),
-        Size = UDim2.new(1, 0, 0, 134),
+    -- Options card: a second pill below the header, revealed as the wrapper grows.
+    -- Anchored to the wrapper's bottom (top edge sits 6px under the header) so the
+    -- clip hides it while collapsed.
+    self.panel = self.window:Create("Frame", {
+        AnchorPoint = Vector2.new(1, 1),
+        Position = UDim2.new(1, 0, 1, 0),
+        Size = UDim2.new(1, -40, 1, -47),
         BorderSizePixel = 0,
-        BackgroundTransparency = 1,
-        Visible = false,
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        ZIndex = 1,
+
+        BackgroundTransparency = 1, -- Open = ElementTransparency
 
         Parent = self.main,
     })
+
+    self.panelStroke = self.window:StyleElementPanel(self.panel)
 
     self.list = self.window:Create("ScrollingFrame", {
         Active = true,
@@ -238,16 +235,18 @@ function Dropdown.new(tab, properties)
         Size = UDim2.fromScale(1, 1),
         BorderSizePixel = 0,
         BackgroundTransparency = 1,
+        ClipsDescendants = true,
         AutomaticCanvasSize = Enum.AutomaticSize.Y,
         CanvasSize = UDim2.new(),
         ScrollBarImageColor3 = Color3.fromRGB(240, 240, 240),
         ScrollBarThickness = 3,
         ScrollingDirection = Enum.ScrollingDirection.Y,
+        ZIndex = 1,
 
         -- Animation
         ScrollBarImageTransparency = 1, -- In = 0.7
 
-        Parent = self.listContainer,
+        Parent = self.panel,
     })
 
     self.listLayout = self.window:Create("UIListLayout", {
@@ -259,6 +258,7 @@ function Dropdown.new(tab, properties)
     })
 
     self.window:Create("UIPadding", {
+        PaddingTop = UDim.new(0, 6),
         PaddingBottom = UDim.new(0, 6),
 
         Parent = self.list,
@@ -273,15 +273,19 @@ function Dropdown.new(tab, properties)
         local bgT = if self._isOpen then (selected and 0.9 or 1) else 1
         local titleT = if self._isOpen then (selected and 0 or 0.3) else 1
         local checkT = if self._isOpen and selected then 0 else 1
+        local strokeT = if self._isOpen and selected then 0.85 else 1
 
         if animate then
-            variables.tweenService:Create(data.frame, TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = bgT}):Play()
-            variables.tweenService:Create(data.title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = titleT}):Play()
-            variables.tweenService:Create(data.checkIcon, TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = checkT}):Play()
+            local info = TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+            variables.tweenService:Create(data.frame, info, {BackgroundTransparency = bgT}):Play()
+            variables.tweenService:Create(data.title, info, {TextTransparency = titleT}):Play()
+            variables.tweenService:Create(data.checkIcon, info, {ImageTransparency = checkT}):Play()
+            variables.tweenService:Create(data.stroke, info, {Transparency = strokeT}):Play()
         else
             data.frame.BackgroundTransparency = bgT
             data.title.TextTransparency = titleT
             data.checkIcon.ImageTransparency = checkT
+            data.stroke.Transparency = strokeT
         end
     end
 
@@ -301,8 +305,8 @@ function Dropdown.new(tab, properties)
     end
 
     local function flashError(result)
-        variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = self.window.theme.ErrorColor}):Play()
-        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = self.window.theme.ErrorStrokeColor}):Play()
+        -- Flash the header card red (the wrapper is transparent, so tint the pill itself).
+        variables.tweenService:Create(self.top, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = self.window.theme.ErrorColor}):Play()
         self.title.Text = 'Error, log recorded in console.'
 
         warn(`Rayfield encountered an error, with the callback for a {self.__type} component named '{self.name}':`)
@@ -311,8 +315,7 @@ function Dropdown.new(tab, properties)
         task.wait(1)
 
         self.title.Text = self.name
-        variables.tweenService:Create(self.main, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
-        variables.tweenService:Create(self.stroke, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = self.window.theme.ElementStroke}):Play()
+        variables.tweenService:Create(self.top, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
     end
 
     self._renderOptionState = renderOptionState
@@ -330,6 +333,13 @@ function Dropdown.new(tab, properties)
 
         self.window:Create("UICorner", {
             CornerRadius = UDim.new(0, 12),
+            Parent = frame,
+        })
+
+        -- Subtle stroke, only shown on the selected option
+        local optionStroke = self.window:Create("UIStroke", {
+            Color = Color3.fromRGB(255, 255, 255),
+            Transparency = 1, -- selected = 0.85
             Parent = frame,
         })
 
@@ -391,6 +401,7 @@ function Dropdown.new(tab, properties)
             title = title,
             checkIcon = checkIcon,
             container = container,
+            stroke = optionStroke,
         }
 
         self.window:Connect(frame.MouseEnter, function()
@@ -473,15 +484,15 @@ function Dropdown.new(tab, properties)
         end
     end)
 
+    -- Hover feedback via the overlay + title only. The card uses a gradient stroke (white
+    -- base tinted by the gradient), so tweening stroke.Color here would fight the gradient.
     self.window:Connect(self.main.MouseEnter, function()
         if self._isOpen then return end
-        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeHoverTransparency, Color = self.window.theme.ElementStrokeHover}):Play()
         variables.tweenService:Create(self.title, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextColor3 = self.window.theme.ElementTextHoverColor}):Play()
         variables.tweenService:Create(self.hoverOverlay, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.97}):Play()
     end)
 
     self.window:Connect(self.main.MouseLeave, function()
-        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeTransparency, Color = self.window.theme.ElementStroke}):Play()
         variables.tweenService:Create(self.title, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextColor3 = self.window.theme.ContentColor}):Play()
         variables.tweenService:Create(self.hoverOverlay, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
     end)
@@ -498,9 +509,6 @@ end
 function Dropdown:_open()
     if self._isOpen then return end
     self._isOpen = true
-    self._closeToken = nil
-
-    self.listContainer.Visible = true
 
     if self._outsideClickConn then self._outsideClickConn:Disconnect() end
     self._outsideClickConn = self.window:Connect(variables.userInputService.InputBegan, function(input)
@@ -518,8 +526,8 @@ function Dropdown:_open()
     variables.tweenService:Create(self.main, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(1, -20, 0, 180)}):Play()
     variables.tweenService:Create(self.chevron, TweenInfo.new(0.7, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Rotation = 0}):Play()
     variables.tweenService:Create(self.list, TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ScrollBarImageTransparency = 0.7}):Play()
-    variables.tweenService:Create(self.top, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.95}):Play()
-    variables.tweenService:Create(self.topStroke, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = 0.9}):Play()
+    variables.tweenService:Create(self.panel, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = self.window.theme.ElementTransparency or 0}):Play()
+    variables.tweenService:Create(self.panelStroke, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeTransparency}):Play()
 
     for _, data in self._optionFrames do
         self._renderOptionState(data, true)
@@ -537,22 +545,14 @@ function Dropdown:_close()
 
     variables.tweenService:Create(self.chevron, TweenInfo.new(0.7, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Rotation = 180}):Play()
     variables.tweenService:Create(self.list, TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ScrollBarImageTransparency = 1}):Play()
-    variables.tweenService:Create(self.top, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
-    variables.tweenService:Create(self.topStroke, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = 1}):Play()
+    variables.tweenService:Create(self.panel, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+    variables.tweenService:Create(self.panelStroke, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = 1}):Play()
 
     for _, data in self._optionFrames do
         self._renderOptionState(data, true)
     end
 
     variables.tweenService:Create(self.main, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(1, -20, 0, 41)}):Play()
-
-    local token = {}
-    self._closeToken = token
-    task.delay(0.5, function()
-        if self._closeToken == token and not self._isOpen then
-            self.listContainer.Visible = false
-        end
-    end)
 end
 
 
@@ -636,8 +636,14 @@ end
 
 
 function Dropdown:_setShown(animate)
+    -- Custom reveal: main is a transparent wrapper, so reveal the header card (self.top)
+    -- rather than main. The options card fades in on open, not here.
     local w = self.window
-    w:_revealCommon(self, animate)
+    w:_reveal(self.stroke, {Transparency = w.theme.ElementStrokeTransparency}, animate)
+    w:_reveal(self.title, {TextTransparency = 0}, animate)
+    w:_reveal(self.top, {BackgroundTransparency = w.theme.ElementTransparency or 0}, animate)
+    if self.iconLabel then w:_reveal(self.iconLabel, {ImageTransparency = 0}, animate) end
+    if self.descriptor then w:_reveal(self.descriptor.titleLabel, {TextTransparency = 0.7}, animate) end
     w:_reveal(self.selectedLabel, {TextTransparency = 0.5}, animate)
     w:_reveal(self.chevron, {ImageTransparency = 0.5}, animate)
 end
