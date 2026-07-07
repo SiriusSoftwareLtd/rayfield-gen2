@@ -2,12 +2,6 @@ local Descriptor = {}
 Descriptor.__index = Descriptor
 Descriptor.__type = "Descriptor"
 
--- Utility
-local utility = script.Parent.Parent.utility
-
--- Variables
-local variables = require(utility.variables)
-
 function Descriptor.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
 
@@ -44,7 +38,7 @@ function Descriptor.new(tab, properties)
         TextTransparency = 1, -- In = 0.7
 
         Parent = self.main,
-    }, { TextColor3 = 'ContentColor', FontFace = 'Font' })
+    }, { TextColor3 = "ContentColor", FontFace = "Font" })
 
     -- Bottom spacing
     self.window:Create("Frame", {

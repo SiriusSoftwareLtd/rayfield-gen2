@@ -7,12 +7,16 @@ end
 
 local variables = {}
 
-variables.rayfieldHidden = false -- update if hidden.. blah
+variables.rayfieldHidden = false -- flipped while the menu is hidden
 
 variables.secureMode = (function()
     local _getgenv = rawget(_G, "getgenv")
-    if not _getgenv then return false end
-    local ok, val = pcall(function() return _getgenv().RAYFIELD_SECURE end)
+    if not _getgenv then
+        return false
+    end
+    local ok, val = pcall(function()
+        return _getgenv().RAYFIELD_SECURE
+    end)
     return ok and val == true
 end)()
 
@@ -21,10 +25,10 @@ variables.runService = getService("RunService")
 variables.userInputService = getService("UserInputService")
 variables.guiService = getService("GuiService")
 variables.localPlayer = getService("Players").LocalPlayer
-variables.tweenService = getService('TweenService')
-variables.httpService = getService('HttpService')
-variables.guiContainer =
-    if variables.runService:IsStudio() then variables.localPlayer.PlayerGui
+variables.tweenService = getService("TweenService")
+variables.httpService = getService("HttpService")
+variables.guiContainer = if variables.runService:IsStudio()
+    then variables.localPlayer.PlayerGui
     elseif gethui then gethui()
     else variables.coreGui
 

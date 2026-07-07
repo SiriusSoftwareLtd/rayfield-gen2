@@ -1,0 +1,19 @@
+{
+    "languageMode": "nonstrict",
+    "lintErrors": false,
+    "globals": [
+        "writefile",
+        "readfile",
+        "appendfile",
+        "isfile",
+        "delfile",
+        "listfiles",
+        "makefolder",
+        "isfolder",
+        "delfolder",
+        "cloneref",
+        "gethui",
+        "getcustomasset",
+        "getgenv"
+    ]
+}

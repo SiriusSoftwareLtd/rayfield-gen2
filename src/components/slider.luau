@@ -9,6 +9,8 @@ local utility = script.Parent.Parent.utility
 local variables = require(utility.variables)
 local functions = require(utility.functions)
 local odometer = require(utility.odometer)
+local moveable = require(utility.moveable)
+local constants = require(utility.constants)
 
 -- Decimal places implied by an increment (0.1 -> 1, 0.25 -> 2, 1 -> 0). Used so
 -- the readout formats mid-roll floats to the same precision as landed values.
@@ -36,7 +38,7 @@ function Slider.new(tab, properties)
         description = properties.description or properties.Description,
         forgetState = properties.forgetState or properties.ForgetState,
 
-        range = properties.range or properties.Range or {0, 100},
+        range = properties.range or properties.Range or { 0, 100 },
         increment = properties.increment or properties.Increment or 1,
         suffix = properties.suffix or properties.Suffix or "",
 
@@ -47,14 +49,17 @@ function Slider.new(tab, properties)
 
     -- keep range ascending and increment positive so the clamp/snap math stays sane
     if self.range[1] > self.range[2] then
-        self.range = {self.range[2], self.range[1]}
+        self.range = { self.range[2], self.range[1] }
     end
     if self.increment <= 0 then
         self.increment = 1
     end
 
-    self.value = if (properties.value or properties.Value) ~= nil then (properties.value or properties.Value)
-        elseif (properties.currentValue or properties.CurrentValue) ~= nil then (properties.currentValue or properties.CurrentValue)
+    self.value = if (properties.value or properties.Value) ~= nil
+        then (properties.value or properties.Value)
+        elseif (properties.currentValue or properties.CurrentValue) ~= nil then (
+            properties.currentValue or properties.CurrentValue
+        )
         else self.range[1]
 
     -- snap + clamp the starting value the same way Set does, so the stored value
@@ -63,7 +68,9 @@ function Slider.new(tab, properties)
 
     self._decimals = decimalsOf(self.increment)
 
-    self.flag = properties.flag or properties.Flag or (not self.forgetState and functions.deriveFlagFromName(self.name) or nil)
+    self.flag = properties.flag
+        or properties.Flag
+        or (not self.forgetState and functions.deriveFlagFromName(self.name) or nil)
     self.window:_registerControl(self)
 
     self.main = self.window:Create("Frame", {
@@ -75,7 +82,7 @@ function Slider.new(tab, properties)
         BackgroundTransparency = 1,
 
         Parent = self.tab.tabPage,
-    }, {BackgroundTransparency = 'ElementTransparency'})
+    }, { BackgroundTransparency = "ElementTransparency" })
 
     self.stroke = self.window:StyleElementBody(self.main)
 
@@ -119,7 +126,7 @@ function Slider.new(tab, properties)
 
     if self.icon then
         self.iconLabel = self.window:Create("ImageLabel", {
-            Image = 'rbxassetid://'..tostring(self.icon),
+            Image = "rbxassetid://" .. tostring(self.icon),
             Size = UDim2.fromOffset(16, 16),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
@@ -129,7 +136,7 @@ function Slider.new(tab, properties)
             ImageTransparency = 1, -- In = 0
 
             Parent = self.titleContainer,
-        }, {ImageColor3 = 'ContentColor'})
+        }, { ImageColor3 = "ContentColor" })
     end
 
     self.title = self.window:Create("TextLabel", {
@@ -148,7 +155,7 @@ function Slider.new(tab, properties)
         TextTransparency = 1, -- In = 0
 
         Parent = self.titleContainer,
-    }, {TextColor3 = 'ContentColor', FontFace = 'Font'})
+    }, { TextColor3 = "ContentColor", FontFace = "Font" })
 
     -- Odometer readout: host frame in place of the old label; the odometer lays
     -- its per-digit reels out inside it, left-aligned under the title.
@@ -179,7 +186,7 @@ function Slider.new(tab, properties)
         BackgroundTransparency = 1, -- In = 0
 
         Parent = self.main,
-    }, {BackgroundColor3 = 'SliderBackground'})
+    }, { BackgroundColor3 = "SliderBackground" })
 
     self.window:Create("UICorner", {
         CornerRadius = UDim.new(0, 13),
@@ -214,16 +221,10 @@ function Slider.new(tab, properties)
         }),
 
         Parent = self.progress,
-    }, {Color = {'SliderProgress', function(color)
-        if typeof(color) == 'ColorSequence' then
-            return color
-        else
-            return ColorSequence.new(color)
-        end
-    end}})
+    }, { Color = { "SliderProgress", functions.toColorSequence } })
 
     -- Green glow behind the filled progress (revealed on show)
-    self.progressGlow = self.window:CreateGlow(self.progress, Color3.fromRGB(23, 153, 110), 20, 1)
+    self.progressGlow = self.window:CreateGlow(self.progress, constants.accent.on, 20, 1)
 
     -- Handle blob: solid white at rest, ghosts + grows a stroke while held
     self.handle = self.window:Create("Frame", {
@@ -251,7 +252,7 @@ function Slider.new(tab, properties)
         Transparency = 1, -- 0.6 while held
 
         Parent = self.handle,
-    }, {Color = 'SliderStroke'})
+    }, { Color = "SliderStroke" })
 
     self.interact = self.window:Create("TextButton", {
         BackgroundTransparency = 1,
@@ -265,18 +266,29 @@ function Slider.new(tab, properties)
 
     -- Subtle hover on the slider track itself, not the whole element row
     self.window:Connect(self.main.MouseEnter, function()
-        variables.tweenService:Create(self.track, tweenInfo, {BackgroundColor3 = Color3.fromRGB(60, 60, 60)}):Play()
+        variables.tweenService:Create(self.track, tweenInfo, { BackgroundColor3 = Color3.fromRGB(60, 60, 60) }):Play()
     end)
 
     self.window:Connect(self.main.MouseLeave, function()
-        variables.tweenService:Create(self.track, tweenInfo, {BackgroundColor3 = self.window.theme.SliderBackground}):Play()
+        variables.tweenService
+            :Create(self.track, tweenInfo, { BackgroundColor3 = self.window.theme.SliderBackground })
+            :Play()
     end)
 
     self.window:Connect(self.interact.InputBegan, function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if
+            input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch
+        then
             self.dragging = true
             self:_setHeld(true)
             self:_updateFromMouse()
+
+            -- drop any stale follow first, in case InputBegan fires again before InputEnded
+            if self._dragConnection then
+                self._dragConnection:Disconnect()
+                self._dragConnection = nil
+            end
 
             -- Only run the per-frame follow while actually dragging. Self-terminates if the
             -- window unloads mid-drag, since InputEnded won't fire to clean us up then.
@@ -294,7 +306,10 @@ function Slider.new(tab, properties)
     end)
 
     self.window:Connect(variables.userInputService.InputEnded, function(input)
-        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and self.dragging then
+        if
+            (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch)
+            and self.dragging
+        then
             self.dragging = false
             self:_setHeld(false)
 
@@ -331,7 +346,7 @@ function Slider:_renderProgress(info)
     local ratio = if span ~= 0 then math.clamp((self.value - self.range[1]) / span, 0, 1) else 0
     local size = UDim2.fromScale(ratio, 1)
     if info then
-        variables.tweenService:Create(self.progress, info, {Size = size}):Play()
+        variables.tweenService:Create(self.progress, info, { Size = size }):Play()
     else
         self.progress.Size = size
     end
@@ -339,10 +354,17 @@ end
 
 function Slider:_updateFromMouse()
     local width = self.track.AbsoluteSize.X
-    if width <= 0 then return end
+    if width <= 0 then
+        return
+    end
 
-    local ratio = math.clamp((variables.userInputService:GetMouseLocation().X - self.track.AbsolutePosition.X) / width, 0, 1)
-    local value = math.clamp(math.round((self.range[1] + ratio * (self.range[2] - self.range[1])) / self.increment) * self.increment, self.range[1], self.range[2])
+    local ratio =
+        math.clamp((variables.userInputService:GetMouseLocation().X - self.track.AbsolutePosition.X) / width, 0, 1)
+    local value = math.clamp(
+        math.round((self.range[1] + ratio * (self.range[2] - self.range[1])) / self.increment) * self.increment,
+        self.range[1],
+        self.range[2]
+    )
 
     if value ~= self.value then
         self.value = value
@@ -355,36 +377,21 @@ end
 
 function Slider:_setHeld(held)
     if held then
-        variables.tweenService:Create(self.handle, heldInfo, {Size = UDim2.fromOffset(41, 22), BackgroundTransparency = 0.7}):Play()
-        variables.tweenService:Create(self.handleStroke, heldInfo, {Transparency = 0.6}):Play()
+        variables.tweenService
+            :Create(self.handle, heldInfo, { Size = UDim2.fromOffset(41, 22), BackgroundTransparency = 0.7 })
+            :Play()
+        variables.tweenService:Create(self.handleStroke, heldInfo, { Transparency = 0.6 }):Play()
     else
-        variables.tweenService:Create(self.handle, heldInfo, {Size = UDim2.fromOffset(35, 20), BackgroundTransparency = 0}):Play()
-        variables.tweenService:Create(self.handleStroke, heldInfo, {Transparency = 1}):Play()
+        variables.tweenService
+            :Create(self.handle, heldInfo, { Size = UDim2.fromOffset(35, 20), BackgroundTransparency = 0 })
+            :Play()
+        variables.tweenService:Create(self.handleStroke, heldInfo, { Transparency = 1 }):Play()
     end
 end
 
--- Contained callback: pcall so a bad callback can't spam raw errors on every
--- drag frame; flash the element red once (debounced) like the other components.
+-- pcall + debounced error-flash via Window:_runGuarded (fires every drag frame)
 function Slider:_fireCallback(value)
-    task.spawn(function()
-        local ok, err = pcall(self.callback, value)
-        if ok or self._errored then return end
-        self._errored = true
-
-        variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = self.window.theme.ErrorColor}):Play()
-        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = self.window.theme.ErrorStrokeColor}):Play()
-        self.title.Text = 'Error, log recorded in console.'
-
-        warn(`Rayfield encountered an error, with the callback for a {self.__type} component named '{self.name}':`)
-        print(err)
-
-        task.wait(1)
-
-        self.title.Text = self.name
-        variables.tweenService:Create(self.main, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
-        variables.tweenService:Create(self.stroke, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = self.window.theme.ElementStroke}):Play()
-        self._errored = false
-    end)
+    self.window:_runGuarded(self, self.callback, value)
 end
 
 function Slider:Set(value, skipCallback)
@@ -405,34 +412,14 @@ local sliderGlowReveal = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.E
 function Slider:_setShown(animate)
     local w = self.window
     w:_revealCommon(self, animate)
-    w:_reveal(self.track, {BackgroundTransparency = 0}, animate)
-    w:_reveal(self.progress, {BackgroundTransparency = 0}, animate)
-    w:_reveal(self.handle, {BackgroundTransparency = 0}, animate)
+    w:_reveal(self.track, { BackgroundTransparency = 0 }, animate)
+    w:_reveal(self.progress, { BackgroundTransparency = 0 }, animate)
+    w:_reveal(self.handle, { BackgroundTransparency = 0 }, animate)
     self.valueOdo:reveal(0.3, animate)
-    w:_reveal(self.progressGlow, {Transparency = 0.55}, animate, sliderGlowReveal)
-    w:_reveal(self.handleGlow, {Transparency = 0.8}, animate, sliderGlowReveal)
+    w:_reveal(self.progressGlow, { Transparency = 0.55 }, animate, sliderGlowReveal)
+    w:_reveal(self.handleGlow, { Transparency = 0.8 }, animate, sliderGlowReveal)
 end
 
-function Slider:MoveTo(index)
-    self.tab:_moveElement(self, index)
-end
-
-function Slider:MoveToTop()
-    self.tab:_moveElement(self, 1)
-end
-
-function Slider:MoveToBottom()
-    self.tab:_moveElement(self, #self.tab.elements)
-end
-
-function Slider:MoveUp()
-    local idx = table.find(self.tab.elements, self)
-    if idx then self.tab:_moveElement(self, idx - 1) end
-end
-
-function Slider:MoveDown()
-    local idx = table.find(self.tab.elements, self)
-    if idx then self.tab:_moveElement(self, idx + 1) end
-end
+moveable(Slider)
 
 return Slider

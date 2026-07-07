@@ -1,3 +1,5 @@
+local constants = require(script.Parent.Parent.utility.constants)
+
 return {
     CornerRoundness = UDim.new(0, 20),
     WindowColor = ColorSequence.new({
@@ -29,8 +31,8 @@ return {
     SliderProgress = ColorSequence.new(Color3.fromRGB(0, 170, 127), Color3.fromRGB(0, 134, 98)),
     SliderStroke = Color3.fromRGB(255, 255, 255),
     ActionColor = Color3.fromRGB(255, 255, 255),
-    TitleFont = Font.new("rbxassetid://12187365364", Enum.FontWeight.SemiBold),
-    Font = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium),
+    TitleFont = Font.new(constants.fontAsset, Enum.FontWeight.SemiBold),
+    Font = Font.new(constants.fontAsset, Enum.FontWeight.Medium),
     ContentColor = Color3.fromRGB(255, 255, 255),
 
     LiveAnimation = false, -- Subtly changes window gradient and shadow offset to make Rayfield feel more natural.
@@ -47,5 +49,5 @@ return {
     DropdownHighlight = Color3.fromRGB(255, 255, 255),
 
     ErrorColor = Color3.fromRGB(110, 0, 0),
-    ErrorStrokeColor = Color3.fromRGB(140, 0, 0)
+    ErrorStrokeColor = Color3.fromRGB(140, 0, 0),
 }

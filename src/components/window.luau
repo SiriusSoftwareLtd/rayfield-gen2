@@ -2,9 +2,11 @@
 
 -- Utility
 local utility = script.Parent.Parent.utility
-local SignalEngine = require(utility.SignalEngine)
-local filesystem = require(utility.filesystem)
 local image = require(utility.image)
+local functions = require(utility.functions)
+local persistence = require(utility.persistence)
+local constants = require(utility.constants)
+local chrome = require(script.Parent.chrome)
 
 -- Variables
 local variables = require(utility.variables)
@@ -22,16 +24,14 @@ local REVEAL_INFO = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.Easing
 -- Resolve a theme arg (table or name) to a fresh table. We copy so ChangeTheme never
 -- mutates the required theme module, which require() caches and shares between windows.
 local function resolveTheme(value)
-    local source = if typeof(value) == 'table' then value
-        elseif typeof(value) == 'string' and themes:FindFirstChild(string.lower(value))
-        then require(themes[string.lower(value)])
-        else require(themes['default'])
+    local source = if typeof(value) == "table"
+        then value
+        elseif typeof(value) == "string" and themes:FindFirstChild(string.lower(value)) then require(
+            themes[string.lower(value)]
+        )
+        else require(themes["default"])
 
-    local copy = {}
-    for name, entry in source do
-        copy[name] = entry
-    end
-    return copy
+    return table.clone(source)
 end
 
 function Window.new(properties)
@@ -54,20 +54,20 @@ function Window.new(properties)
         selectedTab = nil,
         theme = resolveTheme(properties.theme or properties.Theme),
 
-        signal = SignalEngine.new(),
-        
         controls = {},
 
         configuration = (function()
             local cfg = properties.configuration or properties.Configuration
-            if not cfg then return {} end
+            if not cfg then
+                return {}
+            end
             return {
                 autoSave = cfg.autoSave or cfg.AutoSave,
                 autoLoad = cfg.autoLoad or cfg.AutoLoad,
                 fileName = cfg.fileName or cfg.FileName,
                 customFolder = cfg.customFolder or cfg.CustomFolder,
             }
-        end)()
+        end)(),
     }, Window)
 
     -- Rayfield Gen2 Screen
@@ -76,7 +76,7 @@ function Window.new(properties)
         IgnoreGuiInset = true,
         ResetOnSpawn = false,
         Enabled = true,
-        DisplayOrder = 99999,
+        DisplayOrder = constants.displayOrder.window,
         ZIndexBehavior = Enum.ZIndexBehavior.Global,
 
         Parent = variables.guiContainer,
@@ -94,48 +94,40 @@ function Window.new(properties)
         BackgroundTransparency = 1, -- In = 0
         Visible = false, -- In == true
 
-        Parent = self.screenGui
+        Parent = self.screenGui,
     })
 
     self.drag = require(script.Parent.drag).new(self)
 
     self:Create("UICorner", {
 
-        Parent = self.main
-    }, {CornerRadius = 'CornerRoundness'})
+        Parent = self.main,
+    }, { CornerRadius = "CornerRoundness" })
 
     self.windowStroke = self:Create("UIStroke", {
         Color = Color3.fromRGB(255, 255, 255),
-        
+
         -- Animations
         Transparency = 1, -- In = 0.95
 
-        Parent = self.main
+        Parent = self.main,
     })
 
     self.windowGradient = self:Create("UIGradient", {
         Rotation = 270,
         Offset = Vector2.new(0, -0.1),
 
-        Parent = self.main
-    }, {Color = {'WindowColor', function(color)
-        
-        if typeof(color) == 'ColorSequence' then
-            return color
-        else
-            return ColorSequence.new(color)
-        end
-    
-    end }})
+        Parent = self.main,
+    }, { Color = { "WindowColor", functions.toColorSequence } })
 
-    -- Bottom fade — gradient overlay so elements scroll out softly at the window's base
+    -- Bottom fade - gradient overlay so elements scroll out softly at the window's base
     self.bottomFade = self:Create("Frame", {
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         BorderSizePixel = 0,
         AnchorPoint = Vector2.new(0, 1),
         Position = UDim2.fromScale(0, 1),
         Size = UDim2.new(1, 0, -0.093, 100),
-        ZIndex = 100,
+        ZIndex = constants.zIndex.bottomFade,
 
         -- Animation
         BackgroundTransparency = 1, -- In = 0
@@ -145,7 +137,7 @@ function Window.new(properties)
 
     self:Create("UICorner", {
         Parent = self.bottomFade,
-    }, {CornerRadius = 'CornerRoundness'})
+    }, { CornerRadius = "CornerRoundness" })
 
     self.bottomFadeGradient = self:Create("UIGradient", {
         Rotation = 270,
@@ -161,14 +153,13 @@ function Window.new(properties)
         Parent = self.bottomFade,
     })
 
-
     -- Topbar
     self.topbar = self:Create("Frame", {
-        
+
         BackgroundTransparency = 1,
         Size = UDim2.new(1, 0, 0, 66),
 
-        Parent = self.main
+        Parent = self.main,
     })
 
     self.topContainer = self:Create("Frame", {
@@ -177,9 +168,8 @@ function Window.new(properties)
         AutomaticSize = Enum.AutomaticSize.Y,
         AnchorPoint = Vector2.new(0, 0.5),
         BackgroundTransparency = 1,
-        
 
-        Parent = self.topbar
+        Parent = self.topbar,
     })
 
     self.topContainerLayout = self:Create("UIListLayout", {
@@ -189,7 +179,7 @@ function Window.new(properties)
         HorizontalAlignment = Enum.HorizontalAlignment.Left,
         SortOrder = Enum.SortOrder.LayoutOrder,
 
-        Parent = self.topContainer
+        Parent = self.topContainer,
     })
 
     self.titleContainer = self:Create("Frame", {
@@ -200,7 +190,7 @@ function Window.new(properties)
         BackgroundTransparency = 1,
         LayoutOrder = 1,
 
-        Parent = self.topContainer
+        Parent = self.topContainer,
     })
 
     self.titleContainerLayout = self:Create("UIListLayout", {
@@ -209,7 +199,7 @@ function Window.new(properties)
         VerticalAlignment = Enum.VerticalAlignment.Center,
         SortOrder = Enum.SortOrder.LayoutOrder,
 
-        Parent = self.titleContainer
+        Parent = self.titleContainer,
     })
 
     if self.name then
@@ -219,11 +209,11 @@ function Window.new(properties)
 
             -- Theming
             TextColor3 = Color3.fromRGB(255, 255, 255),
-            FontFace = Font.new("rbxassetid://12187365364", Enum.FontWeight.SemiBold),
+            FontFace = Font.new(constants.fontAsset, Enum.FontWeight.SemiBold),
 
             Size = UDim2.fromOffset(50, 20),
             AutomaticSize = Enum.AutomaticSize.X,
-            
+
             BackgroundTransparency = 1,
             TextSize = 20,
             TextXAlignment = Enum.TextXAlignment.Left,
@@ -231,13 +221,13 @@ function Window.new(properties)
 
             -- Animations
             TextTransparency = 1, -- In = 0
-        
-            Parent = self.titleContainer
-        }, {FontFace = 'TitleFont', TextColor3 = 'TitlingColor'})
+
+            Parent = self.titleContainer,
+        }, { FontFace = "TitleFont", TextColor3 = "TitlingColor" })
     end
 
     if self.icon then
-        self.topbarIcon = self:Create('ImageLabel', {
+        self.topbarIcon = self:Create("ImageLabel", {
             Image = self.icon,
 
             BackgroundTransparency = 1,
@@ -246,8 +236,8 @@ function Window.new(properties)
             -- Animation
             ImageTransparency = 1, -- In = 0
 
-            Parent = self.topContainer
-        }, {ImageColor3 = 'TitlingColor'})
+            Parent = self.topContainer,
+        }, { ImageColor3 = "TitlingColor" })
     end
 
     if self.subheading then
@@ -264,9 +254,9 @@ function Window.new(properties)
 
             -- Animations
             TextTransparency = 1, -- In = 0.7
-        
-            Parent = self.titleContainer
-        }, {TextColor3 = 'TitlingColor', FontFace = 'Font'})
+
+            Parent = self.titleContainer,
+        }, { TextColor3 = "TitlingColor", FontFace = "Font" })
     end
 
     self.tagContainer = self:Create("Frame", {
@@ -287,7 +277,7 @@ function Window.new(properties)
         VerticalAlignment = Enum.VerticalAlignment.Center,
         SortOrder = Enum.SortOrder.LayoutOrder,
 
-        Parent = self.tagContainer
+        Parent = self.tagContainer,
     })
 
     -- Shadow
@@ -299,17 +289,21 @@ function Window.new(properties)
         ZIndex = -1,
 
         Parent = self.main,
-    }, {Color = {'ShadowColor', function(color)
-        if typeof(color) == 'ColorSequence' then
-            return color.Keypoints[1].Value
-        else
-            return color
-        end
-    end}})
-
+    }, {
+        Color = {
+            "ShadowColor",
+            function(color)
+                if typeof(color) == "ColorSequence" then
+                    return color.Keypoints[1].Value
+                else
+                    return color
+                end
+            end,
+        },
+    })
 
     -- Elements Preparation
-    
+
     self.elements = self:Create("Frame", {
         Size = UDim2.new(1, 0, 1, -106),
         Position = UDim2.fromScale(0.5, 1),
@@ -320,7 +314,7 @@ function Window.new(properties)
         Parent = self.main,
     })
 
-    self.elementsLayout = self:Create('UIPageLayout', {
+    self.elementsLayout = self:Create("UIPageLayout", {
         Padding = UDim.new(0, 0),
         FillDirection = Enum.FillDirection.Horizontal,
         VerticalAlignment = Enum.VerticalAlignment.Center,
@@ -330,9 +324,8 @@ function Window.new(properties)
         EasingStyle = Enum.EasingStyle.Exponential,
         TweenTime = 0.4,
 
-        Parent = self.elements
+        Parent = self.elements,
     })
-
 
     -- Tabs Preparation
     self.tabList = self:Create("ScrollingFrame", {
@@ -341,36 +334,35 @@ function Window.new(properties)
         Size = UDim2.new(1, 0, 0, 36),
         Position = UDim2.new(0.5, 0, 0, 66),
         AnchorPoint = Vector2.new(0.5, 0),
-        
+
         BackgroundTransparency = 1,
         AutomaticCanvasSize = Enum.AutomaticSize.X,
         CanvasSize = UDim2.new(0, 0, 0, 0),
         ScrollBarThickness = 0,
         ScrollingDirection = Enum.ScrollingDirection.X,
 
-        Parent = self.main
+        Parent = self.main,
     })
 
-    self.tabListLayout = self:Create('UIListLayout', {
+    self.tabListLayout = self:Create("UIListLayout", {
         Padding = UDim.new(0, 7),
         FillDirection = Enum.FillDirection.Horizontal,
         VerticalAlignment = Enum.VerticalAlignment.Center,
         HorizontalAlignment = Enum.HorizontalAlignment.Left,
         SortOrder = Enum.SortOrder.LayoutOrder,
 
-        Parent = self.tabList
+        Parent = self.tabList,
     })
 
     self:Create("UIPadding", {
         PaddingLeft = UDim.new(0, 22),
         PaddingRight = UDim.new(0, 10),
 
-        Parent = self.tabList
+        Parent = self.tabList,
     })
 
     -- Actions
     self.actionContainer = self:Create("Frame", {
-        
 
         AnchorPoint = Vector2.new(1, 0.5),
         AutomaticSize = Enum.AutomaticSize.X,
@@ -378,67 +370,66 @@ function Window.new(properties)
         Position = UDim2.new(1, -20, 0.5, 0),
         BackgroundTransparency = 1,
 
-        Parent = self.topbar
+        Parent = self.topbar,
     })
 
-    self.actionsListLayout = self:Create('UIListLayout', {
+    self.actionsListLayout = self:Create("UIListLayout", {
         Padding = UDim.new(0, 5),
         FillDirection = Enum.FillDirection.Horizontal,
         VerticalAlignment = Enum.VerticalAlignment.Center,
         HorizontalAlignment = Enum.HorizontalAlignment.Right,
         SortOrder = Enum.SortOrder.LayoutOrder,
 
-        Parent = self.actionContainer
+        Parent = self.actionContainer,
     })
 
     self.rfSettings = self:CreateTab({
-        name = 'Rayfield Settings',
+        name = "Rayfield Settings",
         customOrder = 1000,
 
         neglectSelector = true,
     })
 
     require(script.Parent.action).new(self, {
-        name = 'Close',
+        name = "Close",
         icon = 83277910885129,
         order = 1,
 
         callback = function()
             self:ToggleHide()
-        end
+        end,
     })
 
     require(script.Parent.action).new(self, {
-        name = 'Minimise',
+        name = "Minimise",
         icon = 108115485663409,
         order = 2,
 
         callback = function()
             self:ToggleMinimise()
-        end
+        end,
     })
 
     self.settingsAction = require(script.Parent.action).new(self, {
-        name = 'Settings',
+        name = "Settings",
         icon = 129180860773723,
         order = 3,
         linkedTab = self.rfSettings,
 
         callback = function()
             self.rfSettings:Select()
-        end
+        end,
     })
 
     require(script.Parent.action).new(self, {
-        name = 'Search',
+        name = "Search",
         icon = 100604009889706,
         order = 4,
 
         callback = function()
             -- TODO: search isn't wired up yet
-        end
+        end,
     })
-
 
     self.unloaded = false
     self.minimised = false
@@ -449,14 +440,15 @@ function Window.new(properties)
     self.settings = {
         toggleKeybind = Enum.KeyCode.K,
         mouseOverride = true, -- free the cursor while the menu is open (for FPS games that lock it)
+        keepOnScreen = true, -- clamp the drag so the window cant be pulled off screen
     }
 
     self:LoadSettings()
-    self:_buildRestoreButton()
+    chrome.buildRestoreButton(self)
     self:_bindKeybind()
     self:_bindMouseOverride()
     self:_buildSettingsUI()
-    self:_buildLicense()
+    chrome.buildLicense(self)
 
     if self.theme.LiveAnimation then
         task.spawn(function()
@@ -465,7 +457,8 @@ function Window.new(properties)
 
             while not self.unloaded do
                 local tweenW = variables.tweenService:Create(self.windowGradient, tweenInfo, {
-                    Offset = Vector2.new(if out then 0.4 else -0.2, 0), Rotation = (if out then 220 else 280)
+                    Offset = Vector2.new(if out then 0.4 else -0.2, 0),
+                    Rotation = (if out then 220 else 280),
                 })
 
                 tweenW:Play()
@@ -479,23 +472,24 @@ function Window.new(properties)
 end
 
 function Window:ChangeTheme(theme)
-    --assert(typeof(theme) == "table", "Invalid argument #1 (theme table expected)")
-    -- ^ gonna be accepting strings and checking with a theme dict
-
     theme = resolveTheme(theme)
 
     for name, value in theme do
         self.theme[name] = value
     end
-    
+
     for instance, properties in self.themeProperties do
         for property, value in properties do
-            local targetValue = if typeof(value) == "table"
-                then value[2](self.theme[value[1]])
-                else self.theme[value]
+            local targetValue = if typeof(value) == "table" then value[2](self.theme[value[1]]) else self.theme[value]
 
             if typeof(targetValue) == "Color3" or typeof(targetValue) == "number" then
-                variables.tweenService:Create(instance, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {[property] = targetValue}):Play()
+                variables.tweenService
+                    :Create(
+                        instance,
+                        TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+                        { [property] = targetValue }
+                    )
+                    :Play()
             else
                 instance[property] = targetValue
             end
@@ -534,12 +528,16 @@ end
 -- elements dont clobber each other's saved value. Updates control.flag to the key we
 -- actually stored under and returns it.
 function Window:_registerControl(control)
-    if not control.flag or control.flag == "" or control.forgetState then return end
+    if not control.flag or control.flag == "" or control.forgetState then
+        return
+    end
 
     local flag = control.flag
     if self.controls[flag] then
         local n = 2
-        while self.controls[flag .. n] do n += 1 end
+        while self.controls[flag .. n] do
+            n += 1
+        end
         flag = flag .. n
         warn("Rayfield: duplicate config flag '" .. control.flag .. "', saving this one as '" .. flag .. "'")
     end
@@ -578,7 +576,9 @@ function Window:Notify(properties)
 end
 
 function Window:Hide()
-    if self.animating then return end
+    if self.animating then
+        return
+    end
     self.animating = true
     self.hidden = true
     variables.rayfieldHidden = true
@@ -587,17 +587,23 @@ function Window:Hide()
 
     self.drag.drag.Visible = false
 
-    variables.tweenService:Create(self.main, fadeInfo, {BackgroundTransparency = 1}):Play()
-    variables.tweenService:Create(self.windowShadow, fadeInfo, {Transparency =1}):Play()
-    variables.tweenService:Create(self.bottomFade, fadeInfo, {BackgroundTransparency = 1}):Play()
+    variables.tweenService:Create(self.main, fadeInfo, { BackgroundTransparency = 1 }):Play()
+    variables.tweenService:Create(self.windowShadow, fadeInfo, { Transparency = 1 }):Play()
+    variables.tweenService:Create(self.bottomFade, fadeInfo, { BackgroundTransparency = 1 }):Play()
 
-    if self.title then variables.tweenService:Create(self.title, fadeInfo, {TextTransparency = 1}):Play() end
-    if self.subtitle then variables.tweenService:Create(self.subtitle, fadeInfo, {TextTransparency = 1}):Play() end
-    if self.topbarIcon then variables.tweenService:Create(self.topbarIcon, fadeInfo, {ImageTransparency = 1}):Play() end
+    if self.title then
+        variables.tweenService:Create(self.title, fadeInfo, { TextTransparency = 1 }):Play()
+    end
+    if self.subtitle then
+        variables.tweenService:Create(self.subtitle, fadeInfo, { TextTransparency = 1 }):Play()
+    end
+    if self.topbarIcon then
+        variables.tweenService:Create(self.topbarIcon, fadeInfo, { ImageTransparency = 1 }):Play()
+    end
 
     for _, action in ipairs(self.actionContainer:GetChildren()) do
-        if action:IsA('Frame') then
-            variables.tweenService:Create(action.ImageLabel, fadeInfo, {ImageTransparency = 1}):Play()
+        if action:IsA("Frame") then
+            variables.tweenService:Create(action.ImageLabel, fadeInfo, { ImageTransparency = 1 }):Play()
         end
     end
 
@@ -607,7 +613,7 @@ function Window:Hide()
 
     for _, tab in pairs(self.tabs) do
         if not tab.neglectSelector and tab.topbarItem then
-            tab:_applyVisual('hidden', fadeInfo)
+            tab:_applyVisual("hidden", fadeInfo)
         end
     end
 
@@ -631,7 +637,9 @@ function Window:Hide()
 end
 
 function Window:ToggleHide()
-    if self.animating then return end
+    if self.animating then
+        return
+    end
     if self.hidden then
         self:Show()
     else
@@ -640,7 +648,9 @@ function Window:ToggleHide()
 end
 
 function Window:ToggleMinimise()
-    if self.animating or self.hidden then return end
+    if self.animating or self.hidden then
+        return
+    end
     self.animating = true
 
     if self.minimised then
@@ -648,19 +658,25 @@ function Window:ToggleMinimise()
 
         local fadeInfo = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 
-        variables.tweenService:Create(self.main, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
-            Size = self.size,
-        }):Play()
+        variables.tweenService
+            :Create(self.main, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+                Size = self.size,
+            })
+            :Play()
 
-        variables.tweenService:Create(self.windowShadow, fadeInfo, {Transparency =0.6}):Play()
-        variables.tweenService:Create(self.bottomFade, fadeInfo, {BackgroundTransparency = 0}):Play()
+        variables.tweenService:Create(self.windowShadow, fadeInfo, { Transparency = 0.6 }):Play()
+        variables.tweenService:Create(self.bottomFade, fadeInfo, { BackgroundTransparency = 0 }):Play()
 
-        variables.tweenService:Create(self.drag.drag, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
-            Position = UDim2.new(
-                self.main.Position.X.Scale, self.main.Position.X.Offset,
-                self.main.Position.Y.Scale, self.main.Position.Y.Offset + self.size.Y.Offset / 2 + 15
-            ),
-        }):Play()
+        variables.tweenService
+            :Create(self.drag.drag, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+                Position = UDim2.new(
+                    self.main.Position.X.Scale,
+                    self.main.Position.X.Offset,
+                    self.main.Position.Y.Scale,
+                    self.main.Position.Y.Offset + self.size.Y.Offset / 2 + 15
+                ),
+            })
+            :Play()
 
         task.delay(0.2, function()
             self.elements.Visible = true
@@ -669,7 +685,7 @@ function Window:ToggleMinimise()
             for _, tab in pairs(self.tabs) do
                 if not tab.neglectSelector and tab.topbarItem then
                     tab.topbarItem.Visible = true
-                    tab:_applyVisual(if self.selectedTab == tab then 'selected' else 'unselected', fadeInfo)
+                    tab:_applyVisual(if self.selectedTab == tab then "selected" else "unselected", fadeInfo)
                 end
             end
         end)
@@ -689,19 +705,25 @@ function Window:ToggleMinimise()
         end
 
         local fadeOutInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-        variables.tweenService:Create(self.windowShadow, fadeOutInfo, {Transparency = 1}):Play()
-        variables.tweenService:Create(self.bottomFade, fadeOutInfo, {BackgroundTransparency = 1}):Play()
+        variables.tweenService:Create(self.windowShadow, fadeOutInfo, { Transparency = 1 }):Play()
+        variables.tweenService:Create(self.bottomFade, fadeOutInfo, { BackgroundTransparency = 1 }):Play()
 
-        variables.tweenService:Create(self.main, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
-            Size = UDim2.fromOffset(self.size.X.Offset, 66),
-        }):Play()
+        variables.tweenService
+            :Create(self.main, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+                Size = UDim2.fromOffset(self.size.X.Offset, 66),
+            })
+            :Play()
 
-        variables.tweenService:Create(self.drag.drag, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
-            Position = UDim2.new(
-                self.main.Position.X.Scale, self.main.Position.X.Offset,
-                self.main.Position.Y.Scale, self.main.Position.Y.Offset + 66 / 2 + 15
-            ),
-        }):Play()
+        variables.tweenService
+            :Create(self.drag.drag, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+                Position = UDim2.new(
+                    self.main.Position.X.Scale,
+                    self.main.Position.X.Offset,
+                    self.main.Position.Y.Scale,
+                    self.main.Position.Y.Offset + 66 / 2 + 15
+                ),
+            })
+            :Play()
 
         task.delay(0.5, function()
             self.animating = false
@@ -709,138 +731,11 @@ function Window:ToggleMinimise()
     end
 end
 
-function Window:_buildRestoreButton()
-    self.restoreButton = self:Create("Frame", {
-        Name = "Show",
-        Size = UDim2.fromOffset(185, 50),
-        Position = UDim2.new(0.5, 0, 0, 20),
-        AnchorPoint = Vector2.new(0.5, 0),
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-        BorderSizePixel = 0,
-        Visible = false,
-        ZIndex = 100000,
-
-        BackgroundTransparency = 0,
-
-        Parent = self.screenGui,
-    })
-
-    self:Create("UICorner", {
-        CornerRadius = UDim.new(1, 0),
-
-        Parent = self.restoreButton,
-    })
-
-    self.restoreStroke = self:Create("UIStroke", {
-        Color = Color3.fromRGB(255, 255, 255),
-        Transparency = 0.9,
-
-        Parent = self.restoreButton,
-    })
-
-    self:Create("UIGradient", {
-        Rotation = 270,
-        Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(12, 13, 13)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(27, 27, 27)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(35, 35, 35)),
-        }),
-
-        Parent = self.restoreButton,
-    })
-
-    self.restoreIcon = self:Create("ImageLabel", {
-        Name = "icon",
-        AnchorPoint = Vector2.new(0, 0.5),
-        Position = UDim2.new(0, 16, 0.5, 0),
-        Size = UDim2.fromOffset(24, 24),
-        BackgroundTransparency = 1,
-        Image = 'rbxassetid://'..tostring(self.showIcon),
-        ZIndex = 100001,
-
-        ImageTransparency = 0,
-
-        Parent = self.restoreButton,
-    })
-
-    self:Create("UICorner", {
-        CornerRadius = UDim.new(1, 0),
-
-        Parent = self.restoreIcon,
-    })
-
-    local textContainer = self:Create("Frame", {
-        AnchorPoint = Vector2.new(0, 0.5),
-        Position = UDim2.new(0, 50, 0.5, 0),
-        Size = UDim2.new(1, -60, 0, 32),
-        BackgroundTransparency = 1,
-        ZIndex = 100001,
-
-        Parent = self.restoreButton,
-    })
-
-    self:Create("UIListLayout", {
-        Padding = UDim.new(0, 1),
-        VerticalAlignment = Enum.VerticalAlignment.Center,
-        SortOrder = Enum.SortOrder.LayoutOrder,
-
-        Parent = textContainer,
-    })
-
-    self.restoreLabel = self:Create("TextLabel", {
-        Name = "Title",
-        Text = self.showName,
-        Size = UDim2.new(1, 0, 0, 16),
-        BackgroundTransparency = 1,
-        FontFace = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium),
-        RichText = true,
-        TextColor3 = Color3.fromRGB(240, 240, 240),
-        TextSize = 16,
-        TextWrapped = true,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        LayoutOrder = 1,
-        ZIndex = 100001,
-
-        TextTransparency = 0,
-
-        Parent = textContainer,
-    })
-
-    self.restoreSubtitle = self:Create("TextLabel", {
-        Name = "License",
-        Text = "Tap to show",
-        Size = UDim2.new(1, 0, 0, 14),
-        BackgroundTransparency = 1,
-        FontFace = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium),
-        TextColor3 = Color3.fromRGB(255, 255, 255),
-        TextSize = 14,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        LayoutOrder = 2,
-        ZIndex = 100001,
-
-        TextTransparency = 0.5,
-
-        Parent = textContainer,
-    })
-
-    local restoreInteract = self:Create("TextButton", {
-        BackgroundTransparency = 1,
-        Size = UDim2.fromScale(1, 1),
-        Text = "",
-        TextTransparency = 1,
-        ZIndex = 100002,
-
-        Parent = self.restoreButton,
-    })
-
-    self:Connect(restoreInteract.MouseButton1Click, function()
-        self:ToggleHide()
-    end)
-end
-
 function Window:_bindKeybind()
     self:Connect(variables.userInputService.InputBegan, function(input, processed)
-        if processed then return end
+        if processed then
+            return
+        end
         if input.KeyCode == self.settings.toggleKeybind then
             self:ToggleHide()
         end
@@ -855,7 +750,9 @@ function Window:_bindMouseOverride()
     end
 
     local function free()
-        if not active() then return end
+        if not active() then
+            return
+        end
         if uis.MouseBehavior ~= Enum.MouseBehavior.Default then
             uis.MouseBehavior = Enum.MouseBehavior.Default
         end
@@ -869,300 +766,68 @@ function Window:_bindMouseOverride()
     self:Connect(uis:GetPropertyChangedSignal("MouseBehavior"), free)
     self:Connect(uis:GetPropertyChangedSignal("MouseIconEnabled"), free)
 
-    -- also free it right when the menu opens, in case the game isnt actively touching it
-    self:Connect(variables.runService.RenderStepped, free)
+    -- Show calls this on open to free the cursor immediately (the signals above only fire on change)
+    self._freeMouse = free
 end
 
 function Window:_buildSettingsUI()
-    self.rfSettings:CreateSection({ name = 'General' })
+    self.rfSettings:CreateSection({ name = "General" })
 
     self.rfSettings:CreateButton({
-        name = 'Toggle Keybind: ' .. self.settings.toggleKeybind.Name,
+        name = "Toggle Keybind: " .. self.settings.toggleKeybind.Name,
         icon = 100604009889706,
         callback = function()
-            print('Rayfield: Keybind changing will be available with the Keybind element.')
-        end
+            print("Rayfield: Keybind changing will be available with the Keybind element.")
+        end,
     })
 
     self.rfSettings:CreateToggle({
-        name = 'Unlock cursor while open',
-        description = 'Unlocks the cursor while the menu is open so you can configure in FPS games that lock it.',
+        name = "Unlock cursor while open",
+        description = "Unlocks the cursor while the menu is open so you can configure in FPS games that lock it.",
         value = self.settings.mouseOverride,
         forgetState = true, -- lives in settings.rfld, not the user's config
         callback = function(state)
             self.settings.mouseOverride = state
             self:SaveSettings()
-        end
+        end,
     })
 
-    self.rfSettings:CreateSection({ name = 'Window' })
+    self.rfSettings:CreateSection({ name = "Window" })
+
+    self.rfSettings:CreateToggle({
+        name = "Keep window on screen",
+        description = "Stops the window being dragged off the edge of the screen and lost.",
+        value = self.settings.keepOnScreen,
+        forgetState = true, -- lives in settings.rfld, not the user's config
+        callback = function(state)
+            self.settings.keepOnScreen = state
+            self:SaveSettings()
+        end,
+    })
 
     self.rfSettings:CreateButton({
-        name = 'Reset Window Position',
+        name = "Reset Window Position",
         callback = function()
-            variables.tweenService:Create(self.main, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
-                Position = UDim2.new(0.5, 0, 0.5, 0),
-            }):Play()
-            variables.tweenService:Create(self.drag.drag, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
-                Position = UDim2.new(0.5, 0, 0.5, self.size.Y.Offset / 2 + 15),
-            }):Play()
-        end
+            variables.tweenService
+                :Create(self.main, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+                    Position = UDim2.new(0.5, 0, 0.5, 0),
+                })
+                :Play()
+            variables.tweenService
+                :Create(self.drag.drag, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+                    Position = UDim2.new(0.5, 0, 0.5, self.size.Y.Offset / 2 + 15),
+                })
+                :Play()
+        end,
     })
-end
-
-function Window:_buildLicense()
-    -- "Signed in as" welcome card, shown once for a new/changed account (sits above the topbar)
-    self.license = self:Create("Frame", {
-        Name = "License",
-        AnchorPoint = Vector2.new(0, 1),
-        Position = UDim2.new(0, 0, 0, 65),
-        Size = UDim2.fromOffset(200, 50),
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-        BorderSizePixel = 0,
-        ZIndex = 0,
-        Visible = false,
-
-        Parent = self.main,
-    })
-
-    self:Create("UICorner", {
-        CornerRadius = UDim.new(1, 0),
-
-        Parent = self.license,
-    })
-
-    self.licenseStroke = self:Create("UIStroke", {
-        Color = Color3.fromRGB(255, 255, 255),
-        Transparency = 1, -- In = 0.9
-
-        Parent = self.license,
-    })
-
-    self:Create("UIGradient", {
-        Rotation = 270,
-        Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(12, 13, 13)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(27, 27, 27)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(35, 35, 35)),
-        }),
-
-        Parent = self.license,
-    })
-
-    self.licenseAvatar = self:Create("ImageLabel", {
-        Name = "Avatar",
-        AnchorPoint = Vector2.new(0, 0.5),
-        Position = UDim2.new(0, 10, 0.5, 0),
-        Size = UDim2.fromOffset(32, 32),
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-        BorderSizePixel = 0,
-        ZIndex = 0,
-        Image = `rbxthumb://type=AvatarHeadShot&id={variables.localPlayer.UserId}&w=48&h=48`,
-
-        -- Animation
-        BackgroundTransparency = 1, -- In = 0.95
-        ImageTransparency = 1, -- In = 0
-
-        Parent = self.license,
-    })
-
-    self:Create("UICorner", {
-        CornerRadius = UDim.new(1, 0),
-
-        Parent = self.licenseAvatar,
-    })
-
-    local container = self:Create("Frame", {
-        AnchorPoint = Vector2.new(0, 0.5),
-        Position = UDim2.new(0, 50, 0.5, 0),
-        Size = UDim2.new(1, -60, 0, 32),
-        BackgroundTransparency = 1,
-        ZIndex = 0,
-
-        Parent = self.license,
-    })
-
-    self:Create("UIListLayout", {
-        Padding = UDim.new(0, 1),
-        VerticalAlignment = Enum.VerticalAlignment.Center,
-        SortOrder = Enum.SortOrder.LayoutOrder,
-
-        Parent = container,
-    })
-
-    self.licenseSubtitle = self:Create("TextLabel", {
-        Name = "License",
-        Text = "Signed in as",
-        Size = UDim2.new(1, 0, 0, 14),
-        BackgroundTransparency = 1,
-        FontFace = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium),
-        TextColor3 = Color3.fromRGB(255, 255, 255),
-        TextSize = 14,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        ZIndex = 0,
-
-        -- Animation
-        TextTransparency = 1, -- In = 0.5
-
-        Parent = container,
-    })
-
-    self.licenseTitle = self:Create("TextLabel", {
-        Name = "Title",
-        Text = variables.localPlayer.DisplayName,
-        Size = UDim2.new(1, 0, 0, 16),
-        BackgroundTransparency = 1,
-        FontFace = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium),
-        RichText = true,
-        TextColor3 = Color3.fromRGB(240, 240, 240),
-        TextSize = 16,
-        TextWrapped = true,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        LayoutOrder = 1,
-        ZIndex = 0,
-
-        -- Animation
-        TextTransparency = 1, -- In = 0
-
-        Parent = container,
-    })
-end
-
-function Window:_isNewUser()
-    -- No filesystem available — just show the banner every launch.
-    if typeof(filesystem.isfile) ~= "function" or typeof(filesystem.writefile) ~= "function" then
-        return true
-    end
-
-    local path = 'Rayfield/lastuser.txt'
-    local currentId = tostring(variables.localPlayer.UserId)
-    local isNew = true
-
-    pcall(function()
-        if filesystem.isfile(path) then
-            isNew = filesystem.readfile(path) ~= currentId
-        end
-    end)
-
-    pcall(function()
-        if typeof(filesystem.isfolder) == "function" and not filesystem.isfolder('Rayfield') then
-            filesystem.makefolder('Rayfield')
-        end
-        filesystem.writefile(path, currentId)
-    end)
-
-    return isNew
-end
-
-function Window:_setLicenseShown(shown, tweenInfo)
-    -- Fade as well as slide, so if the window is minimised mid-animation the banner just
-    -- fades out instead of being left abruptly clipped or repositioned.
-    local targets = {
-        [self.license] = { BackgroundTransparency = if shown then 0 else 1 },
-        [self.licenseStroke] = { Transparency = if shown then 0.9 else 1 },
-        [self.licenseAvatar] = { BackgroundTransparency = if shown then 0.95 else 1, ImageTransparency = if shown then 0 else 1 },
-        [self.licenseSubtitle] = { TextTransparency = if shown then 0.5 else 1 },
-        [self.licenseTitle] = { TextTransparency = if shown then 0 else 1 },
-    }
-
-    for instance, props in targets do
-        if tweenInfo then
-            variables.tweenService:Create(instance, tweenInfo, props):Play()
-        else
-            for property, value in props do
-                instance[property] = value
-            end
-        end
-    end
-end
-
-function Window:_playLicenseBanner()
-    task.spawn(function()
-        local slideInfo = TweenInfo.new(0.7, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
-
-        self.license.Position = UDim2.new(0, 0, 0, 65)
-        self:_setLicenseShown(false)
-        self.license.Visible = true
-
-        -- Slide down + fade in, hold ~3s, then slide back up + fade out and hide.
-        variables.tweenService:Create(self.license, slideInfo, {Position = UDim2.new(0, 0, 0, -8)}):Play()
-        self:_setLicenseShown(true, slideInfo)
-
-        task.wait(3)
-
-        variables.tweenService:Create(self.license, slideInfo, {Position = UDim2.new(0, 0, 0, 65)}):Play()
-        self:_setLicenseShown(false, slideInfo)
-
-        task.wait(0.7)
-        self.license.Visible = false
-    end)
-end
-
-function Window:GetSettingsPath()
-    local dir = 'Rayfield/Settings'
-    return dir, dir .. '/rayfield.rfld'
 end
 
 function Window:SaveSettings()
-    local _, fullPath = self:GetSettingsPath()
-
-    local data = {
-        toggleKeybind = { tostring(self.settings.toggleKeybind.EnumType), self.settings.toggleKeybind.Value },
-        mouseOverride = self.settings.mouseOverride,
-    }
-
-    local ok, encoded = pcall(variables.httpService.JSONEncode, variables.httpService, data)
-    if not ok then return false end
-
-    local writeOk, err = pcall(function()
-        local dir = self:GetSettingsPath()
-        local parts = {}
-        for part in string.gmatch(dir, "[^/]+") do
-            table.insert(parts, part)
-        end
-        local built = ''
-        for _, part in parts do
-            built = if built == '' then part else built .. '/' .. part
-            if not filesystem.isfolder(built) then
-                filesystem.makefolder(built)
-            end
-        end
-
-        filesystem.writefile(fullPath, encoded)
-    end)
-
-    if not writeOk then
-        warn("Rayfield: Failed to save settings - " .. tostring(err))
-        return false
-    end
-
-    return true
+    return persistence.saveSettings(self)
 end
 
 function Window:LoadSettings()
-    local _, fullPath = self:GetSettingsPath()
-
-    local fileExists = false
-    pcall(function() fileExists = filesystem.isfile(fullPath) end)
-    if not fileExists then return false end
-
-    local readOk, config = pcall(filesystem.readfile, fullPath)
-    if not readOk or not config then return false end
-
-    local decodeOk, parsed = pcall(variables.httpService.JSONDecode, variables.httpService, config)
-    if not decodeOk then return false end
-
-    if parsed.toggleKeybind then
-        pcall(function()
-            self.settings.toggleKeybind = Enum[parsed.toggleKeybind[1]]:FromValue(parsed.toggleKeybind[2])
-        end)
-    end
-
-    if type(parsed.mouseOverride) == 'boolean' then
-        self.settings.mouseOverride = parsed.mouseOverride
-    end
-
-    return true
+    return persistence.loadSettings(self)
 end
 
 function Window:_setElementsShown()
@@ -1174,7 +839,9 @@ function Window:_setElementsShown()
 end
 
 function Window:Show()
-    if self.animating then return end
+    if self.animating then
+        return
+    end
     self.animating = true
 
     if self.configuration.autoLoad and self.hidden then
@@ -1184,6 +851,10 @@ function Window:Show()
     self.hidden = false
     self.minimised = false
     variables.rayfieldHidden = false
+
+    if self._freeMouse then
+        self._freeMouse()
+    end
 
     if self.restoreButton then
         self.restoreButton.Visible = false
@@ -1207,17 +878,23 @@ function Window:_quickRestore()
 
     self:_setElementsShown()
 
-    variables.tweenService:Create(self.main, fadeInfo, {BackgroundTransparency = 0}):Play()
-    variables.tweenService:Create(self.windowShadow, fadeInfo, {Transparency =0.6}):Play()
-    variables.tweenService:Create(self.bottomFade, fadeInfo, {BackgroundTransparency = 0}):Play()
+    variables.tweenService:Create(self.main, fadeInfo, { BackgroundTransparency = 0 }):Play()
+    variables.tweenService:Create(self.windowShadow, fadeInfo, { Transparency = 0.6 }):Play()
+    variables.tweenService:Create(self.bottomFade, fadeInfo, { BackgroundTransparency = 0 }):Play()
 
-    if self.topbarIcon then variables.tweenService:Create(self.topbarIcon, fadeInfo, {ImageTransparency = 0}):Play() end
-    if self.title then variables.tweenService:Create(self.title, fadeInfo, {TextTransparency = 0}):Play() end
-    if self.subtitle then variables.tweenService:Create(self.subtitle, fadeInfo, {TextTransparency = 0.7}):Play() end
+    if self.topbarIcon then
+        variables.tweenService:Create(self.topbarIcon, fadeInfo, { ImageTransparency = 0 }):Play()
+    end
+    if self.title then
+        variables.tweenService:Create(self.title, fadeInfo, { TextTransparency = 0 }):Play()
+    end
+    if self.subtitle then
+        variables.tweenService:Create(self.subtitle, fadeInfo, { TextTransparency = 0.7 }):Play()
+    end
 
     for _, action in ipairs(self.actionContainer:GetChildren()) do
-        if action:IsA('Frame') then
-            variables.tweenService:Create(action.ImageLabel, fadeInfo, {ImageTransparency = 0.6}):Play()
+        if action:IsA("Frame") then
+            variables.tweenService:Create(action.ImageLabel, fadeInfo, { ImageTransparency = 0.6 }):Play()
         end
     end
 
@@ -1228,14 +905,14 @@ function Window:_quickRestore()
     for _, tab in pairs(self.tabs) do
         if not tab.neglectSelector and tab.topbarItem then
             tab.topbarItem.Visible = true
-            tab:_applyVisual(if self.selectedTab == tab then 'selected' else 'unselected', fadeInfo)
+            tab:_applyVisual(if self.selectedTab == tab then "selected" else "unselected", fadeInfo)
         end
     end
 
     -- Drag handle
     self.drag.drag.Visible = true
     self.drag.dragCosmetic.Size = UDim2.fromOffset(100, 4)
-    variables.tweenService:Create(self.drag.dragCosmetic, fadeInfo, {BackgroundTransparency = 0.7}):Play()
+    variables.tweenService:Create(self.drag.dragCosmetic, fadeInfo, { BackgroundTransparency = 0.7 }):Play()
 
     task.delay(0.4, function()
         self.animating = false
@@ -1249,21 +926,69 @@ function Window:_firstShow()
 
     self.drag.drag.Visible = false
     self.main.Visible = true
-    variables.tweenService:Create(self.main, TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut), {BackgroundTransparency = 0, Size = self.size}):Play()
+    variables.tweenService
+        :Create(
+            self.main,
+            TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut),
+            { BackgroundTransparency = 0, Size = self.size }
+        )
+        :Play()
     task.wait(0.5)
-    variables.tweenService:Create(self.windowShadow, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Transparency = 0.6}):Play()
-    variables.tweenService:Create(self.bottomFade, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
+    variables.tweenService
+        :Create(
+            self.windowShadow,
+            TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
+            { Transparency = 0.6 }
+        )
+        :Play()
+    variables.tweenService
+        :Create(
+            self.bottomFade,
+            TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
+            { BackgroundTransparency = 0 }
+        )
+        :Play()
     task.wait(0.3)
 
-    if self.icon then variables.tweenService:Create(self.topbarIcon, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0}):Play() end
-    if self.title then variables.tweenService:Create(self.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0}):Play() end
+    if self.icon then
+        variables.tweenService
+            :Create(
+                self.topbarIcon,
+                TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
+                { ImageTransparency = 0 }
+            )
+            :Play()
+    end
+    if self.title then
+        variables.tweenService
+            :Create(
+                self.title,
+                TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
+                { TextTransparency = 0 }
+            )
+            :Play()
+    end
     task.wait(0.1)
-    if self.subtitle then variables.tweenService:Create(self.subtitle, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0.7}):Play() end
+    if self.subtitle then
+        variables.tweenService
+            :Create(
+                self.subtitle,
+                TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
+                { TextTransparency = 0.7 }
+            )
+            :Play()
+    end
 
     for _, action in ipairs(self.actionContainer:GetChildren()) do
-        if action:IsA('Frame') then
+        if action:IsA("Frame") then
             task.wait(0.02)
-            variables.tweenService:Create(action.ImageLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.6}):Play()
+            variables.tweenService
+                :Create(
+                    action.ImageLabel,
+                    TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
+                    { ImageTransparency = 0.6 }
+                )
+                :Play()
         end
     end
 
@@ -1277,7 +1002,10 @@ function Window:_firstShow()
         for _, tab in pairs(self.tabs) do
             if not tab.neglectSelector then
                 tab.topbarItem.Visible = true
-                tab:_applyVisual(if self.selectedTab == tab then 'selected' else 'unselected', TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out))
+                tab:_applyVisual(
+                    if self.selectedTab == tab then "selected" else "unselected",
+                    TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+                )
 
                 task.wait(0.15)
             end
@@ -1306,122 +1034,39 @@ function Window:_firstShow()
     task.wait(1)
 
     self.drag.drag.Visible = true
-    variables.tweenService:Create(self.drag.dragCosmetic, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundTransparency = 0.7}):Play()
-    variables.tweenService:Create(self.drag.dragCosmetic, TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(100, 4)}):Play()
+    variables.tweenService
+        :Create(
+            self.drag.dragCosmetic,
+            TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
+            { BackgroundTransparency = 0.7 }
+        )
+        :Play()
+    variables.tweenService
+        :Create(
+            self.drag.dragCosmetic,
+            TweenInfo.new(1, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
+            { Size = UDim2.fromOffset(100, 4) }
+        )
+        :Play()
 
     self.animating = false
 
     -- Welcome the user once if this is a new/changed account on this device.
-    if self:_isNewUser() then
-        self:_playLicenseBanner()
+    if chrome.isNewUser() then
+        chrome.playLicenseBanner(self)
     end
 end
 
 function Window:GetPath()
-    local dir = 'Rayfield/Configurations'
-
-    if self.configuration.customFolder then
-        dir = dir .. '/' .. tostring(self.configuration.customFolder)
-    end
-
-    local fileName = tostring(self.configuration.fileName or self.name) .. '.rfld'
-
-    return dir, dir .. '/' .. fileName
-end
-
-function Window:EnsureDirectory()
-    local dir = self:GetPath()
-
-    local parts = {}
-    for part in string.gmatch(dir, "[^/]+") do
-        table.insert(parts, part)
-    end
-
-    local built = ''
-    for _, part in parts do
-        built = if built == '' then part else built .. '/' .. part
-        if not filesystem.isfolder(built) then
-            filesystem.makefolder(built)
-        end
-    end
-end
-
-function Window:Modify(element, newValue)
-    -- e.g change title or subtitle text
+    return persistence.getPath(self)
 end
 
 function Window:Save()
-    local _, fullPath = self:GetPath()
-
-    local flags = {}
-    for flag, control in self.controls do
-        local value = control.value
-        if control.__type == "ColorPicker" then
-            value = value:ToHex()
-        elseif control.__type == "Keybind" then
-            value = { tostring(value.EnumType), value.Value }
-        end
-        flags[flag] = value
-    end
-
-    local encodeSuccess, encoded = pcall(variables.httpService.JSONEncode, variables.httpService, flags)
-    if not encodeSuccess then
-        warn("Rayfield: Failed to encode configuration - " .. tostring(encoded))
-        return false
-    end
-
-    local ok, err = pcall(function()
-        self:EnsureDirectory()
-        filesystem.writefile(fullPath, encoded)
-    end)
-
-    if not ok then
-        warn("Rayfield: Failed to save configuration - " .. tostring(err))
-        return false
-    end
-
-    return true
+    return persistence.save(self)
 end
 
 function Window:Load()
-    local dir, fullPath = self:GetPath()
-
-    if not filesystem.isfile(fullPath) then return false end
-
-    local readOk, config = pcall(filesystem.readfile, fullPath)
-    if not readOk or not config then
-        warn("Rayfield: Failed to read configuration file")
-        return false
-    end
-
-    local decodeOk, parsed = pcall(variables.httpService.JSONDecode, variables.httpService, config)
-
-    if not decodeOk then
-        -- Backup the corrupt file and remove the original
-        warn("Rayfield: Configuration file has an invalid format, backing up and resetting")
-        local backupPath = dir .. '/' .. tostring(self.configuration.fileName or self.name) .. ' (Incorrect Format).rfld'
-        pcall(function()
-            self:EnsureDirectory()
-            filesystem.writefile(backupPath, config)
-            filesystem.delfile(fullPath)
-        end)
-        return false
-    end
-
-    for flag, control in self.controls do
-        local value = parsed[flag]
-        if value ~= nil or control._canBeNil then
-            if control.__type == "ColorPicker" and value ~= nil then
-                value = Color3.fromHex(value)
-            end
-            if control.__type == "Keybind" and value ~= nil then
-                value = Enum[value[1]]:FromValue(value[2])
-            end
-            control:Set(value, true)
-        end
-    end
-
-    return true
+    return persistence.load(self)
 end
 
 function Window:Navigate(tab)
@@ -1441,9 +1086,9 @@ function Window:Create(className, properties, themeProperties)
 
     if themeProperties and self.theme then
         for property, value in themeProperties do
-            instance[property] = (if typeof(value) == "table"
-                then value[2](self.theme[value[1]])
-                else self.theme[value])
+            instance[property] = (
+                if typeof(value) == "table" then value[2](self.theme[value[1]]) else self.theme[value]
+            )
         end
 
         self.themeProperties[instance] = themeProperties
@@ -1486,9 +1131,87 @@ function Window:CreateHoverOverlay(parent)
 
     self:Create("UICorner", {
         Parent = overlay,
-    }, {CornerRadius = 'ElementCornerRadius'})
+    }, { CornerRadius = "ElementCornerRadius" })
 
     return overlay
+end
+
+-- hover: brighten stroke + title (+ overlay). shared by button/toggle
+function Window:_wireElementHover(element)
+    local info = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local theme = self.theme
+
+    self:Connect(element.main.MouseEnter, function()
+        variables.tweenService
+            :Create(
+                element.stroke,
+                info,
+                { Transparency = theme.ElementStrokeHoverTransparency, Color = theme.ElementStrokeHover }
+            )
+            :Play()
+        variables.tweenService:Create(element.title, info, { TextColor3 = theme.ElementTextHoverColor }):Play()
+        if element.hoverOverlay then
+            variables.tweenService:Create(element.hoverOverlay, info, { BackgroundTransparency = 0.97 }):Play()
+        end
+    end)
+
+    self:Connect(element.main.MouseLeave, function()
+        variables.tweenService
+            :Create(
+                element.stroke,
+                info,
+                { Transparency = theme.ElementStrokeTransparency, Color = theme.ElementStroke }
+            )
+            :Play()
+        variables.tweenService:Create(element.title, info, { TextColor3 = theme.ContentColor }):Play()
+        if element.hoverOverlay then
+            variables.tweenService:Create(element.hoverOverlay, info, { BackgroundTransparency = 1 }):Play()
+        end
+    end)
+end
+
+-- run a callback with the red error-flash on failure, debounced via element._errored so a
+-- slider firing every frame flashes once. shared by button/toggle/slider
+function Window:_runGuarded(element, fn, ...)
+    local args = table.pack(...)
+    task.spawn(function()
+        local ok, err = pcall(function()
+            return fn(table.unpack(args, 1, args.n))
+        end)
+        if ok or element._errored then
+            return
+        end
+        element._errored = true
+
+        local quickOut = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+        variables.tweenService:Create(element.main, quickOut, { BackgroundColor3 = self.theme.ErrorColor }):Play()
+        variables.tweenService:Create(element.stroke, quickOut, { Color = self.theme.ErrorStrokeColor }):Play()
+        element.title.Text = "Error, log recorded in console."
+
+        warn(
+            `Rayfield encountered an error, with the callback for a {element.__type} component named '{element.name}':`
+        )
+        print(err)
+
+        task.wait(1)
+
+        element.title.Text = element.name
+        variables.tweenService
+            :Create(
+                element.main,
+                TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In),
+                { BackgroundColor3 = Color3.fromRGB(255, 255, 255) }
+            )
+            :Play()
+        variables.tweenService
+            :Create(
+                element.stroke,
+                TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+                { Color = self.theme.ElementStroke }
+            )
+            :Play()
+        element._errored = false
+    end)
 end
 
 -- Standard element body: white base + gradient fill + rounded corner + flat stroke (hidden until shown).
@@ -1498,17 +1221,17 @@ function Window:StyleElementBody(main)
         Rotation = 270,
 
         Parent = main,
-    }, {Color = 'ElementGradient'})
+    }, { Color = "ElementGradient" })
 
     self:Create("UICorner", {
         Parent = main,
-    }, {CornerRadius = 'ElementCornerRadius'})
+    }, { CornerRadius = "ElementCornerRadius" })
 
     return self:Create("UIStroke", {
         Transparency = 1,
 
         Parent = main,
-    }, {Color = 'ElementStroke', Transparency = 'ElementStrokeTransparency'})
+    }, { Color = "ElementStroke", Transparency = "ElementStrokeTransparency" })
 end
 
 -- Like StyleElementBody but with a gradient stroke (subtle sheen) instead of a flat one.
@@ -1519,11 +1242,11 @@ function Window:StyleElementPanel(frame)
         Rotation = 270,
 
         Parent = frame,
-    }, {Color = 'ElementGradient'})
+    }, { Color = "ElementGradient" })
 
     self:Create("UICorner", {
         Parent = frame,
-    }, {CornerRadius = 'ElementCornerRadius'})
+    }, { CornerRadius = "ElementCornerRadius" })
 
     local stroke = self:Create("UIStroke", {
         Color = Color3.fromRGB(255, 255, 255),
@@ -1536,14 +1259,16 @@ function Window:StyleElementPanel(frame)
         Rotation = 270,
 
         Parent = stroke,
-    }, {Color = 'ElementStrokeGradient'})
+    }, { Color = "ElementStrokeGradient" })
 
     return stroke
 end
 
 -- Reveal a single instance: instantly set props when animate is false, else tween them with info.
 function Window:_reveal(instance, props, animate, info)
-    if not instance then return end
+    if not instance then
+        return
+    end
     if animate then
         variables.tweenService:Create(instance, info or REVEAL_INFO, props):Play()
     else
@@ -1555,11 +1280,15 @@ end
 
 -- Reveal the parts every non-Section element shares (fill/stroke/title/icon/descriptor).
 function Window:_revealCommon(element, animate)
-    self:_reveal(element.stroke, {Transparency = self.theme.ElementStrokeTransparency}, animate)
-    self:_reveal(element.title, {TextTransparency = 0}, animate)
-    self:_reveal(element.main, {BackgroundTransparency = self.theme.ElementTransparency or 0}, animate)
-    if element.iconLabel then self:_reveal(element.iconLabel, {ImageTransparency = 0}, animate) end
-    if element.descriptor then self:_reveal(element.descriptor.titleLabel, {TextTransparency = 0.7}, animate) end
+    self:_reveal(element.stroke, { Transparency = self.theme.ElementStrokeTransparency }, animate)
+    self:_reveal(element.title, { TextTransparency = 0 }, animate)
+    self:_reveal(element.main, { BackgroundTransparency = self.theme.ElementTransparency or 0 }, animate)
+    if element.iconLabel then
+        self:_reveal(element.iconLabel, { ImageTransparency = 0 }, animate)
+    end
+    if element.descriptor then
+        self:_reveal(element.descriptor.titleLabel, { TextTransparency = 0.7 }, animate)
+    end
 end
 
 function Window:Connect(signal, callback)
@@ -1572,9 +1301,13 @@ end
 -- Transient UI (dropdown popups, removed tabs) calls this so open/close churn doesnt
 -- pile up dead entries that only get cleared at Unload.
 function Window:Disconnect(connection)
-    if not connection then return end
+    if not connection then
+        return
+    end
     local index = table.find(self.connections, connection)
-    if index then table.remove(self.connections, index) end
+    if index then
+        table.remove(self.connections, index)
+    end
     connection:Disconnect()
 end
 
@@ -1582,9 +1315,11 @@ end
 -- (notifications) use this instead of a bare Destroy so self.instances doesnt grow
 -- for the whole session.
 function Window:DestroySubtree(root)
-    if not root then return end
+    if not root then
+        return
+    end
 
-    local inSubtree = {[root] = true}
+    local inSubtree = { [root] = true }
     for _, descendant in root:GetDescendants() do
         inSubtree[descendant] = true
     end

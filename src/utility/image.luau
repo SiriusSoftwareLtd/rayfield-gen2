@@ -11,12 +11,12 @@ local CACHE_FOLDER = CACHE_ROOT .. "/Assets"
 local ASSET_BASE = "https://github.com/SiriusSoftwareLtd/rayfield-gen2/blob/main/assets/"
 
 local MANIFEST = {
-    [5587865193]      = ASSET_BASE.."5587865193.png?raw=true",      -- window shadow + stat glow
-    [111263549366178] = ASSET_BASE.."111263549366178.png?raw=true", -- loading banner
-    [83277910885129]  = ASSET_BASE.."83277910885129.png?raw=true",  -- close action
-    [108115485663409] = ASSET_BASE.."108115485663409.png?raw=true", -- minimise action
-    [129180860773723] = ASSET_BASE.."129180860773723.png?raw=true", -- settings action
-    [100604009889706] = ASSET_BASE.."100604009889706.png?raw=true", -- search action
+    [5587865193] = ASSET_BASE .. "5587865193.png?raw=true", -- window shadow + stat glow
+    [111263549366178] = ASSET_BASE .. "111263549366178.png?raw=true", -- loading banner
+    [83277910885129] = ASSET_BASE .. "83277910885129.png?raw=true", -- close action
+    [108115485663409] = ASSET_BASE .. "108115485663409.png?raw=true", -- minimise action
+    [129180860773723] = ASSET_BASE .. "129180860773723.png?raw=true", -- settings action
+    [100604009889706] = ASSET_BASE .. "100604009889706.png?raw=true", -- search action
 }
 
 local IMAGE_PROPERTIES = {
@@ -31,7 +31,9 @@ image.onBlock = nil
 local env = getfenv()
 
 local function blocked(value)
-    if image.onBlock then image.onBlock(value) end
+    if image.onBlock then
+        image.onBlock(value)
+    end
     return ""
 end
 
@@ -50,7 +52,9 @@ local function getRequestFn()
 end
 
 function image.preload()
-    if type(env.getcustomasset) ~= "function" then return false end
+    if type(env.getcustomasset) ~= "function" then
+        return false
+    end
 
     pcall(ensureFolder, CACHE_ROOT)
     pcall(ensureFolder, CACHE_FOLDER)
@@ -83,12 +87,20 @@ function image.preload()
         end
     end
 
-    while pending > 0 do task.wait(0.05) end
+    -- bound the wait so a hung request cant block window creation forever
+    local deadline = os.clock() + 10
+    while pending > 0 and os.clock() < deadline do
+        task.wait(0.05)
+    end
 
     local mapped = {}
     for id, path in downloaded do
         local ok, uri = pcall(env.getcustomasset, path)
-        if ok and uri then mapped[id] = uri else errors += 1 end
+        if ok and uri then
+            mapped[id] = uri
+        else
+            errors += 1
+        end
     end
 
     image.rewrites = mapped
@@ -108,7 +120,8 @@ function image.resolve(value)
         return ""
     end
 
-    if type(value) == "string"
+    if
+        type(value) == "string"
         and (string.sub(value, 1, 11) == "rbxasset://" or string.sub(value, 1, 11) == "rbxthumb://")
     then
         return value

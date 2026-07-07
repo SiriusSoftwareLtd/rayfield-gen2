@@ -1,12 +1,26 @@
 local rayfield = {}
 local variables = require(script.utility.variables)
 local image = require(script.utility.image)
+local constants = require(script.utility.constants)
+local types = require(script.types)
+
+-- re-export public types so consumers can annotate against Rayfield.Window etc
+export type WindowProps = types.WindowProps
+export type Window = types.Window
+export type Tab = types.Tab
+export type Row = types.Row
+export type Button = types.Button
+export type Toggle = types.Toggle
+export type Slider = types.Slider
+export type Dropdown = types.Dropdown
+export type Stat = types.Stat
+export type Section = types.Section
 
 local function createBanner()
     local ui = Instance.new("ScreenGui")
     ui.Name = variables.httpService:GenerateGUID(false)
     ui.ClipToDeviceSafeArea = false
-    ui.DisplayOrder = 1e+05
+    ui.DisplayOrder = constants.displayOrder.banner
     ui.IgnoreGuiInset = true
     ui.ResetOnSpawn = false
     ui.Enabled = true
@@ -30,16 +44,16 @@ local function createBanner()
     return ui
 end
 
--- maybe add localization options with set languages ? 
+-- maybe add localization options with set languages ?
 -- add menu to choose language before continuing if there's no built-in service to check region
 
-function rayfield:CreateWindow(properties)
+function rayfield:CreateWindow(properties: types.WindowProps): types.Window
     local banner = createBanner()
 
-    if variables.secureMode and not image.preload() then
-        -- TODO: once notifications land, surface a non-blocking notify here
-        -- letting the user know secureMode degraded — at least one library
-        -- asset failed to cache locally so it'll render empty. UI keeps going.
+    if variables.secureMode then
+        -- cache assets locally so secureMode doesnt leak asset ids
+        -- TODO: notify on partial cache failure once notifications land
+        image.preload()
     end
 
     local window = require(script.components.window).new(properties)
@@ -53,12 +67,7 @@ function rayfield:CreateWindow(properties)
         window:Show()
     end)
 
-    return window
+    return window :: any
 end
 
-
-
-
-return rayfield
-
--- hello
+return rayfield :: types.Rayfield

@@ -1,14 +1,42 @@
-name: Release
+name: CI
 permissions:
   contents: write
 on:
   push:
     branches:
       - main
+      - dev
+  pull_request:
 
 jobs:
+  check:
+    name: Lint, Format and Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Setup RoKit
+        uses: CompeyDev/setup-rokit@v0.1.2
+
+      - name: Install RoKit packages
+        run: |
+          rokit trust rojo-rbx/rojo
+          rokit trust lune-org/lune
+          rokit trust seaofvoices/darklua
+          rokit trust JohnnyMorganz/StyLua
+          rokit trust Kampfkarren/selene
+          rokit trust JohnnyMorganz/luau-lsp
+          rokit install
+
+      - name: Format, lint and typecheck
+        run: bash scripts/check.sh
+
   build_and_bundle:
     name: Bundle and Publish Rayfield Gen2 Release
+    needs: check
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,6 +66,9 @@ jobs:
           rokit trust rojo-rbx/rojo
           rokit trust lune-org/lune
           rokit trust seaofvoices/darklua
+          rokit trust JohnnyMorganz/StyLua
+          rokit trust Kampfkarren/selene
+          rokit trust JohnnyMorganz/luau-lsp
           rokit install
 
       - name: Bundle

@@ -8,6 +8,8 @@ Row.__type = "Row"
 -- _moveElement, compact) so the same code builds them. Flags register on
 -- window.controls, so config works through the nesting.
 
+local moveable = require(script.Parent.Parent.utility.moveable)
+
 local maxElements = 3
 local elementPadding = 8
 
@@ -61,15 +63,25 @@ function Row:_add(componentName, properties)
     return element
 end
 
-function Row:CreateButton(properties) return self:_add("button", properties) end
-function Row:CreateToggle(properties) return self:_add("toggle", properties) end
-function Row:CreateSwitch(properties) return self:_add("toggle", properties) end
-function Row:CreateStat(properties) return self:_add("stat", properties) end
+function Row:CreateButton(properties)
+    return self:_add("button", properties)
+end
+function Row:CreateToggle(properties)
+    return self:_add("toggle", properties)
+end
+function Row:CreateSwitch(properties)
+    return self:_add("toggle", properties)
+end
+function Row:CreateStat(properties)
+    return self:_add("stat", properties)
+end
 
 -- reorder a child within the row
 function Row:_moveElement(element, targetIndex)
     local idx = table.find(self.elements, element)
-    if not idx then return end
+    if not idx then
+        return
+    end
     table.remove(self.elements, idx)
     targetIndex = math.clamp(targetIndex, 1, #self.elements + 1)
     table.insert(self.elements, targetIndex, element)
@@ -86,26 +98,6 @@ function Row:_setShown(animate)
 end
 
 -- reorder the row within its tab
-function Row:MoveTo(index)
-    self.tab:_moveElement(self, index)
-end
-
-function Row:MoveToTop()
-    self.tab:_moveElement(self, 1)
-end
-
-function Row:MoveToBottom()
-    self.tab:_moveElement(self, #self.tab.elements)
-end
-
-function Row:MoveUp()
-    local idx = table.find(self.tab.elements, self)
-    if idx then self.tab:_moveElement(self, idx - 1) end
-end
-
-function Row:MoveDown()
-    local idx = table.find(self.tab.elements, self)
-    if idx then self.tab:_moveElement(self, idx + 1) end
-end
+moveable(Row)
 
 return Row

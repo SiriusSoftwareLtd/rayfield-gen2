@@ -1,0 +1,55 @@
+base: roblox
+name: rayfield
+globals:
+  writefile:
+    args:
+    - required: false
+      type: '...'
+  readfile:
+    args:
+    - required: false
+      type: '...'
+  appendfile:
+    args:
+    - required: false
+      type: '...'
+  isfile:
+    args:
+    - required: false
+      type: '...'
+  delfile:
+    args:
+    - required: false
+      type: '...'
+  listfiles:
+    args:
+    - required: false
+      type: '...'
+  makefolder:
+    args:
+    - required: false
+      type: '...'
+  isfolder:
+    args:
+    - required: false
+      type: '...'
+  delfolder:
+    args:
+    - required: false
+      type: '...'
+  cloneref:
+    args:
+    - required: false
+      type: '...'
+  gethui:
+    args:
+    - required: false
+      type: '...'
+  getcustomasset:
+    args:
+    - required: false
+      type: '...'
+  getgenv:
+    args:
+    - required: false
+      type: '...'

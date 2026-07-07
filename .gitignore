@@ -8,5 +8,14 @@
 # Mac
 .DS_Store
 
+# Build output + generated files
+/build/
+/sourcemap.json
+
+# Generated tooling defs (created in CI / locally on demand)
+/roblox.yml
+/globalTypes.d.luau
+
 # Claude and Artificial Intelligence
 CLAUDE.md
+.claude/

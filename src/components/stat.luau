@@ -8,23 +8,11 @@ local utility = script.Parent.Parent.utility
 -- Variables
 local variables = require(utility.variables)
 local odometer = require(utility.odometer)
+local moveable = require(utility.moveable)
+local constants = require(utility.constants)
 
 -- Accent gradients per direction (fill drives the card + glow, stroke is the brighter edge)
-local accents = {
-    positive = {
-        fill = ColorSequence.new(Color3.fromRGB(0, 170, 127), Color3.fromRGB(0, 134, 98)),
-        stroke = ColorSequence.new(Color3.fromRGB(0, 213, 156), Color3.fromRGB(0, 189, 135)),
-    },
-    negative = {
-        fill = ColorSequence.new(Color3.fromRGB(172, 47, 47), Color3.fromRGB(135, 37, 37)),
-        stroke = ColorSequence.new(Color3.fromRGB(255, 75, 75), Color3.fromRGB(244, 67, 67)),
-    },
-    -- Neutral matches RF2's default green stat exactly
-    neutral = {
-        fill = ColorSequence.new(Color3.fromRGB(0, 170, 127), Color3.fromRGB(0, 134, 98)),
-        stroke = ColorSequence.new(Color3.fromRGB(0, 213, 156), Color3.fromRGB(0, 189, 135)),
-    },
-}
+local accents = constants.statAccents
 
 local accentTransparency = NumberSequence.new({
     NumberSequenceKeypoint.new(0, 0.85),
@@ -32,6 +20,8 @@ local accentTransparency = NumberSequence.new({
 })
 
 local compactHeight = 41
+
+local accentTweenInfo = TweenInfo.new(0.6, Enum.EasingStyle.Exponential)
 
 local function formatPct(pct)
     if pct > 0 then
@@ -49,7 +39,9 @@ local function formatValue(value)
     end
     local s = tostring(math.floor(math.abs(value)))
     local result = s:reverse():gsub("%d%d%d", "%0,"):reverse()
-    if result:sub(1, 1) == "," then result = result:sub(2) end
+    if result:sub(1, 1) == "," then
+        result = result:sub(2)
+    end
     return if value < 0 then "-" .. result else result
 end
 
@@ -80,9 +72,10 @@ function Statistic.new(tab, properties)
         -- the first Set on a placeholder establishes the baseline instead of showing a change
         _hasValue = (properties.value or properties.Value) ~= nil,
 
-        numberEasing = if (properties.numberEasing ~= nil) then properties.numberEasing
-        elseif (properties.NumberEasing ~= nil) then properties.NumberEasing
-        else true,
+        numberEasing = if (properties.numberEasing ~= nil)
+            then properties.numberEasing
+            elseif properties.NumberEasing ~= nil then properties.NumberEasing
+            else true,
 
         changeMode = properties.changeMode or properties.ChangeMode or "percentage", -- "percentage" | "absolute"
         changeBaseline = properties.changeBaseline or properties.ChangeBaseline or "previous",
@@ -95,7 +88,9 @@ function Statistic.new(tab, properties)
         compact = properties.compact or properties.Compact or tab.compact or false,
         display = (properties.display or properties.Display or "value"), -- "value" | "change"
 
-        _initialValue = if (properties.value or properties.Value) ~= nil then (properties.value or properties.Value) else nil,
+        _initialValue = if (properties.value or properties.Value) ~= nil
+            then (properties.value or properties.Value)
+            else nil,
         _lastChange = 0,
     }, Statistic)
 
@@ -127,18 +122,18 @@ function Statistic:_buildFull()
         BackgroundTransparency = 1,
 
         Parent = self.tab.tabPage,
-    }, {BackgroundTransparency = 'ElementTransparency'})
+    }, { BackgroundTransparency = "ElementTransparency" })
 
     window:Create("UICorner", {
         Parent = self.main,
-    }, {CornerRadius = 'ElementCornerRadius'})
+    }, { CornerRadius = "ElementCornerRadius" })
 
     self.stroke = window:Create("UIStroke", {
         Transparency = 1, -- Animation In = 0
         Color = Color3.fromRGB(255, 255, 255),
 
         Parent = self.main,
-    }, {Transparency = 'ElementStrokeTransparency'})
+    }, { Transparency = "ElementStrokeTransparency" })
 
     self.strokeGradient = window:Create("UIGradient", {
         Rotation = 2,
@@ -146,7 +141,7 @@ function Statistic:_buildFull()
         Color = accents.neutral.stroke,
         Transparency = accentTransparency,
 
-        Parent = self.stroke
+        Parent = self.stroke,
     })
 
     self.titleContainer = window:Create("Frame", {
@@ -183,7 +178,7 @@ function Statistic:_buildFull()
     })
 
     self.glowImage = window:Create("ImageLabel", {
-        Image = 'rbxassetid://5587865193',
+        Image = "rbxassetid://5587865193",
         ImageColor3 = Color3.fromRGB(255, 255, 255),
         Size = UDim2.fromScale(1.15, 1),
 
@@ -194,7 +189,7 @@ function Statistic:_buildFull()
 
         ImageTransparency = 1, -- In = 0.6
 
-        Parent = self.glowContainer
+        Parent = self.glowContainer,
     })
 
     self.title = window:Create("TextLabel", {
@@ -211,8 +206,8 @@ function Statistic:_buildFull()
 
         TextTransparency = 1, -- In = 0
 
-        Parent = self.titleContainer
-    }, {TextColor3 = 'ContentColor', FontFace = 'TitleFont'})
+        Parent = self.titleContainer,
+    }, { TextColor3 = "ContentColor", FontFace = "TitleFont" })
 
     self.mainGradient = window:Create("UIGradient", {
         Rotation = 2,
@@ -220,7 +215,7 @@ function Statistic:_buildFull()
         Color = accents.neutral.fill,
         Transparency = accentTransparency,
 
-        Parent = self.gradientContainer
+        Parent = self.gradientContainer,
     })
 
     self.glowGradient = window:Create("UIGradient", {
@@ -229,16 +224,16 @@ function Statistic:_buildFull()
         Color = accents.neutral.fill,
         Transparency = accentTransparency,
 
-        Parent = self.glowImage
+        Parent = self.glowImage,
     })
 
     window:Create("UICorner", {
         Parent = self.gradientContainer,
-    }, {CornerRadius = 'ElementCornerRadius'})
+    }, { CornerRadius = "ElementCornerRadius" })
 
     if self.icon then
         self.iconLabel = window:Create("ImageLabel", {
-            Image = 'rbxassetid://'..tostring(self.icon),
+            Image = "rbxassetid://" .. tostring(self.icon),
             ImageColor3 = Color3.fromRGB(255, 255, 255),
 
             Size = UDim2.fromOffset(32, 32),
@@ -248,8 +243,8 @@ function Statistic:_buildFull()
 
             ImageTransparency = 1, -- In = 0
 
-            Parent = self.titleContainer
-        }, {ImageColor3 = 'ContentColor'})
+            Parent = self.titleContainer,
+        }, { ImageColor3 = "ContentColor" })
     end
 
     self.containerLayout = window:Create("UIListLayout", {
@@ -259,7 +254,7 @@ function Statistic:_buildFull()
         HorizontalAlignment = Enum.HorizontalAlignment.Left,
         SortOrder = Enum.SortOrder.LayoutOrder,
 
-        Parent = self.titleContainer
+        Parent = self.titleContainer,
     })
 
     -- Value (bottom-left) + change (bottom-right) odometer readouts.
@@ -271,7 +266,7 @@ function Statistic:_buildFull()
         BorderSizePixel = 0,
         ZIndex = 10,
 
-        Parent = self.main
+        Parent = self.main,
     })
 
     self.changeHost = window:Create("Frame", {
@@ -282,7 +277,7 @@ function Statistic:_buildFull()
         BorderSizePixel = 0,
         ZIndex = 10,
 
-        Parent = self.main
+        Parent = self.main,
     })
 
     self.valueOdo = odometer.new(window, self.valueHost, {
@@ -322,18 +317,18 @@ function Statistic:_buildCompact()
         BackgroundTransparency = 1, -- In = ElementTransparency
 
         Parent = self.tab.tabPage,
-    }, {BackgroundTransparency = 'ElementTransparency'})
+    }, { BackgroundTransparency = "ElementTransparency" })
 
     window:Create("UICorner", {
         Parent = self.main,
-    }, {CornerRadius = 'ElementCornerRadius'})
+    }, { CornerRadius = "ElementCornerRadius" })
 
     self.stroke = window:Create("UIStroke", {
         Transparency = 1, -- In = ElementStrokeTransparency
         Color = Color3.fromRGB(255, 255, 255),
 
         Parent = self.main,
-    }, {Transparency = 'ElementStrokeTransparency'})
+    }, { Transparency = "ElementStrokeTransparency" })
 
     self.strokeGradient = window:Create("UIGradient", {
         Rotation = 2,
@@ -374,7 +369,7 @@ function Statistic:_buildCompact()
 
     window:Create("UICorner", {
         Parent = self.card,
-    }, {CornerRadius = 'ElementCornerRadius'})
+    }, { CornerRadius = "ElementCornerRadius" })
 
     self.mainGradient = window:Create("UIGradient", {
         Rotation = 2,
@@ -431,7 +426,7 @@ function Statistic:_buildCompact()
 
     if self.icon then
         self.iconLabel = window:Create("ImageLabel", {
-            Image = 'rbxassetid://'..tostring(self.icon),
+            Image = "rbxassetid://" .. tostring(self.icon),
             ImageColor3 = Color3.fromRGB(255, 255, 255),
             Size = UDim2.fromOffset(20, 20), -- smaller than the full 32
             BorderSizePixel = 0,
@@ -442,7 +437,7 @@ function Statistic:_buildCompact()
             ImageTransparency = 1, -- In = 0
 
             Parent = self.titleContainer,
-        }, {ImageColor3 = 'ContentColor'})
+        }, { ImageColor3 = "ContentColor" })
     end
 
     self.title = window:Create("TextLabel", {
@@ -460,7 +455,7 @@ function Statistic:_buildCompact()
         TextTransparency = 1, -- In = 0
 
         Parent = self.titleContainer,
-    }, {TextColor3 = 'ContentColor', FontFace = 'Font'}) -- Medium, like the other row elements
+    }, { TextColor3 = "ContentColor", FontFace = "Font" }) -- Medium, like the other row elements
 
     -- grows to its text, shrinks + ellipsizes when tight
     window:Create("UIFlexItem", {
@@ -490,19 +485,22 @@ function Statistic:_buildCompact()
     self._accentGradients = { self.strokeGradient, self.mainGradient }
 end
 
-
 function Statistic:_setAccent(key, direction)
     local accent = accents[key]
     self.strokeGradient.Color = accent.stroke
     self.mainGradient.Color = accent.fill
-    if self.glowGradient then self.glowGradient.Color = accent.fill end
+    if self.glowGradient then
+        self.glowGradient.Color = accent.fill
+    end
 
     -- Subtle rotation + offset shift to give the gradient a bit of life
     local rotation = if direction == 1 then 14 elseif direction == -1 then -10 else 2
-    local offset = if direction == 1 then Vector2.new(0.04, 0.5) elseif direction == -1 then Vector2.new(-0.04, 0.5) else Vector2.new(0, 0.5)
-    local gradientTweenInfo = TweenInfo.new(0.6, Enum.EasingStyle.Exponential)
+    local offset = if direction == 1
+        then Vector2.new(0.04, 0.5)
+        elseif direction == -1 then Vector2.new(-0.04, 0.5)
+        else Vector2.new(0, 0.5)
     for _, gradient in self._accentGradients do
-        variables.tweenService:Create(gradient, gradientTweenInfo, { Rotation = rotation, Offset = offset }):Play()
+        variables.tweenService:Create(gradient, accentTweenInfo, { Rotation = rotation, Offset = offset }):Play()
     end
 end
 
@@ -579,22 +577,22 @@ function Statistic:Set(value)
     local targetChange, infinityText, accentKey, direction
     if noChange then
         targetChange = 0
-        accentKey = 'neutral'
+        accentKey = "neutral"
         direction = 0
     elseif refValue == 0 then
         local sign = if value > 0 then "+" else "-"
         local suffix = if self.changeMode == "percentage" then "∞%" else "∞"
         infinityText = sign .. suffix
-        accentKey = if value > 0 then 'positive' else 'negative'
+        accentKey = if value > 0 then "positive" else "negative"
         direction = if value > 0 then 1 else -1
     elseif self.changeMode == "percentage" then
         targetChange = ((value - refValue) / math.abs(refValue)) * 100
         direction = if targetChange > 0 then 1 elseif targetChange < 0 then -1 else 0
-        accentKey = if direction == 1 then 'positive' elseif direction == -1 then 'negative' else 'neutral'
+        accentKey = if direction == 1 then "positive" elseif direction == -1 then "negative" else "neutral"
     else
         targetChange = value - refValue
         direction = if targetChange > 0 then 1 elseif targetChange < 0 then -1 else 0
-        accentKey = if direction == 1 then 'positive' elseif direction == -1 then 'negative' else 'neutral'
+        accentKey = if direction == 1 then "positive" elseif direction == -1 then "negative" else "neutral"
     end
 
     self:_setAccent(accentKey, direction)
@@ -615,56 +613,38 @@ function Statistic:ResetBaseline(newBaseline)
 
     -- change-display card resets to 0; a value card is unaffected
     if self.compact then
-        if self.display == "change" then self.readoutOdo:snap(self:_formatChange(0)) end
+        if self.display == "change" then
+            self.readoutOdo:snap(self:_formatChange(0))
+        end
     else
         self.changeOdo:snap(self:_formatChange(0))
     end
 
-    self:_setAccent('neutral', 0)
+    self:_setAccent("neutral", 0)
 end
-
 
 function Statistic:_setShown(animate)
     local w = self.window
 
     if self.compact then
-        w:_reveal(self.main, {BackgroundTransparency = self.window.theme.ElementTransparency or 0}, animate)
-        w:_reveal(self.stroke, {Transparency = self.window.theme.ElementStrokeTransparency}, animate)
-        w:_reveal(self.card, {BackgroundTransparency = 0}, animate)
-        w:_reveal(self.title, {TextTransparency = 0}, animate)
-        if self.iconLabel then w:_reveal(self.iconLabel, {ImageTransparency = 0}, animate) end
+        w:_reveal(self.main, { BackgroundTransparency = self.window.theme.ElementTransparency or 0 }, animate)
+        w:_reveal(self.stroke, { Transparency = self.window.theme.ElementStrokeTransparency }, animate)
+        w:_reveal(self.card, { BackgroundTransparency = 0 }, animate)
+        w:_reveal(self.title, { TextTransparency = 0 }, animate)
+        if self.iconLabel then
+            w:_reveal(self.iconLabel, { ImageTransparency = 0 }, animate)
+        end
         self.readoutOdo:reveal(0, animate)
         return
     end
 
     w:_revealCommon(self, animate)
-    w:_reveal(self.gradientContainer, {BackgroundTransparency = 0}, animate)
-    w:_reveal(self.glowImage, {ImageTransparency = 0.6}, animate)
+    w:_reveal(self.gradientContainer, { BackgroundTransparency = 0 }, animate)
+    w:_reveal(self.glowImage, { ImageTransparency = 0.6 }, animate)
     self.valueOdo:reveal(0, animate)
     self.changeOdo:reveal(0, animate)
 end
 
-function Statistic:MoveTo(index)
-    self.tab:_moveElement(self, index)
-end
-
-function Statistic:MoveToTop()
-    self.tab:_moveElement(self, 1)
-end
-
-function Statistic:MoveToBottom()
-    self.tab:_moveElement(self, #self.tab.elements)
-end
-
-function Statistic:MoveUp()
-    local idx = table.find(self.tab.elements, self)
-    if idx then self.tab:_moveElement(self, idx - 1) end
-end
-
-function Statistic:MoveDown()
-    local idx = table.find(self.tab.elements, self)
-    if idx then self.tab:_moveElement(self, idx + 1) end
-end
-
+moveable(Statistic)
 
 return Statistic

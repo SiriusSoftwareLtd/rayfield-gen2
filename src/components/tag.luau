@@ -64,7 +64,7 @@ function Tag.new(window, properties)
 
     self.iconLabel = self.window:Create("ImageLabel", {
         Name = "Icon",
-        Image = if self.icon then 'rbxassetid://'..tostring(self.icon) else '',
+        Image = if self.icon then "rbxassetid://" .. tostring(self.icon) else "",
         ImageColor3 = contrast,
         Size = UDim2.fromOffset(16, 16),
         BackgroundTransparency = 1,
@@ -97,7 +97,7 @@ function Tag.new(window, properties)
         TextTransparency = 1, -- In = 0
 
         Parent = self.main,
-    }, {FontFace = 'Font'})
+    }, { FontFace = "Font" })
 
     self.window.tagContainer.Visible = true
 
@@ -138,22 +138,28 @@ end
 
 function Tag:SetIcon(icon)
     self.icon = icon
-    self.iconLabel.Image = if icon then 'rbxassetid://'..tostring(icon) else ''
+    self.iconLabel.Image = if icon then "rbxassetid://" .. tostring(icon) else ""
     self.iconLabel.Visible = icon ~= nil
 end
 
 function Tag:Set(properties)
-    if properties.color or properties.Color then self:SetColor(properties.color or properties.Color) end
+    if properties.color or properties.Color then
+        self:SetColor(properties.color or properties.Color)
+    end
     if properties.text or properties.Text or properties.title or properties.Title then
         self:SetText(properties.text or properties.Text or properties.title or properties.Title)
     end
-    if properties.icon ~= nil or properties.Icon ~= nil then self:SetIcon(properties.icon or properties.Icon) end
+    if properties.icon ~= nil or properties.Icon ~= nil then
+        self:SetIcon(properties.icon or properties.Icon)
+    end
 end
 
 function Tag:Remove()
     self.main:Destroy()
     local idx = table.find(self.window.tags, self)
-    if idx then table.remove(self.window.tags, idx) end
+    if idx then
+        table.remove(self.window.tags, idx)
+    end
     if #self.window.tags == 0 then
         self.window.tagContainer.Visible = false
     end

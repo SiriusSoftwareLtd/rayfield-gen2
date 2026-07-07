@@ -8,6 +8,8 @@ local utility = script.Parent.Parent.utility
 -- Variables
 local variables = require(utility.variables)
 local functions = require(utility.functions)
+local moveable = require(utility.moveable)
+local constants = require(utility.constants)
 
 -- Compact (row) sizing.
 local compactHeight = 41
@@ -24,7 +26,13 @@ function Toggle.new(tab, properties)
         forgetState = properties.forgetState or properties.ForgetState, -- dont save config for this element if true.
         compact = tab.compact or false, -- true when the host is a Row
 
-        flag = properties.flag or properties.Flag or (not (properties.forgetState or properties.ForgetState) and functions.deriveFlagFromName(properties.name or properties.Name or "Switch") or nil),
+        flag = properties.flag
+            or properties.Flag
+            or (
+                not (properties.forgetState or properties.ForgetState)
+                    and functions.deriveFlagFromName(properties.name or properties.Name or "Switch")
+                or nil
+            ),
 
         callback = properties.callback or properties.Callback or function() end,
 
@@ -60,7 +68,7 @@ function Toggle:_buildSwitch(parent)
 
         BackgroundTransparency = 1, -- In = 0.9
 
-        Parent = parent
+        Parent = parent,
     })
 
     window:Create("UICorner", {
@@ -79,11 +87,11 @@ function Toggle:_buildSwitch(parent)
         Size = UDim2.fromOffset(25, 17),
         Position = self.value and UDim2.new(1, -28, 0.5, 0) or UDim2.new(1, -47, 0.5, 0),
         AnchorPoint = Vector2.new(0, 0.5),
-        BackgroundColor3 = self.value and Color3.fromRGB(23, 153, 110) or Color3.fromRGB(255, 255, 255),
+        BackgroundColor3 = self.value and constants.accent.on or Color3.fromRGB(255, 255, 255),
 
         BackgroundTransparency = 1, -- In = 0.8
 
-        Parent = self.functionContainer
+        Parent = self.functionContainer,
     })
 
     window:Create("UICorner", {
@@ -92,13 +100,13 @@ function Toggle:_buildSwitch(parent)
     })
 
     self.indicatorStroke = window:Create("UIStroke", {
-        Color = self.value and Color3.fromRGB(32, 201, 144) or Color3.fromRGB(255, 255, 255),
+        Color = self.value and constants.accent.onStroke or Color3.fromRGB(255, 255, 255),
         Transparency = 1, -- In = 0.7
         Parent = self.indicator,
     })
 
     -- Green glow behind the selector; hidden until on (gated by Transparency: 1 hidden, 0.4 shown)
-    self.indicatorGlow = window:CreateGlow(self.indicator, Color3.fromRGB(23, 153, 110), 20, 1)
+    self.indicatorGlow = window:CreateGlow(self.indicator, constants.accent.on, 20, 1)
 
     self.overlay = window:Create("Frame", {
         BorderSizePixel = 0,
@@ -109,8 +117,8 @@ function Toggle:_buildSwitch(parent)
 
         BackgroundTransparency = 1, -- In = 0
 
-        Parent = self.functionContainer
-    }, {Visible = 'DarkToggleOverlay'})
+        Parent = self.functionContainer,
+    }, { Visible = "DarkToggleOverlay" })
 
     window:Create("UICorner", {
         CornerRadius = UDim.new(0, 15),
@@ -134,50 +142,12 @@ function Toggle:_buildSwitch(parent)
     return self.functionContainer
 end
 
--- hover: brighten stroke + title
-function Toggle:_wireHover()
-    self.window:Connect(self.main.MouseEnter, function()
-        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeHoverTransparency, Color = self.window.theme.ElementStrokeHover}):Play()
-        variables.tweenService:Create(self.title, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextColor3 = self.window.theme.ElementTextHoverColor}):Play()
-        if self.hoverOverlay then
-            variables.tweenService:Create(self.hoverOverlay, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.97}):Play()
-        end
-    end)
-
-    self.window:Connect(self.main.MouseLeave, function()
-        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeTransparency, Color = self.window.theme.ElementStroke}):Play()
-        variables.tweenService:Create(self.title, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextColor3 = self.window.theme.ContentColor}):Play()
-        if self.hoverOverlay then
-            variables.tweenService:Create(self.hoverOverlay, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
-        end
-    end)
-end
-
 -- flip, animate, run callback (error-flash on fail), autosave. press anim is per-layout
 function Toggle:_performToggle()
     self.value = not self.value
     self:_animateIndicator()
 
-    task.spawn(function()
-        local success, result = pcall(function()
-            self.callback(self.value)
-        end)
-
-        if not success then
-            variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = self.window.theme.ErrorColor}):Play()
-            variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = self.window.theme.ErrorStrokeColor}):Play()
-            self.title.Text = 'Error, log recorded in console.'
-
-            warn(`Rayfield encountered an error, with the callback for a {self.__type} component named '{self.name}':`)
-            print(result)
-
-            task.wait(1)
-
-            self.title.Text = self.name
-            variables.tweenService:Create(self.main, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
-            variables.tweenService:Create(self.stroke, TweenInfo.new(0.6, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Color = self.window.theme.ElementStroke}):Play()
-        end
-    end)
+    self.window:_runGuarded(self, self.callback, self.value)
 
     if self.flag and not self.forgetState and self.window.configuration.autoSave then
         task.spawn(self.window.Save, self.window)
@@ -197,7 +167,7 @@ function Toggle:_buildFull()
         BackgroundTransparency = 1,
 
         Parent = self.tab.tabPage,
-    }, {BackgroundTransparency = 'ElementTransparency'})
+    }, { BackgroundTransparency = "ElementTransparency" })
 
     self.stroke = window:StyleElementBody(self.main)
     self.hoverOverlay = window:CreateHoverOverlay(self.main)
@@ -209,7 +179,7 @@ function Toggle:_buildFull()
         Size = UDim2.new(0, 170, 0, 16),
         Position = UDim2.new(0, 20, 0.5, 0),
         AnchorPoint = Vector2.new(0, 0.5),
-        BackgroundTransparency = 1
+        BackgroundTransparency = 1,
     })
 
     self.containerLayout = window:Create("UIListLayout", {
@@ -218,12 +188,12 @@ function Toggle:_buildFull()
         VerticalAlignment = Enum.VerticalAlignment.Center,
         HorizontalAlignment = Enum.HorizontalAlignment.Left,
 
-        Parent = self.container
+        Parent = self.container,
     })
 
     if self.icon then
         self.iconLabel = window:Create("ImageLabel", {
-            Image = 'rbxassetid://'..tostring(self.icon),
+            Image = "rbxassetid://" .. tostring(self.icon),
             ImageColor3 = Color3.fromRGB(255, 255, 255),
             Size = UDim2.fromOffset(16, 16),
             BorderSizePixel = 0,
@@ -231,8 +201,8 @@ function Toggle:_buildFull()
 
             ImageTransparency = 1, -- In = 0
 
-            Parent = self.container
-        }, {ImageColor3 = 'ContentColor'})
+            Parent = self.container,
+        }, { ImageColor3 = "ContentColor" })
     end
 
     self.title = window:Create("TextLabel", {
@@ -248,8 +218,8 @@ function Toggle:_buildFull()
 
         TextTransparency = 1, -- In = 0
 
-        Parent = self.container
-    }, {TextColor3 = 'ContentColor', FontFace = 'Font'})
+        Parent = self.container,
+    }, { TextColor3 = "ContentColor", FontFace = "Font" })
 
     self.interact = window:Create("TextButton", {
         BackgroundTransparency = 1,
@@ -270,20 +240,46 @@ function Toggle:_buildFull()
 
     self:_buildLock()
 
-    self:_wireHover()
+    self.window:_wireElementHover(self)
 
     self.window:Connect(self.interact.MouseButton1Click, function()
-        if self.locked then return end
+        if self.locked then
+            return
+        end
 
-        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = 1}):Play()
-        variables.tweenService:Create(self.main, TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(1, -26, 0, 41)}):Play()
+        variables.tweenService
+            :Create(
+                self.stroke,
+                TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+                { Transparency = 1 }
+            )
+            :Play()
+        variables.tweenService
+            :Create(
+                self.main,
+                TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
+                { Size = UDim2.new(1, -26, 0, 41) }
+            )
+            :Play()
 
         self:_performToggle()
 
         task.wait(0.11)
 
-        variables.tweenService:Create(self.main, TweenInfo.new(0.25, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(1, -20, 0, 41)}):Play()
-        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeTransparency}):Play()
+        variables.tweenService
+            :Create(
+                self.main,
+                TweenInfo.new(0.25, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
+                { Size = UDim2.new(1, -20, 0, 41) }
+            )
+            :Play()
+        variables.tweenService
+            :Create(
+                self.stroke,
+                TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+                { Transparency = self.window.theme.ElementStrokeTransparency }
+            )
+            :Play()
     end)
 end
 
@@ -302,7 +298,7 @@ function Toggle:_buildCompact()
         BackgroundTransparency = 1,
 
         Parent = self.tab.tabPage,
-    }, {BackgroundTransparency = 'ElementTransparency'})
+    }, { BackgroundTransparency = "ElementTransparency" })
 
     self.stroke = window:StyleElementBody(self.main)
 
@@ -336,7 +332,7 @@ function Toggle:_buildCompact()
 
     window:Create("UICorner", {
         Parent = self.interact,
-    }, {CornerRadius = 'ElementCornerRadius'})
+    }, { CornerRadius = "ElementCornerRadius" })
 
     window:Create("UIPadding", {
         PaddingLeft = UDim.new(0, 15),
@@ -382,7 +378,7 @@ function Toggle:_buildCompact()
 
     if self.icon then
         self.iconLabel = window:Create("ImageLabel", {
-            Image = 'rbxassetid://'..tostring(self.icon),
+            Image = "rbxassetid://" .. tostring(self.icon),
             ImageColor3 = Color3.fromRGB(255, 255, 255),
             Size = UDim2.fromOffset(16, 16),
             BorderSizePixel = 0,
@@ -392,7 +388,7 @@ function Toggle:_buildCompact()
             ImageTransparency = 1, -- In = 0
 
             Parent = self.container,
-        }, {ImageColor3 = 'ContentColor'})
+        }, { ImageColor3 = "ContentColor" })
     end
 
     self.title = window:Create("TextLabel", {
@@ -409,7 +405,7 @@ function Toggle:_buildCompact()
         TextTransparency = 1, -- In = 0
 
         Parent = self.container,
-    }, {TextColor3 = 'ContentColor', FontFace = 'Font'})
+    }, { TextColor3 = "ContentColor", FontFace = "Font" })
 
     -- grows to its text, shrinks + ellipsizes when tight
     window:Create("UIFlexItem", {
@@ -421,18 +417,32 @@ function Toggle:_buildCompact()
     self:_buildSwitch(self.interact)
     self.functionContainer.LayoutOrder = 1
 
-    self:_wireHover()
+    self.window:_wireElementHover(self)
 
     self.window:Connect(self.interact.MouseButton1Click, function()
-        if self.locked then return end
+        if self.locked then
+            return
+        end
 
-        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = 1}):Play()
+        variables.tweenService
+            :Create(
+                self.stroke,
+                TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+                { Transparency = 1 }
+            )
+            :Play()
 
         self:_performToggle()
 
         task.wait(0.11)
 
-        variables.tweenService:Create(self.stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeTransparency}):Play()
+        variables.tweenService
+            :Create(
+                self.stroke,
+                TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+                { Transparency = self.window.theme.ElementStrokeTransparency }
+            )
+            :Play()
     end)
 end
 
@@ -454,7 +464,7 @@ function Toggle:_buildLock()
 
     window:Create("UICorner", {
         Parent = self.elementLock,
-    }, {CornerRadius = 'ElementCornerRadius'})
+    }, { CornerRadius = "ElementCornerRadius" })
 
     local lockContent = window:Create("Frame", {
         AnchorPoint = Vector2.new(0.5, 0.5),
@@ -477,7 +487,7 @@ function Toggle:_buildLock()
     })
 
     window:Create("ImageLabel", {
-        Image = 'rbxassetid://78137979054938',
+        Image = "rbxassetid://78137979054938",
         Size = UDim2.fromOffset(20, 20),
         BorderSizePixel = 0,
         BackgroundTransparency = 1,
@@ -500,21 +510,36 @@ function Toggle:_buildLock()
         ZIndex = 15,
 
         Parent = lockContent,
-    }, {TextColor3 = 'ContentColor', FontFace = 'TitleFont'})
+    }, { TextColor3 = "ContentColor", FontFace = "TitleFont" })
 end
-
 
 function Toggle:_animateIndicator()
     local info = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
     if self.indicatorGlow then
-        variables.tweenService:Create(self.indicatorGlow, info, {Transparency = self.value and 0.4 or 1}):Play()
+        variables.tweenService:Create(self.indicatorGlow, info, { Transparency = self.value and 0.4 or 1 }):Play()
     end
     if self.value then
-        variables.tweenService:Create(self.indicator, info, {Position = UDim2.new(1, -28, 0.5, 0), BackgroundColor3 = Color3.fromRGB(23, 153, 110), BackgroundTransparency = 0}):Play()
-        variables.tweenService:Create(self.indicatorStroke, info, {Color = Color3.fromRGB(32, 201, 144), Transparency = 0}):Play()
+        variables.tweenService
+            :Create(self.indicator, info, {
+                Position = UDim2.new(1, -28, 0.5, 0),
+                BackgroundColor3 = constants.accent.on,
+                BackgroundTransparency = 0,
+            })
+            :Play()
+        variables.tweenService
+            :Create(self.indicatorStroke, info, { Color = constants.accent.onStroke, Transparency = 0 })
+            :Play()
     else
-        variables.tweenService:Create(self.indicator, info, {Position = UDim2.new(1, -47, 0.5, 0), BackgroundColor3 = Color3.fromRGB(255, 255, 255), BackgroundTransparency = 0.8}):Play()
-        variables.tweenService:Create(self.indicatorStroke, info, {Color = Color3.fromRGB(255, 255, 255), Transparency = 0.7}):Play()
+        variables.tweenService
+            :Create(self.indicator, info, {
+                Position = UDim2.new(1, -47, 0.5, 0),
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 0.8,
+            })
+            :Play()
+        variables.tweenService
+            :Create(self.indicatorStroke, info, { Color = Color3.fromRGB(255, 255, 255), Transparency = 0.7 })
+            :Play()
     end
 end
 
@@ -525,38 +550,20 @@ local toggleGlowReveal = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.E
 function Toggle:_setShown(animate)
     local w = self.window
     w:_revealCommon(self, animate)
-    w:_reveal(self.indicator, {BackgroundTransparency = self.value and 0 or 0.8}, animate, toggleReveal)
-    w:_reveal(self.indicatorStroke, {Transparency = self.value and 0 or 0.7}, animate, toggleReveal)
-    w:_reveal(self.indicatorGlow, {Transparency = self.value and 0.4 or 1}, animate, toggleGlowReveal)
-    w:_reveal(self.overlay, {BackgroundTransparency = 0}, animate, toggleReveal)
-    w:_reveal(self.containerStroke, {Transparency = 0.85}, animate, toggleReveal)
-    w:_reveal(self.functionContainer, {BackgroundTransparency = 0.9}, animate, toggleReveal)
+    w:_reveal(self.indicator, { BackgroundTransparency = self.value and 0 or 0.8 }, animate, toggleReveal)
+    w:_reveal(self.indicatorStroke, { Transparency = self.value and 0 or 0.7 }, animate, toggleReveal)
+    w:_reveal(self.indicatorGlow, { Transparency = self.value and 0.4 or 1 }, animate, toggleGlowReveal)
+    w:_reveal(self.overlay, { BackgroundTransparency = 0 }, animate, toggleReveal)
+    w:_reveal(self.containerStroke, { Transparency = 0.85 }, animate, toggleReveal)
+    w:_reveal(self.functionContainer, { BackgroundTransparency = 0.9 }, animate, toggleReveal)
 end
 
-function Toggle:MoveTo(index)
-    self.tab:_moveElement(self, index)
-end
-
-function Toggle:MoveToTop()
-    self.tab:_moveElement(self, 1)
-end
-
-function Toggle:MoveToBottom()
-    self.tab:_moveElement(self, #self.tab.elements)
-end
-
-function Toggle:MoveUp()
-    local idx = table.find(self.tab.elements, self)
-    if idx then self.tab:_moveElement(self, idx - 1) end
-end
-
-function Toggle:MoveDown()
-    local idx = table.find(self.tab.elements, self)
-    if idx then self.tab:_moveElement(self, idx + 1) end
-end
+moveable(Toggle)
 
 function Toggle:Set(value, skipCallback)
-    if self.value == value then return end
+    if self.value == value then
+        return
+    end
     self.value = value
 
     self:_animateIndicator()
@@ -573,7 +580,9 @@ end
 
 function Toggle:Lock(message)
     self.locked = true
-    if self.lockLabel and message then self.lockLabel.Text = message end
+    if self.lockLabel and message then
+        self.lockLabel.Text = message
+    end
     if self.elementLock then
         self.elementLock.Visible = true
     elseif self.title then

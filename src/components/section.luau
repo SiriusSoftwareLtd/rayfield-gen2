@@ -2,11 +2,7 @@ local Section = {}
 Section.__index = Section
 Section.__type = "Section"
 
--- Utility
-local utility = script.Parent.Parent.utility
-
--- Variables
-local variables = require(utility.variables)
+local moveable = require(script.Parent.Parent.utility.moveable)
 
 function Section.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
@@ -37,7 +33,7 @@ function Section.new(tab, properties)
     if self.icon then
         self.iconLabel = self.window:Create("ImageLabel", {
             -- Configurables
-            Image = 'rbxassetid://'..tostring(self.icon),
+            Image = "rbxassetid://" .. tostring(self.icon),
 
             -- Theming
             ImageColor3 = Color3.fromRGB(255, 255, 255),
@@ -49,8 +45,8 @@ function Section.new(tab, properties)
             -- Animation
             ImageTransparency = 1, -- In = 0.65
 
-            Parent = self.main
-        }, {ImageColor3 = 'ContentColor'})
+            Parent = self.main,
+        }, { ImageColor3 = "ContentColor" })
     end
 
     self.title = self.window:Create("TextLabel", {
@@ -69,50 +65,20 @@ function Section.new(tab, properties)
         -- Animation
         TextTransparency = 1, -- In = 0.6
 
-        Parent = self.main
-    }, {TextColor3 = 'ContentColor', FontFace = 'Font'})
-
-    self.window:Connect(self.window.signal, function(command)
-        if command == 'hide' then
-
-        elseif command == 'show' then
-            task.wait(0.7)
-            variables.tweenService:Create(self.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextTransparency = 0.6}):Play()
-            if self.icon then variables.tweenService:Create(self.iconLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {ImageTransparency = 0.65}):Play() end
-        end
-    end)
+        Parent = self.main,
+    }, { TextColor3 = "ContentColor", FontFace = "Font" })
 
     return self
 end
 
-
 function Section:_setShown(animate)
     local w = self.window
-    w:_reveal(self.title, {TextTransparency = 0.6}, animate)
-    if self.iconLabel then w:_reveal(self.iconLabel, {ImageTransparency = 0.65}, animate) end
+    w:_reveal(self.title, { TextTransparency = 0.6 }, animate)
+    if self.iconLabel then
+        w:_reveal(self.iconLabel, { ImageTransparency = 0.65 }, animate)
+    end
 end
 
-function Section:MoveTo(index)
-    self.tab:_moveElement(self, index)
-end
-
-function Section:MoveToTop()
-    self.tab:_moveElement(self, 1)
-end
-
-function Section:MoveToBottom()
-    self.tab:_moveElement(self, #self.tab.elements)
-end
-
-function Section:MoveUp()
-    local idx = table.find(self.tab.elements, self)
-    if idx then self.tab:_moveElement(self, idx - 1) end
-end
-
-function Section:MoveDown()
-    local idx = table.find(self.tab.elements, self)
-    if idx then self.tab:_moveElement(self, idx + 1) end
-end
-
+moveable(Section)
 
 return Section

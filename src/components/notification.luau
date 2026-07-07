@@ -9,10 +9,11 @@ local utility = script.Parent.Parent.utility
 
 -- Variables
 local variables = require(utility.variables)
+local functions = require(utility.functions)
 
 -- Timings/easings copied from Rayfield Gen1 (all Exponential, Out).
 local growInfo = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
-local fadeLong = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)  -- bg + stroke
+local fadeLong = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out) -- bg + stroke
 local fadeShort = TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out) -- title/icon/desc/shadow
 -- entry: card slides in from the right as the slot opens
 local swipeInInfo = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
@@ -91,13 +92,11 @@ function Notification.new(window, properties)
         Offset = Vector2.new(0, -0.1),
 
         Parent = self.body,
-    }, {Color = {'WindowColor', function(color)
-        if typeof(color) == 'ColorSequence' then return color else return ColorSequence.new(color) end
-    end}})
+    }, { Color = { "WindowColor", functions.toColorSequence } })
 
     self.window:Create("UICorner", {
         Parent = self.body,
-    }, {CornerRadius = 'CornerRoundness'})
+    }, { CornerRadius = "CornerRoundness" })
 
     self.stroke = self.window:Create("UIStroke", {
         Color = Color3.fromRGB(255, 255, 255),
@@ -139,7 +138,7 @@ function Notification.new(window, properties)
             ImageTransparency = 1, -- In = 0
 
             Parent = self.body,
-        }, {ImageColor3 = 'ContentColor'})
+        }, { ImageColor3 = "ContentColor" })
     end
 
     -- Text column fills the row minus icon + padding (container is 300 wide)
@@ -177,7 +176,7 @@ function Notification.new(window, properties)
         TextTransparency = 1, -- In = 0
 
         Parent = self.container,
-    }, {TextColor3 = 'ContentColor', FontFace = 'TitleFont'})
+    }, { TextColor3 = "ContentColor", FontFace = "TitleFont" })
 
     if self.content ~= "" then
         self.descriptionLabel = self.window:Create("TextLabel", {
@@ -196,7 +195,7 @@ function Notification.new(window, properties)
             TextTransparency = 1, -- In = 0.35
 
             Parent = self.container,
-        }, {TextColor3 = 'ContentColor', FontFace = 'Font'})
+        }, { TextColor3 = "ContentColor", FontFace = "Font" })
     end
 
     -- Newest sits at the bottom of the (bottom-anchored) stack
@@ -206,10 +205,17 @@ function Notification.new(window, properties)
     -- tracked so _dismiss can drop them; notifications come and go so we cant let their
     -- connections/instances sit in the window lists until Unload
     self._connections = {
-        self.window:Connect(self.body.MouseEnter, function() self._hovered = true end),
-        self.window:Connect(self.body.MouseLeave, function() self._hovered = false end),
+        self.window:Connect(self.body.MouseEnter, function()
+            self._hovered = true
+        end),
+        self.window:Connect(self.body.MouseLeave, function()
+            self._hovered = false
+        end),
         self.window:Connect(self.body.InputBegan, function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            if
+                input.UserInputType == Enum.UserInputType.MouseButton1
+                or input.UserInputType == Enum.UserInputType.Touch
+            then
                 self:_dismiss()
             end
         end),
@@ -233,6 +239,7 @@ function Notification:_measure()
         params.Size = size
         params.Width = colWidth
         local ok, bounds = pcall(TextService.GetTextBoundsAsync, TextService, params)
+        params:Destroy()
         return ok and bounds.Y or size
     end
 
@@ -250,54 +257,72 @@ function Notification:_show()
     -- is fully transparent until the grow tween starts, so there's no flicker.
     -- +STACK_PADDING because the outer's top padding holds the inter-card gap.
     local target = self:_measure() + STACK_PADDING
-    if not self.main.Parent then return end
+    if not self.main.Parent then
+        return
+    end
 
     -- Open the slot and slide the card in from the right (body starts off-right), fading as it comes
-    variables.tweenService:Create(self.main, growInfo, {Size = UDim2.new(1, 0, 0, target)}):Play()
-    variables.tweenService:Create(self.body, swipeInInfo, {Position = CENTRED}):Play()
-    variables.tweenService:Create(self.body, fadeLong, {BackgroundTransparency = 0}):Play()
-    variables.tweenService:Create(self.titleLabel, fadeShort, {TextTransparency = 0}):Play()
-    variables.tweenService:Create(self.stroke, fadeLong, {Transparency = 0.95}):Play()
-    variables.tweenService:Create(self.shadow, fadeShort, {Transparency = 0.6}):Play()
+    variables.tweenService:Create(self.main, growInfo, { Size = UDim2.new(1, 0, 0, target) }):Play()
+    variables.tweenService:Create(self.body, swipeInInfo, { Position = CENTRED }):Play()
+    variables.tweenService:Create(self.body, fadeLong, { BackgroundTransparency = 0 }):Play()
+    variables.tweenService:Create(self.titleLabel, fadeShort, { TextTransparency = 0 }):Play()
+    variables.tweenService:Create(self.stroke, fadeLong, { Transparency = 0.95 }):Play()
+    variables.tweenService:Create(self.shadow, fadeShort, { Transparency = 0.6 }):Play()
 
     task.wait(0.05)
-    if self.iconLabel then variables.tweenService:Create(self.iconLabel, fadeShort, {ImageTransparency = 0}):Play() end
+    if self.iconLabel then
+        variables.tweenService:Create(self.iconLabel, fadeShort, { ImageTransparency = 0 }):Play()
+    end
 
     task.wait(0.05)
-    if self.descriptionLabel then variables.tweenService:Create(self.descriptionLabel, fadeShort, {TextTransparency = 0.35}):Play() end
+    if self.descriptionLabel then
+        variables.tweenService:Create(self.descriptionLabel, fadeShort, { TextTransparency = 0.35 }):Play()
+    end
 
     -- Dwell, pausing while hovered
     local elapsed = 0
     while elapsed < self.duration and not self._dismissed and self.main.Parent do
         local dt = task.wait()
-        if not self._hovered then elapsed += dt end
+        if not self._hovered then
+            elapsed += dt
+        end
     end
 
     self:_dismiss()
 end
 
--- Exit: fade out while the card shrinks (width + height) — Gen1's exit.
+-- Exit: fade out while the card shrinks (width + height) - Gen1's exit.
 function Notification:_dismiss()
-    if self._dismissed then return end
+    if self._dismissed then
+        return
+    end
     self._dismissed = true
 
-    if not self.main.Parent then return end
+    if not self.main.Parent then
+        return
+    end
 
     -- Fade everything out (runs during the shrink -> "goes transparent as it scales")
-    variables.tweenService:Create(self.body, fadeLong, {BackgroundTransparency = 1}):Play()
-    variables.tweenService:Create(self.stroke, fadeLong, {Transparency = 1}):Play()
-    variables.tweenService:Create(self.shadow, fadeShort, {Transparency = 1}):Play()
-    variables.tweenService:Create(self.titleLabel, fadeShort, {TextTransparency = 1}):Play()
-    if self.descriptionLabel then variables.tweenService:Create(self.descriptionLabel, fadeShort, {TextTransparency = 1}):Play() end
-    if self.iconLabel then variables.tweenService:Create(self.iconLabel, fadeShort, {ImageTransparency = 1}):Play() end
+    variables.tweenService:Create(self.body, fadeLong, { BackgroundTransparency = 1 }):Play()
+    variables.tweenService:Create(self.stroke, fadeLong, { Transparency = 1 }):Play()
+    variables.tweenService:Create(self.shadow, fadeShort, { Transparency = 1 }):Play()
+    variables.tweenService:Create(self.titleLabel, fadeShort, { TextTransparency = 1 }):Play()
+    if self.descriptionLabel then
+        variables.tweenService:Create(self.descriptionLabel, fadeShort, { TextTransparency = 1 }):Play()
+    end
+    if self.iconLabel then
+        variables.tweenService:Create(self.iconLabel, fadeShort, { ImageTransparency = 1 }):Play()
+    end
 
     -- Shrink: narrow the card (width -90) and collapse the slot (height 0) together
-    variables.tweenService:Create(self.body, shrinkInfo, {Size = UDim2.new(1, -90, 1, 0)}):Play()
-    local collapse = variables.tweenService:Create(self.main, shrinkInfo, {Size = UDim2.new(1, 0, 0, 0)})
+    variables.tweenService:Create(self.body, shrinkInfo, { Size = UDim2.new(1, -90, 1, 0) }):Play()
+    local collapse = variables.tweenService:Create(self.main, shrinkInfo, { Size = UDim2.new(1, 0, 0, 0) })
     collapse:Play()
     collapse.Completed:Wait()
 
-    if not self.main.Parent then return end
+    if not self.main.Parent then
+        return
+    end
 
     for _, connection in self._connections do
         self.window:Disconnect(connection)

@@ -35,12 +35,16 @@ local function dedupStrings(arr)
 end
 
 local function normalizeValue(value, multi)
-    if value == nil then return {} end
-    if typeof(value) == "string" then return {value} end
+    if value == nil then
+        return {}
+    end
+    if typeof(value) == "string" then
+        return { value }
+    end
     if typeof(value) == "table" then
         local out = dedupStrings(value)
         if not multi and #out > 1 then
-            return {out[1]}
+            return { out[1] }
         end
         return out
     end
@@ -61,14 +65,23 @@ function Dropdown.new(tab, properties)
         description = properties.description or properties.Description,
         forgetState = properties.forgetState or properties.ForgetState, -- dont save config for this element if true.
 
-        flag = properties.flag or properties.Flag or (not (properties.forgetState or properties.ForgetState) and functions.deriveFlagFromName(properties.name or properties.Name or "Dropdown") or nil),
+        flag = properties.flag
+            or properties.Flag
+            or (
+                not (properties.forgetState or properties.ForgetState)
+                    and functions.deriveFlagFromName(properties.name or properties.Name or "Dropdown")
+                or nil
+            ),
 
         callback = properties.callback or properties.Callback or function() end,
 
         options = dedupStrings(options),
         multiSelect = multiSelect,
         placeholderText = properties.placeholder or properties.Placeholder or "None",
-        value = normalizeValue(properties.value or properties.Value or properties.currentOption or properties.CurrentOption, multiSelect),
+        value = normalizeValue(
+            properties.value or properties.Value or properties.currentOption or properties.CurrentOption,
+            multiSelect
+        ),
 
         _isOpen = false,
         _optionFrames = {},
@@ -77,7 +90,9 @@ function Dropdown.new(tab, properties)
     -- Prune the initial value to options that actually exist (matches Set/Refresh)
     local prunedValue = {}
     for _, v in self.value do
-        if table.find(self.options, v) then table.insert(prunedValue, v) end
+        if table.find(self.options, v) then
+            table.insert(prunedValue, v)
+        end
     end
     self.value = prunedValue
 
@@ -106,7 +121,7 @@ function Dropdown.new(tab, properties)
         ZIndex = 1,
 
         Parent = self.main,
-    }, {BackgroundTransparency = 'ElementTransparency'})
+    }, { BackgroundTransparency = "ElementTransparency" })
 
     self.stroke = self.window:StyleElementPanel(self.top)
     self.hoverOverlay = self.window:CreateHoverOverlay(self.top)
@@ -134,7 +149,7 @@ function Dropdown.new(tab, properties)
     if self.icon then
         self.iconLabel = self.window:Create("ImageLabel", {
             -- Configurables
-            Image = 'rbxassetid://'..tostring(self.icon),
+            Image = "rbxassetid://" .. tostring(self.icon),
 
             -- Theming
             ImageColor3 = Color3.fromRGB(255, 255, 255),
@@ -148,7 +163,7 @@ function Dropdown.new(tab, properties)
 
             ZIndex = 5,
             Parent = self.container,
-        }, {ImageColor3 = 'ContentColor'})
+        }, { ImageColor3 = "ContentColor" })
     end
 
     self.title = self.window:Create("TextLabel", {
@@ -169,7 +184,7 @@ function Dropdown.new(tab, properties)
 
         ZIndex = 5,
         Parent = self.container,
-    }, {TextColor3 = 'ContentColor', FontFace = 'Font'})
+    }, { TextColor3 = "ContentColor", FontFace = "Font" })
 
     self.selectedLabel = self.window:Create("TextLabel", {
         AnchorPoint = Vector2.new(1, 0.5),
@@ -186,7 +201,7 @@ function Dropdown.new(tab, properties)
 
         ZIndex = 5,
         Parent = self.top,
-    }, {TextColor3 = 'ContentColor', FontFace = 'Font'})
+    }, { TextColor3 = "ContentColor", FontFace = "Font" })
 
     self.chevron = self.window:Create("ImageLabel", {
         AnchorPoint = Vector2.new(1, 0.5),
@@ -194,7 +209,7 @@ function Dropdown.new(tab, properties)
         Size = UDim2.fromOffset(16, 16),
         BorderSizePixel = 0,
         BackgroundTransparency = 1,
-        Image = 'rbxassetid://'..tostring(CHEVRON_ICON),
+        Image = "rbxassetid://" .. tostring(CHEVRON_ICON),
         Rotation = 180,
 
         -- Animation
@@ -202,7 +217,7 @@ function Dropdown.new(tab, properties)
 
         ZIndex = 5,
         Parent = self.top,
-    }, {ImageColor3 = 'ContentColor'})
+    }, { ImageColor3 = "ContentColor" })
 
     -- Covers only the header, so option clicks in the open panel below don't hit it.
     self.interact = self.window:Create("TextButton", {
@@ -308,14 +323,14 @@ function Dropdown.new(tab, properties)
         local iconT = if self._isOpen then (selected and 0 or 0.7) else 1
         local strokeT = if self._isOpen then (selected and 0.85 or 0.93) else 1
 
-        data.checkIcon.Image = 'rbxassetid://'..tostring(if selected then CHECK_ICON else DOT_ICON)
+        data.checkIcon.Image = "rbxassetid://" .. tostring(if selected then CHECK_ICON else DOT_ICON)
 
         if animate then
             local info = TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
-            variables.tweenService:Create(data.frame, info, {BackgroundTransparency = bgT}):Play()
-            variables.tweenService:Create(data.title, info, {TextTransparency = titleT}):Play()
-            variables.tweenService:Create(data.checkIcon, info, {ImageTransparency = iconT}):Play()
-            variables.tweenService:Create(data.stroke, info, {Transparency = strokeT}):Play()
+            variables.tweenService:Create(data.frame, info, { BackgroundTransparency = bgT }):Play()
+            variables.tweenService:Create(data.title, info, { TextTransparency = titleT }):Play()
+            variables.tweenService:Create(data.checkIcon, info, { ImageTransparency = iconT }):Play()
+            variables.tweenService:Create(data.stroke, info, { Transparency = strokeT }):Play()
         else
             data.frame.BackgroundTransparency = bgT
             data.title.TextTransparency = titleT
@@ -341,8 +356,14 @@ function Dropdown.new(tab, properties)
 
     local function flashError(result)
         -- Flash the header card red (the wrapper is transparent, so tint the pill itself).
-        variables.tweenService:Create(self.top, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundColor3 = self.window.theme.ErrorColor}):Play()
-        self.title.Text = 'Error, log recorded in console.'
+        variables.tweenService
+            :Create(
+                self.top,
+                TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+                { BackgroundColor3 = self.window.theme.ErrorColor }
+            )
+            :Play()
+        self.title.Text = "Error, log recorded in console."
 
         warn(`Rayfield encountered an error, with the callback for a {self.__type} component named '{self.name}':`)
         print(result)
@@ -350,7 +371,13 @@ function Dropdown.new(tab, properties)
         task.wait(1)
 
         self.title.Text = self.name
-        variables.tweenService:Create(self.top, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+        variables.tweenService
+            :Create(
+                self.top,
+                TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In),
+                { BackgroundColor3 = Color3.fromRGB(255, 255, 255) }
+            )
+            :Play()
     end
 
     self._renderOptionState = renderOptionState
@@ -364,7 +391,7 @@ function Dropdown.new(tab, properties)
             BackgroundTransparency = 1,
 
             Parent = self.list,
-        }, {BackgroundColor3 = 'DropdownHighlight'})
+        }, { BackgroundColor3 = "DropdownHighlight" })
 
         -- Radius is driven by selection in renderOptionState (5 sharp / 12 rounded)
         local corner = self.window:Create("UICorner", {
@@ -407,14 +434,14 @@ function Dropdown.new(tab, properties)
         })
 
         local checkIcon = self.window:Create("ImageLabel", {
-            Image = 'rbxassetid://'..tostring(CHECK_ICON),
+            Image = "rbxassetid://" .. tostring(CHECK_ICON),
             Size = UDim2.fromOffset(16, 16),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
             ImageTransparency = 1,
             ZIndex = 5,
             Parent = container,
-        }, {ImageColor3 = 'ContentColor'})
+        }, { ImageColor3 = "ContentColor" })
 
         local title = self.window:Create("TextLabel", {
             Text = optionName,
@@ -428,7 +455,7 @@ function Dropdown.new(tab, properties)
             TextTransparency = 1,
             ZIndex = 5,
             Parent = container,
-        }, {TextColor3 = 'ContentColor', FontFace = 'Font'})
+        }, { TextColor3 = "ContentColor", FontFace = "Font" })
 
         local data = {
             name = optionName,
@@ -442,17 +469,49 @@ function Dropdown.new(tab, properties)
         }
 
         self.window:Connect(frame.MouseEnter, function()
-            if not self._isOpen then return end
-            if isOptionSelected(optionName) then return end
-            variables.tweenService:Create(frame, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.9}):Play()
-            variables.tweenService:Create(title, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.15}):Play()
+            if not self._isOpen then
+                return
+            end
+            if isOptionSelected(optionName) then
+                return
+            end
+            variables.tweenService
+                :Create(
+                    frame,
+                    TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+                    { BackgroundTransparency = 0.9 }
+                )
+                :Play()
+            variables.tweenService
+                :Create(
+                    title,
+                    TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+                    { TextTransparency = 0.15 }
+                )
+                :Play()
         end)
 
         self.window:Connect(frame.MouseLeave, function()
-            if not self._isOpen then return end
-            if isOptionSelected(optionName) then return end
-            variables.tweenService:Create(frame, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.95}):Play()
-            variables.tweenService:Create(title, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0.3}):Play()
+            if not self._isOpen then
+                return
+            end
+            if isOptionSelected(optionName) then
+                return
+            end
+            variables.tweenService
+                :Create(
+                    frame,
+                    TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+                    { BackgroundTransparency = 0.95 }
+                )
+                :Play()
+            variables.tweenService
+                :Create(
+                    title,
+                    TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+                    { TextTransparency = 0.3 }
+                )
+                :Play()
         end)
 
         self.window:Connect(interact.MouseButton1Click, function()
@@ -468,7 +527,9 @@ function Dropdown.new(tab, properties)
             else
                 if sel then
                     local idx = table.find(self.value, optionName)
-                    if idx then table.remove(self.value, idx) end
+                    if idx then
+                        table.remove(self.value, idx)
+                    end
                 else
                     table.insert(self.value, optionName)
                 end
@@ -525,16 +586,41 @@ function Dropdown.new(tab, properties)
     -- Hover feedback via the overlay + title only. The card uses a gradient stroke (white
     -- base tinted by the gradient), so tweening stroke.Color here would fight the gradient.
     self.window:Connect(self.main.MouseEnter, function()
-        if self._isOpen then return end
-        variables.tweenService:Create(self.title, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextColor3 = self.window.theme.ElementTextHoverColor}):Play()
-        variables.tweenService:Create(self.hoverOverlay, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.97}):Play()
+        if self._isOpen then
+            return
+        end
+        variables.tweenService
+            :Create(
+                self.title,
+                TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+                { TextColor3 = self.window.theme.ElementTextHoverColor }
+            )
+            :Play()
+        variables.tweenService
+            :Create(
+                self.hoverOverlay,
+                TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+                { BackgroundTransparency = 0.97 }
+            )
+            :Play()
     end)
 
     self.window:Connect(self.main.MouseLeave, function()
-        variables.tweenService:Create(self.title, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextColor3 = self.window.theme.ContentColor}):Play()
-        variables.tweenService:Create(self.hoverOverlay, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+        variables.tweenService
+            :Create(
+                self.title,
+                TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+                { TextColor3 = self.window.theme.ContentColor }
+            )
+            :Play()
+        variables.tweenService
+            :Create(
+                self.hoverOverlay,
+                TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+                { BackgroundTransparency = 1 }
+            )
+            :Play()
     end)
-
 
     if self.description then
         self.descriptor = require(script.Parent.descriptor).new(self.tab, { description = self.description })
@@ -543,9 +629,8 @@ function Dropdown.new(tab, properties)
     return self
 end
 
-
 -- Search bar: collapsed it's just the icon (centred, no bar); tapping expands it into a
--- full field. It's always in the card's layout — only its height/fills animate — so the
+-- full field. It's always in the card's layout - only its height/fills animate - so the
 -- list below just flexes down as it grows.
 function Dropdown:_buildSearch()
     self._searchOpen = false
@@ -605,10 +690,10 @@ function Dropdown:_buildSearch()
         TextTransparency = 1, -- expanded = 0.3
 
         Parent = self.searchbar,
-    }, {TextColor3 = 'ContentColor', FontFace = 'Font'})
+    }, { TextColor3 = "ContentColor", FontFace = "Font" })
 
     self.searchIcon = self.window:Create("ImageButton", {
-        Image = 'rbxassetid://'..tostring(SEARCH_ICON),
+        Image = "rbxassetid://" .. tostring(SEARCH_ICON),
         Size = UDim2.fromOffset(20, 20),
         Position = UDim2.new(0, 24, 0.5, 0), -- left-aligned (centre at x=24, edge at 14)
         AnchorPoint = Vector2.new(0.5, 0.5),
@@ -620,48 +705,72 @@ function Dropdown:_buildSearch()
         ImageTransparency = 1, -- In = 0.5
 
         Parent = self.searchbar,
-    }, {ImageColor3 = 'ContentColor'})
+    }, { ImageColor3 = "ContentColor" })
 
     self.window:Connect(self.searchToggle.MouseButton1Click, function()
-        if not self._searchOpen then self:_expandSearch() end
+        if not self._searchOpen then
+            self:_expandSearch()
+        end
     end)
     self.window:Connect(self.searchIcon.MouseButton1Click, function()
-        if self._searchOpen then self:_collapseSearch() else self:_expandSearch() end
+        if self._searchOpen then
+            self:_collapseSearch()
+        else
+            self:_expandSearch()
+        end
     end)
     self.window:Connect(self.searchInput:GetPropertyChangedSignal("Text"), function()
         self:_applyFilter(self.searchInput.Text)
     end)
     self.window:Connect(self.searchInput.FocusLost, function()
-        if self.searchInput.Text == "" then self:_collapseSearch() end
+        if self.searchInput.Text == "" then
+            self:_collapseSearch()
+        end
     end)
 end
 
 function Dropdown:_expandSearch()
-    if self._searchOpen then return end
+    if self._searchOpen then
+        return
+    end
     self._searchOpen = true
     self.searchInput.TextEditable = true
     self.searchInput.Interactable = true
 
-    variables.tweenService:Create(self.searchbar, searchTween, {Size = UDim2.new(1, -12, 0, SEARCH_EXPANDED_H), BackgroundTransparency = 0.92}):Play()
-    variables.tweenService:Create(self.searchStroke, searchTween, {Transparency = 0.86}):Play()
-    variables.tweenService:Create(self.searchShadow, searchTween, {Transparency = 0.92}):Play()
-    variables.tweenService:Create(self.searchInput, searchTween, {TextTransparency = 0.3}):Play()
+    variables.tweenService
+        :Create(
+            self.searchbar,
+            searchTween,
+            { Size = UDim2.new(1, -12, 0, SEARCH_EXPANDED_H), BackgroundTransparency = 0.92 }
+        )
+        :Play()
+    variables.tweenService:Create(self.searchStroke, searchTween, { Transparency = 0.86 }):Play()
+    variables.tweenService:Create(self.searchShadow, searchTween, { Transparency = 0.92 }):Play()
+    variables.tweenService:Create(self.searchInput, searchTween, { TextTransparency = 0.3 }):Play()
 
     self.searchInput:CaptureFocus()
 end
 
 function Dropdown:_collapseSearch()
-    if not self._searchOpen then return end
+    if not self._searchOpen then
+        return
+    end
     self._searchOpen = false
     self.searchInput.TextEditable = false
     self.searchInput.Interactable = false
     self.searchInput:ReleaseFocus()
     self.searchInput.Text = "" -- fires the filter, showing everything again
 
-    variables.tweenService:Create(self.searchbar, searchTween, {Size = UDim2.new(1, -12, 0, SEARCH_COLLAPSED_H), BackgroundTransparency = 1}):Play()
-    variables.tweenService:Create(self.searchStroke, searchTween, {Transparency = 1}):Play()
-    variables.tweenService:Create(self.searchShadow, searchTween, {Transparency = 1}):Play()
-    variables.tweenService:Create(self.searchInput, searchTween, {TextTransparency = 1}):Play()
+    variables.tweenService
+        :Create(
+            self.searchbar,
+            searchTween,
+            { Size = UDim2.new(1, -12, 0, SEARCH_COLLAPSED_H), BackgroundTransparency = 1 }
+        )
+        :Play()
+    variables.tweenService:Create(self.searchStroke, searchTween, { Transparency = 1 }):Play()
+    variables.tweenService:Create(self.searchShadow, searchTween, { Transparency = 1 }):Play()
+    variables.tweenService:Create(self.searchInput, searchTween, { TextTransparency = 1 }):Play()
 end
 
 function Dropdown:_applyFilter(query)
@@ -673,13 +782,15 @@ function Dropdown:_applyFilter(query)
 end
 
 -- Per-corner rounding: an option's top corners round off only when nothing sits above it,
--- and its bottom corners only when nothing sits below — so a run of options reads as one
+-- and its bottom corners only when nothing sits below - so a run of options reads as one
 -- grouped block with rounded outer edges and sharp seams (a lone option is fully rounded).
 -- Runs over the currently VISIBLE options, so it re-groups correctly while searching.
 function Dropdown:_updateCorners()
     local visible = {}
     for _, data in self._optionFrames do
-        if data.frame.Visible then table.insert(visible, data) end
+        if data.frame.Visible then
+            table.insert(visible, data)
+        end
     end
 
     for i, data in visible do
@@ -693,27 +804,70 @@ function Dropdown:_updateCorners()
 end
 
 function Dropdown:_open()
-    if self._isOpen then return end
+    if self._isOpen then
+        return
+    end
     self._isOpen = true
 
-    if self._outsideClickConn then self.window:Disconnect(self._outsideClickConn) end
+    if self._outsideClickConn then
+        self.window:Disconnect(self._outsideClickConn)
+    end
     self._outsideClickConn = self.window:Connect(variables.userInputService.InputBegan, function(input)
-        if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+        if
+            input.UserInputType ~= Enum.UserInputType.MouseButton1
+            and input.UserInputType ~= Enum.UserInputType.Touch
+        then
+            return
+        end
 
         local pos = input.Position
         local mainPos = self.main.AbsolutePosition
         local mainSize = self.main.AbsoluteSize
-        if pos.X < mainPos.X or pos.X > mainPos.X + mainSize.X
-            or pos.Y < mainPos.Y or pos.Y > mainPos.Y + mainSize.Y then
+        if
+            pos.X < mainPos.X
+            or pos.X > mainPos.X + mainSize.X
+            or pos.Y < mainPos.Y
+            or pos.Y > mainPos.Y + mainSize.Y
+        then
             self:_close()
         end
     end)
 
-    variables.tweenService:Create(self.main, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(1, -20, 0, 180)}):Play()
-    variables.tweenService:Create(self.chevron, TweenInfo.new(0.7, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Rotation = 0}):Play()
-    variables.tweenService:Create(self.panel, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = self.window.theme.ElementTransparency or 0}):Play()
-    variables.tweenService:Create(self.panelStroke, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = self.window.theme.ElementStrokeTransparency}):Play()
-    variables.tweenService:Create(self.searchIcon, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 0.5}):Play()
+    variables.tweenService
+        :Create(
+            self.main,
+            TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
+            { Size = UDim2.new(1, -20, 0, 180) }
+        )
+        :Play()
+    variables.tweenService
+        :Create(
+            self.chevron,
+            TweenInfo.new(0.7, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
+            { Rotation = 0 }
+        )
+        :Play()
+    variables.tweenService
+        :Create(
+            self.panel,
+            TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+            { BackgroundTransparency = self.window.theme.ElementTransparency or 0 }
+        )
+        :Play()
+    variables.tweenService
+        :Create(
+            self.panelStroke,
+            TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+            { Transparency = self.window.theme.ElementStrokeTransparency }
+        )
+        :Play()
+    variables.tweenService
+        :Create(
+            self.searchIcon,
+            TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+            { ImageTransparency = 0.5 }
+        )
+        :Play()
 
     for _, data in self._optionFrames do
         self._renderOptionState(data, true)
@@ -721,7 +875,9 @@ function Dropdown:_open()
 end
 
 function Dropdown:_close()
-    if not self._isOpen then return end
+    if not self._isOpen then
+        return
+    end
     self._isOpen = false
 
     if self._outsideClickConn then
@@ -731,18 +887,47 @@ function Dropdown:_close()
 
     self:_collapseSearch()
 
-    variables.tweenService:Create(self.chevron, TweenInfo.new(0.7, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Rotation = 180}):Play()
-    variables.tweenService:Create(self.panel, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
-    variables.tweenService:Create(self.panelStroke, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = 1}):Play()
-    variables.tweenService:Create(self.searchIcon, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {ImageTransparency = 1}):Play()
+    variables.tweenService
+        :Create(
+            self.chevron,
+            TweenInfo.new(0.7, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
+            { Rotation = 180 }
+        )
+        :Play()
+    variables.tweenService
+        :Create(
+            self.panel,
+            TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+            { BackgroundTransparency = 1 }
+        )
+        :Play()
+    variables.tweenService
+        :Create(
+            self.panelStroke,
+            TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+            { Transparency = 1 }
+        )
+        :Play()
+    variables.tweenService
+        :Create(
+            self.searchIcon,
+            TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+            { ImageTransparency = 1 }
+        )
+        :Play()
 
     for _, data in self._optionFrames do
         self._renderOptionState(data, true)
     end
 
-    variables.tweenService:Create(self.main, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(1, -20, 0, 41)}):Play()
+    variables.tweenService
+        :Create(
+            self.main,
+            TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
+            { Size = UDim2.new(1, -20, 0, 41) }
+        )
+        :Play()
 end
-
 
 function Dropdown:Refresh(newOptions)
     self.options = dedupStrings(newOptions or {})
@@ -754,7 +939,9 @@ function Dropdown:Refresh(newOptions)
 
     local pruned = {}
     for _, v in self.value do
-        if table.find(self.options, v) then table.insert(pruned, v) end
+        if table.find(self.options, v) then
+            table.insert(pruned, v)
+        end
     end
     self.value = pruned
 
@@ -773,10 +960,13 @@ function Dropdown:Refresh(newOptions)
     self:_applyFilter(if self._searchOpen then self.searchInput.Text else "")
 end
 
-
 function Dropdown:Add(option)
-    if typeof(option) ~= "string" or option == "" then return end
-    if table.find(self.options, option) then return end
+    if typeof(option) ~= "string" or option == "" then
+        return
+    end
+    if table.find(self.options, option) then
+        return
+    end
 
     table.insert(self.options, option)
     local data = self._buildOption(option)
@@ -789,10 +979,11 @@ function Dropdown:Add(option)
     end
 end
 
-
 function Dropdown:Remove(option)
     local idx = table.find(self.options, option)
-    if not idx then return end
+    if not idx then
+        return
+    end
 
     table.remove(self.options, idx)
 
@@ -813,13 +1004,14 @@ function Dropdown:Remove(option)
     self:_updateCorners()
 end
 
-
 function Dropdown:Set(value, skipCallback)
     local newValue = normalizeValue(value, self.multiSelect)
 
     local pruned = {}
     for _, v in newValue do
-        if table.find(self.options, v) then table.insert(pruned, v) end
+        if table.find(self.options, v) then
+            table.insert(pruned, v)
+        end
     end
     self.value = pruned
 
@@ -833,18 +1025,21 @@ function Dropdown:Set(value, skipCallback)
     end
 end
 
-
 function Dropdown:_setShown(animate)
     -- Custom reveal: main is a transparent wrapper, so reveal the header card (self.top)
     -- rather than main. The options card fades in on open, not here.
     local w = self.window
-    w:_reveal(self.stroke, {Transparency = w.theme.ElementStrokeTransparency}, animate)
-    w:_reveal(self.title, {TextTransparency = 0}, animate)
-    w:_reveal(self.top, {BackgroundTransparency = w.theme.ElementTransparency or 0}, animate)
-    if self.iconLabel then w:_reveal(self.iconLabel, {ImageTransparency = 0}, animate) end
-    if self.descriptor then w:_reveal(self.descriptor.titleLabel, {TextTransparency = 0.7}, animate) end
-    w:_reveal(self.selectedLabel, {TextTransparency = 0.5}, animate)
-    w:_reveal(self.chevron, {ImageTransparency = 0.5}, animate)
+    w:_reveal(self.stroke, { Transparency = w.theme.ElementStrokeTransparency }, animate)
+    w:_reveal(self.title, { TextTransparency = 0 }, animate)
+    w:_reveal(self.top, { BackgroundTransparency = w.theme.ElementTransparency or 0 }, animate)
+    if self.iconLabel then
+        w:_reveal(self.iconLabel, { ImageTransparency = 0 }, animate)
+    end
+    if self.descriptor then
+        w:_reveal(self.descriptor.titleLabel, { TextTransparency = 0.7 }, animate)
+    end
+    w:_reveal(self.selectedLabel, { TextTransparency = 0.5 }, animate)
+    w:_reveal(self.chevron, { ImageTransparency = 0.5 }, animate)
 end
 
 function Dropdown:MoveTo(index)
@@ -861,12 +1056,16 @@ end
 
 function Dropdown:MoveUp()
     local idx = table.find(self.tab.elements, self)
-    if idx then self.tab:_moveElement(self, idx - 1) end
+    if idx then
+        self.tab:_moveElement(self, idx - 1)
+    end
 end
 
 function Dropdown:MoveDown()
     local idx = table.find(self.tab.elements, self)
-    if idx then self.tab:_moveElement(self, idx + 1) end
+    if idx then
+        self.tab:_moveElement(self, idx + 1)
+    end
 end
 
 return Dropdown
