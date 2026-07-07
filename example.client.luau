@@ -196,7 +196,8 @@ local compactStat = statsTab:CreateStat({
     name = 'Win Rate',
     icon = 117942554423479,
     compact = true,
-    display = 'change',
+    prefix = '#',
+    display = 'change', -- change | value
     value = 50,
     changeMode = 'percentage',
 })
