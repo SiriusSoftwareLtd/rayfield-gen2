@@ -7,6 +7,7 @@ local utility = script.Parent.Parent.utility
 
 -- Variables
 local variables = require(utility.variables)
+local functions = require(utility.functions)
 local moveable = require(utility.moveable)
 
 -- Compact (row) sizing.
@@ -303,6 +304,17 @@ end
 
 function Button:_setShown(animate)
     self.window:_revealCommon(self, animate)
+end
+
+-- Room the compact button needs before its label would clip: side padding + icon
+-- (and its gap) if shown + the title text. A horizontal stack uses this to wrap.
+function Button:_minWidth()
+    local w = 32 -- interact padding, 16 each side
+    if self.icon then
+        w += 22 -- 16 icon + 6 gap to title
+    end
+    w += functions.textWidth(self.window.theme.Font, 16, self.name)
+    return w
 end
 
 moveable(Button)

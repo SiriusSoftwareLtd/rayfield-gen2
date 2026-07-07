@@ -149,9 +149,9 @@ generalTab:CreateButton({
     end
 })
 
-generalTab:CreateSection({ name = 'Row' })
+generalTab:CreateSection({ name = 'Group' })
 
-local row = generalTab:CreateRow()
+local row = generalTab:CreateGroup()
 
 row:CreateButton({
     name = 'Save',
@@ -191,7 +191,7 @@ local revenue = statsTab:CreateStat({
     changeBaseline = 'previous',
 })
 
--- Compact stat outside a row (config opt-in) — shows just the % change.
+-- Compact stat outside a row (config opt-in). Shows just the % change.
 local compactStat = statsTab:CreateStat({
     name = 'Win Rate',
     icon = 117942554423479,
@@ -222,4 +222,112 @@ statsTab:CreateButton({
         compactStat:ResetBaseline()
     end
 })
+
+
+-- Layouts: rows, columns, grids and wrapping
+local layoutTab = window:CreateTab({
+    name = 'Layouts',
+    icon = 84750991656135,
+})
+
+-- a plain row
+layoutTab:CreateSection({ name = 'Three across' })
+
+local threeStack = layoutTab:CreateGroup()
+threeStack:CreateButton({ name = 'One', callback = function() print('one') end })
+threeStack:CreateButton({ name = 'Two', callback = function() print('two') end })
+threeStack:CreateButton({ name = 'Three', callback = function() print('three') end })
+
+-- five fit fine: they shrink to share, and wrap once there's no room
+layoutTab:CreateSection({ name = 'Five across' })
+
+local fiveStack = layoutTab:CreateGroup()
+for _, label in { 'A', 'B', 'C', 'D', 'E' } do
+    fiveStack:CreateButton({ name = label, callback = function() end })
+end
+
+-- a grid: a row of columns, each column holding full-width elements
+layoutTab:CreateSection({ name = 'Two columns - Group of columns' })
+
+local grid = layoutTab:CreateGroup()
+
+local leftCol = grid:CreateGroup({ direction = 'column' })
+leftCol:CreateToggle({ name = 'Aimbot', flag = 'GridAimbot' })
+leftCol:CreateToggle({ name = 'Triggerbot', flag = 'GridTrigger' })
+leftCol:CreateSlider({ name = 'Smoothing', range = { 0, 100 }, value = 40, suffix = '%' })
+
+local rightCol = grid:CreateGroup({ direction = 'column' })
+rightCol:CreateToggle({ name = 'ESP Boxes', flag = 'GridBoxes', value = true })
+rightCol:CreateToggle({ name = 'ESP Names', flag = 'GridNames' })
+rightCol:CreateDropdown({
+    name = 'ESP Color',
+    flag = 'GridEspColor',
+    options = { 'Red', 'Green', 'Blue' },
+    value = 'Green',
+})
+
+-- 4. smart wrapping: each element reports the width it needs (icon + text + control +
+-- padding), so the row packs as many as fit and wraps the rest instead of shrinking to mush
+layoutTab:CreateSection({ name = 'Wrapping - 8 buttons' })
+
+local wrapButtons = layoutTab:CreateGroup()
+for _, label in { 'Save', 'Load', 'Reset', 'Export', 'Import', 'Copy', 'Paste', 'Clear' } do
+    wrapButtons:CreateButton({ name = label, callback = function() end })
+end
+
+layoutTab:CreateSection({ name = 'Wrapping - 6 toggles (wider, wrap sooner)' })
+
+local wrapToggles = layoutTab:CreateGroup()
+for _, label in { 'Aimbot', 'ESP', 'Fly', 'Speed', 'Noclip', 'Godmode' } do
+    wrapToggles:CreateToggle({ name = label, flag = 'Wrap' .. label })
+end
+
+layoutTab:CreateSection({ name = 'Wrapping - mixed label lengths' })
+
+local wrapMixed = layoutTab:CreateGroup()
+wrapMixed:CreateButton({ name = 'OK', callback = function() end })
+wrapMixed:CreateButton({ name = 'Regenerate All Chunks', callback = function() end })
+wrapMixed:CreateButton({ name = 'Go', callback = function() end })
+wrapMixed:CreateButton({ name = 'Save Current Layout As Preset', callback = function() end })
+wrapMixed:CreateButton({ name = 'X', callback = function() end })
+
+layoutTab:CreateSection({ name = 'Wrapping - icons count toward the width' })
+
+local wrapIcons = layoutTab:CreateGroup()
+for _, label in { 'Save', 'Load', 'Reset', 'Export', 'Import', 'Delete' } do
+    wrapIcons:CreateButton({ name = label, icon = 125823673784681, callback = function() end })
+end
+
+layoutTab:CreateSection({ name = 'Wrapping - stats (title + number both counted)' })
+
+local wrapStats = layoutTab:CreateGroup()
+wrapStats:CreateStat({ name = 'Kills', value = 128, display = 'value' })
+wrapStats:CreateStat({ name = 'Deaths', value = 7, display = 'value' })
+wrapStats:CreateStat({ name = 'KDR', value = 18, suffix = 'x', display = 'value' })
+wrapStats:CreateStat({ name = 'Score', value = 45200, display = 'value' })
+wrapStats:CreateStat({ name = 'Rank', value = 3, prefix = '#', display = 'value' })
+
+layoutTab:CreateSection({ name = 'Wrapping - sliders (floored so the track stays usable)' })
+
+local wrapSliders = layoutTab:CreateGroup()
+wrapSliders:CreateSlider({ name = 'FOV', range = { 70, 120 }, value = 90, suffix = 'deg' })
+wrapSliders:CreateSlider({ name = 'Sens', range = { 0, 10 }, increment = 0.1, value = 3.5 })
+wrapSliders:CreateSlider({ name = 'Volume', range = { 0, 100 }, value = 80, suffix = '%' })
+
+layoutTab:CreateSection({ name = 'Wrapping - 12 buttons (many rows)' })
+
+local wrapMany = layoutTab:CreateGroup()
+for i = 1, 12 do
+    wrapMany:CreateButton({ name = 'Item ' .. i, callback = function() end })
+end
+
+layoutTab:CreateSection({ name = 'Minimal sliders (track only, dense row)' })
+
+local bars = layoutTab:CreateGroup()
+bars:CreateSlider({ minimal = true, range = { 0, 100 }, value = 30, forgetState = true })
+bars:CreateSlider({ minimal = true, range = { 0, 100 }, value = 60, forgetState = true })
+bars:CreateSlider({ minimal = true, range = { 0, 100 }, value = 85, forgetState = true })
+bars:CreateSlider({ minimal = true, range = { 0, 100 }, value = 45, forgetState = true })
+
+layoutTab:CreateSlider({ name = 'Normal slider for contrast', range = { 0, 100 }, value = 50 })
 

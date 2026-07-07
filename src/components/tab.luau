@@ -343,9 +343,23 @@ function Tab:CreateDropdown(properties)
     return self:_register(require(script.Parent.dropdown).new(self, properties))
 end
 
--- Row (packs up to 3 compact elements side by side; add to it via row:CreateX)
-function Tab:CreateRow(properties)
-    return self:_register(require(script.Parent.row).new(self, properties))
+-- Group (layout container). A row that wraps by default; pass direction="column" for a
+-- column. Nest a row of columns for a grid. Add elements via group:CreateX.
+function Tab:CreateGroup(properties)
+    return self:_register(require(script.Parent.group).new(self, properties))
+end
+
+-- direction-named aliases (kept so older code keeps working)
+function Tab:CreateHStack(properties)
+    properties = if typeof(properties) == "table" then table.clone(properties) else {}
+    properties.direction = "row"
+    return self:_register(require(script.Parent.group).new(self, properties))
+end
+
+function Tab:CreateVStack(properties)
+    properties = if typeof(properties) == "table" then table.clone(properties) else {}
+    properties.direction = "column"
+    return self:_register(require(script.Parent.group).new(self, properties))
 end
 
 function Tab:_moveElement(element, targetIndex)

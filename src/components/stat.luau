@@ -7,6 +7,7 @@ local utility = script.Parent.Parent.utility
 
 -- Variables
 local variables = require(utility.variables)
+local functions = require(utility.functions)
 local odometer = require(utility.odometer)
 local moveable = require(utility.moveable)
 local constants = require(utility.constants)
@@ -643,6 +644,19 @@ function Statistic:_setShown(animate)
     w:_reveal(self.glowImage, { ImageTransparency = 0.6 }, animate)
     self.valueOdo:reveal(0, animate)
     self.changeOdo:reveal(0, animate)
+end
+
+-- Room the compact card needs: padding + icon (and gap) if shown + title text + the gap
+-- to the readout + the readout number itself. Lets a horizontal stack wrap sensibly.
+function Statistic:_minWidth()
+    local w = 30 + 10 -- 15+15 card padding, 10 gap between title and readout
+    if self.icon then
+        w += 22 -- 16 icon + 6 gap
+    end
+    w += functions.textWidth(self.window.theme.Font, 16, self.name)
+    local readout = if self.display == "change" then self:_formatChange(0) else self:_formatValue(self.value)
+    w += functions.textWidth(self.window.theme.Font, 17, readout)
+    return w
 end
 
 moveable(Statistic)

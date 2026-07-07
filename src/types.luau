@@ -38,6 +38,11 @@ export type SectionProps = {
     icon: (string | number)?,
 }
 
+export type GroupProps = {
+    direction: string?, -- "row" | "column" (default row); "horizontal"/"vertical" also work
+}
+export type StackProps = GroupProps -- legacy alias
+
 export type ButtonProps = {
     name: string?,
     description: string?,
@@ -64,6 +69,7 @@ export type SliderProps = {
     increment: number?,
     value: number?,
     suffix: string?,
+    minimal: boolean?, -- track only, no name/value (for dense rows)
     forgetState: boolean?,
     callback: ((value: number) -> ())?,
 }
@@ -138,13 +144,21 @@ export type Stat = Moveable & {
 
 export type Section = Moveable & {}
 
--- A row hosts up to three compact elements side by side.
-export type Row = Moveable & {
-    CreateButton: (self: Row, props: ButtonProps) -> Button,
-    CreateToggle: (self: Row, props: ToggleProps) -> Toggle,
-    CreateSwitch: (self: Row, props: ToggleProps) -> Toggle,
-    CreateStat: (self: Row, props: StatProps) -> Stat,
+-- A group lays elements along one axis and nests, so a row of columns builds a grid.
+-- A row accepts the compact elements + slider; a column accepts anything.
+export type Group = Moveable & {
+    CreateButton: (self: Group, props: ButtonProps) -> Button,
+    CreateToggle: (self: Group, props: ToggleProps) -> Toggle,
+    CreateSwitch: (self: Group, props: ToggleProps) -> Toggle,
+    CreateStat: (self: Group, props: StatProps) -> Stat,
+    CreateSlider: (self: Group, props: SliderProps) -> Slider,
+    CreateDropdown: (self: Group, props: DropdownProps) -> Dropdown,
+    CreateSection: (self: Group, props: SectionProps) -> Section,
+    CreateGroup: (self: Group, props: GroupProps?) -> Group,
+    CreateHStack: (self: Group, props: GroupProps?) -> Group,
+    CreateVStack: (self: Group, props: GroupProps?) -> Group,
 }
+export type Stack = Group -- legacy alias
 
 export type Tab = {
     CreateButton: (self: Tab, props: ButtonProps) -> Button,
@@ -154,7 +168,9 @@ export type Tab = {
     CreateDropdown: (self: Tab, props: DropdownProps) -> Dropdown,
     CreateStat: (self: Tab, props: StatProps) -> Stat,
     CreateSection: (self: Tab, props: SectionProps) -> Section,
-    CreateRow: (self: Tab, props: TabProps?) -> Row,
+    CreateGroup: (self: Tab, props: GroupProps?) -> Group,
+    CreateHStack: (self: Tab, props: GroupProps?) -> Group,
+    CreateVStack: (self: Tab, props: GroupProps?) -> Group,
 }
 
 export type Window = {

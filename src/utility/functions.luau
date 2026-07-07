@@ -1,5 +1,31 @@
 local functions = {}
 
+local textService = game:GetService("TextService")
+
+-- Width (px) a string renders at for a given font+size, cached since GetTextBoundsAsync
+-- yields. Elements use this to report how much room they need before they'd overlap,
+-- so a horizontal stack can decide how many fit per row.
+local widthCache = {}
+function functions.textWidth(font, size, text)
+    text = tostring(text)
+    local key = tostring(font.Family) .. "|" .. tostring(font.Weight) .. "|" .. tostring(size) .. "|" .. text
+    local cached = widthCache[key]
+    if cached then
+        return cached
+    end
+
+    local params = Instance.new("GetTextBoundsParams")
+    params.Text = text
+    params.Font = font
+    params.Size = size
+    params.Width = math.huge
+
+    local ok, bounds = pcall(textService.GetTextBoundsAsync, textService, params)
+    local width = if ok then math.ceil(bounds.X) else math.ceil(size * 0.55 * #text)
+    widthCache[key] = width
+    return width
+end
+
 -- Derives a suitable config flag key from element name.
 function functions.deriveFlagFromName(name)
     return (name:gsub("(%S+)", function(w)

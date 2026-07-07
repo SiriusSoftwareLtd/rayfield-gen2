@@ -558,6 +558,17 @@ function Toggle:_setShown(animate)
     w:_reveal(self.functionContainer, { BackgroundTransparency = 0.9 }, animate, toggleReveal)
 end
 
+-- Room the compact toggle needs: side padding + icon (and gap) if shown + title text
+-- + the gap to the pill + the pill itself. Lets a horizontal stack wrap sensibly.
+function Toggle:_minWidth()
+    local w = 30 + 10 + 50 -- 15+15 padding, 10 gap to pill, 50 pill
+    if self.icon then
+        w += 21 -- 16 icon + 5 gap
+    end
+    w += functions.textWidth(self.window.theme.Font, 16, self.name)
+    return w
+end
+
 moveable(Toggle)
 
 function Toggle:Set(value, skipCallback)

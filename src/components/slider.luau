@@ -27,6 +27,11 @@ local tweenInfo = TweenInfo.new(0.45, Enum.EasingStyle.Exponential, Enum.EasingD
 local heldInfo = TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 local followInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
+-- below this element width there's no room for title-left + track-right side by side,
+-- so we reflow to a stacked layout (title/value on top, full-width track under it).
+-- keeps the slider usable in a narrow column or a small window instead of overlapping.
+local narrowWidth = 430
+
 function Slider.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
 
@@ -45,6 +50,7 @@ function Slider.new(tab, properties)
         callback = properties.callback or properties.Callback or function() end,
 
         dragging = false,
+        minimal = properties.minimal or properties.Minimal or false, -- track only, no name/value
     }, Slider)
 
     -- keep range ascending and increment positive so the clamp/snap math stays sane
@@ -85,97 +91,12 @@ function Slider.new(tab, properties)
     }, { BackgroundTransparency = "ElementTransparency" })
 
     self.stroke = self.window:StyleElementBody(self.main)
-
-    -- Left: title (+ icon) stacked over the value
-    self.container = self.window:Create("Frame", {
-        AnchorPoint = Vector2.new(0, 0.5),
-        Position = UDim2.new(0, 20, 0.5, 0),
-        Size = UDim2.fromOffset(170, 33),
-        BackgroundTransparency = 1,
-        BorderSizePixel = 0,
-        ZIndex = 5,
-
-        Parent = self.main,
-    })
-
-    self.window:Create("UIListLayout", {
-        Padding = UDim.new(0, 2),
-        VerticalAlignment = Enum.VerticalAlignment.Center,
-        SortOrder = Enum.SortOrder.LayoutOrder,
-
-        Parent = self.container,
-    })
-
-    self.titleContainer = self.window:Create("Frame", {
-        Size = UDim2.fromOffset(170, 16),
-        BackgroundTransparency = 1,
-        BorderSizePixel = 0,
-        ZIndex = 5,
-
-        Parent = self.container,
-    })
-
-    self.window:Create("UIListLayout", {
-        Padding = UDim.new(0, 5),
-        FillDirection = Enum.FillDirection.Horizontal,
-        VerticalAlignment = Enum.VerticalAlignment.Center,
-        SortOrder = Enum.SortOrder.LayoutOrder,
-
-        Parent = self.titleContainer,
-    })
-
-    if self.icon then
-        self.iconLabel = self.window:Create("ImageLabel", {
-            Image = "rbxassetid://" .. tostring(self.icon),
-            Size = UDim2.fromOffset(16, 16),
-            BorderSizePixel = 0,
-            BackgroundTransparency = 1,
-            ZIndex = 5,
-
-            -- Animation
-            ImageTransparency = 1, -- In = 0
-
-            Parent = self.titleContainer,
-        }, { ImageColor3 = "ContentColor" })
-    end
-
-    self.title = self.window:Create("TextLabel", {
-        Text = self.name,
-        Size = UDim2.fromOffset(150, 16),
-        BorderSizePixel = 0,
-        BackgroundTransparency = 1,
-        TextSize = 16,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        TextWrapped = true,
-        RichText = true,
-        LayoutOrder = 1,
-        ZIndex = 5,
-
-        -- Animation
-        TextTransparency = 1, -- In = 0
-
-        Parent = self.titleContainer,
-    }, { TextColor3 = "ContentColor", FontFace = "Font" })
-
-    -- Odometer readout: host frame in place of the old label; the odometer lays
-    -- its per-digit reels out inside it, left-aligned under the title.
-    self.valueHost = self.window:Create("Frame", {
-        Size = UDim2.fromOffset(145, 16),
-        BackgroundTransparency = 1,
-        BorderSizePixel = 0,
-        ZIndex = 6,
-
-        Parent = self.container,
-    })
-
-    self.valueOdo = odometer.new(self.window, self.valueHost, {
-        textSize = 15,
-        alignment = Enum.HorizontalAlignment.Left,
-        transparency = 1, -- revealed to 0.3 on show
-        duration = 0.28, -- snappy roll on :Set; drag snaps instead (stays glued to the handle)
-    })
-    self.valueOdo:snap(self:_format(self.value))
     self._lastValue = self.value
+
+    -- minimal is just the track (built below); skip the whole title/value block
+    if not self.minimal then
+        self:_buildLabel()
+    end
 
     -- Right: the track
     self.track = self.window:Create("Frame", {
@@ -324,13 +245,192 @@ function Slider.new(tab, properties)
         end
     end)
 
-    if self.description then
+    if self.description and not self.minimal then
         self.descriptor = require(script.Parent.descriptor).new(self.tab, { description = self.description })
+    end
+
+    -- pick wide vs stacked from the real width, and keep it in sync if that width changes
+    -- (column resolves its size a frame after we build, and windows can be small)
+    self.window:Connect(self.main:GetPropertyChangedSignal("AbsoluteSize"), function()
+        self:_applyLayout()
+    end)
+    self:_applyLayout()
+
+    if self.minimal then
+        -- bare: no title/value, keep the compact 41px height so it lines up with
+        -- buttons/toggles/stats, and let the track fill the bar
+        self.main.Size = UDim2.new(1, -20, 0, 41)
+        self.track.AnchorPoint = Vector2.new(0.5, 0.5)
+        self.track.Position = UDim2.new(0.5, 0, 0.5, 0)
+        self.track.Size = UDim2.new(1, -30, 0, 14)
     end
 
     self:_renderProgress()
 
     return self
+end
+
+-- The title + value block: the left column in the wide layout, the top row in the narrow
+-- one. A minimal slider skips this entirely and shows only the track.
+function Slider:_buildLabel()
+    -- Left: title (+ icon) stacked over the value
+    self.container = self.window:Create("Frame", {
+        AnchorPoint = Vector2.new(0, 0.5),
+        Position = UDim2.new(0, 20, 0.5, 0),
+        Size = UDim2.fromOffset(170, 33),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ZIndex = 5,
+
+        Parent = self.main,
+    })
+
+    self.containerLayout = self.window:Create("UIListLayout", {
+        Padding = UDim.new(0, 2),
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+
+        Parent = self.container,
+    })
+
+    self.titleContainer = self.window:Create("Frame", {
+        Size = UDim2.new(1, 0, 0, 16),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ZIndex = 5,
+
+        Parent = self.container,
+    })
+
+    self.window:Create("UIListLayout", {
+        Padding = UDim.new(0, 5),
+        FillDirection = Enum.FillDirection.Horizontal,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+
+        Parent = self.titleContainer,
+    })
+
+    -- narrow layout puts title + value on one row; this fills the title so the value
+    -- gets pushed to the right. wide layout sets it back to None (title over value).
+    self.titleFlex = self.window:Create("UIFlexItem", {
+        FlexMode = Enum.UIFlexMode.None,
+        Parent = self.titleContainer,
+    })
+
+    if self.icon then
+        self.iconLabel = self.window:Create("ImageLabel", {
+            Image = "rbxassetid://" .. tostring(self.icon),
+            Size = UDim2.fromOffset(16, 16),
+            BorderSizePixel = 0,
+            BackgroundTransparency = 1,
+            ZIndex = 5,
+
+            -- Animation
+            ImageTransparency = 1, -- In = 0
+
+            Parent = self.titleContainer,
+        }, { ImageColor3 = "ContentColor" })
+    end
+
+    self.title = self.window:Create("TextLabel", {
+        Text = self.name,
+        Size = UDim2.new(1, 0, 0, 16),
+        BorderSizePixel = 0,
+        BackgroundTransparency = 1,
+        TextSize = 16,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextTruncate = Enum.TextTruncate.AtEnd, -- ellipsize instead of wrapping when the column's tight
+        RichText = true,
+        LayoutOrder = 1,
+        ZIndex = 5,
+
+        -- Animation
+        TextTransparency = 1, -- In = 0
+
+        Parent = self.titleContainer,
+    }, { TextColor3 = "ContentColor", FontFace = "Font" })
+
+    -- shrink to share the title row with the icon when space is tight
+    self.window:Create("UIFlexItem", {
+        FlexMode = Enum.UIFlexMode.Shrink,
+        Parent = self.title,
+    })
+
+    -- Odometer readout: host frame in place of the old label; the odometer lays
+    -- its per-digit reels out inside it, left-aligned under the title.
+    self.valueHost = self.window:Create("Frame", {
+        Size = UDim2.new(1, 0, 0, 16),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ZIndex = 6,
+        LayoutOrder = 1, -- sits under the title (wide) / right of it (narrow)
+
+        Parent = self.container,
+    })
+
+    self.valueOdo = odometer.new(self.window, self.valueHost, {
+        textSize = 15,
+        alignment = Enum.HorizontalAlignment.Left,
+        transparency = 1, -- revealed to 0.3 on show
+        duration = 0.28, -- snappy roll on :Set; drag snaps instead (stays glued to the handle)
+    })
+    self.valueOdo:snap(self:_format(self.value))
+end
+
+-- Set the element height, keeping the width alone when a horizontal stack owns it
+-- (_widthManaged): there the stack freezes us to _minWidth and wraps, so we must not
+-- stomp the X it set. Standalone we take the usual full width.
+function Slider:_setMainHeight(height)
+    if self._widthManaged then
+        self.main.Size = UDim2.new(self.main.Size.X.Scale, self.main.Size.X.Offset, 0, height)
+    else
+        self.main.Size = UDim2.new(1, -20, 0, height)
+    end
+end
+
+-- wide: title over value on the left, fixed track on the right.
+-- narrow: title + value share the top row (value pushed right), full-width track below.
+function Slider:_applyLayout()
+    if self.minimal then
+        return -- bare mode has a fixed slim layout, nothing to reflow
+    end
+    local width = self.main.AbsoluteSize.X
+    local mode = if width > 0 and width < narrowWidth then "narrow" else "wide"
+    if self._layoutMode == mode then
+        return
+    end
+    self._layoutMode = mode
+
+    if mode == "narrow" then
+        self:_setMainHeight(70)
+
+        self.container.AnchorPoint = Vector2.new(0, 0)
+        self.container.Position = UDim2.new(0, 20, 0, 14)
+        self.container.Size = UDim2.new(1, -40, 0, 16)
+        self.containerLayout.FillDirection = Enum.FillDirection.Horizontal
+        self.titleFlex.FlexMode = Enum.UIFlexMode.Fill -- title grows, value hugs the right
+        self.valueHost.AutomaticSize = Enum.AutomaticSize.X
+        self.valueHost.Size = UDim2.new(0, 0, 0, 16)
+
+        self.track.AnchorPoint = Vector2.new(0.5, 1)
+        self.track.Position = UDim2.new(0.5, 0, 1, -14)
+        self.track.Size = UDim2.new(1, -30, 0, 14)
+    else
+        self:_setMainHeight(65)
+
+        self.container.AnchorPoint = Vector2.new(0, 0.5)
+        self.container.Position = UDim2.new(0, 20, 0.5, 0)
+        self.container.Size = UDim2.new(0, 170, 0, 33)
+        self.containerLayout.FillDirection = Enum.FillDirection.Vertical
+        self.titleFlex.FlexMode = Enum.UIFlexMode.None
+        self.valueHost.AutomaticSize = Enum.AutomaticSize.None
+        self.valueHost.Size = UDim2.new(1, 0, 0, 16)
+
+        self.track.AnchorPoint = Vector2.new(1, 0.5)
+        self.track.Position = UDim2.new(1, -15, 0.5, 0)
+        self.track.Size = UDim2.new(0, 222, 0, 14)
+    end
 end
 
 function Slider:_format(value)
@@ -368,7 +468,9 @@ function Slider:_updateFromMouse()
 
     if value ~= self.value then
         self.value = value
-        self.valueOdo:snap(self:_format(value)) -- glued to the handle: no roll mid-drag
+        if self.valueOdo then
+            self.valueOdo:snap(self:_format(value)) -- glued to the handle: no roll mid-drag
+        end
         self._lastValue = value
         self:_renderProgress(followInfo)
         self:_fireCallback(value)
@@ -397,7 +499,9 @@ end
 function Slider:Set(value, skipCallback)
     value = math.clamp(math.round(value / self.increment) * self.increment, self.range[1], self.range[2])
     self.value = value
-    self.valueOdo:to(self:_format(value), value >= (self._lastValue or value))
+    if self.valueOdo then
+        self.valueOdo:to(self:_format(value), value >= (self._lastValue or value))
+    end
     self._lastValue = value
     self:_renderProgress(tweenInfo)
 
@@ -415,9 +519,27 @@ function Slider:_setShown(animate)
     w:_reveal(self.track, { BackgroundTransparency = 0 }, animate)
     w:_reveal(self.progress, { BackgroundTransparency = 0 }, animate)
     w:_reveal(self.handle, { BackgroundTransparency = 0 }, animate)
-    self.valueOdo:reveal(0.3, animate)
+    if self.valueOdo then
+        self.valueOdo:reveal(0.3, animate)
+    end
     w:_reveal(self.progressGlow, { Transparency = 0.55 }, animate, sliderGlowReveal)
     w:_reveal(self.handleGlow, { Transparency = 0.8 }, animate, sliderGlowReveal)
+end
+
+-- Room the slider needs in a row: its narrow layout puts title + value on the top row,
+-- so that has to fit, and we floor it so the track underneath stays draggable.
+function Slider:_minWidth()
+    if self.minimal then
+        return 100 -- a slim bar: side padding + a usable minimum track
+    end
+    local w = 40 -- container inset, 20 each side
+    if self.icon then
+        w += 22 -- 16 icon + 6 gap
+    end
+    w += functions.textWidth(self.window.theme.Font, 16, self.name)
+    w += 12 -- gap before the value
+    w += functions.textWidth(self.window.theme.Font, 15, self:_format(self.value))
+    return math.max(w, 160)
 end
 
 moveable(Slider)
