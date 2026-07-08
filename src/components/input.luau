@@ -12,6 +12,8 @@ local moveable = require(utility.moveable)
 
 -- the field hugs its text; tween the width instead of AutomaticSize so it animates
 local resizeInfo = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+-- text is muted at rest, opaque while typing
+local focusInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
 function Input.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
@@ -164,8 +166,14 @@ function Input.new(tab, properties)
         self:_sizeBox(true)
     end)
 
+    -- opaque while the field is focused, back to muted when you click away
+    self.window:Connect(self.input.Focused, function()
+        variables.tweenService:Create(self.input, focusInfo, { TextTransparency = 0 }):Play()
+    end)
+
     -- commit on focus loss (enter or click away)
     self.window:Connect(self.input.FocusLost, function()
+        variables.tweenService:Create(self.input, focusInfo, { TextTransparency = 0.6 }):Play()
         self:_commit(self.input.Text)
     end)
 
