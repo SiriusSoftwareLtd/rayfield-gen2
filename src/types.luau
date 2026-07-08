@@ -107,7 +107,9 @@ export type KeybindProps = {
     flag: string?,
     value: (EnumItem | string)?, -- an Enum.KeyCode / mouse button, or a KeyCode name
     forgetState: boolean?,
-    callback: ((key: EnumItem) -> ())?, -- fires when the bound key is pressed
+    hold: boolean?, -- fire callback(true) once held, callback(false) on release
+    holdThreshold: number?, -- seconds to hold before it counts (default 0.2)
+    callback: ((value: EnumItem | boolean) -> ())?, -- bound key on press, or true/false in hold mode
     onChanged: ((key: EnumItem) -> ())?, -- fires when the binding is changed
 }
 

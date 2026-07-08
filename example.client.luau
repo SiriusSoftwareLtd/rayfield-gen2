@@ -164,11 +164,13 @@ generalTab:CreateKeybind({
 })
 
 generalTab:CreateKeybind({
-    name = 'Crouch Key',
+    name = 'Crouch Key (hold)',
+    description = 'Hold mode: fires once held, and again on release. A quick tap does nothing.',
     value = Enum.KeyCode.C,
     flag = 'CrouchKey',
-    callback = function(key)
-        print('Crouch key pressed:', key.Name)
+    hold = true,
+    callback = function(held)
+        print('Crouch held:', held)
     end,
 })
 

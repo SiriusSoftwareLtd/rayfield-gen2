@@ -55,10 +55,15 @@ function Keybind.new(tab, properties)
         description = properties.description or properties.Description,
         forgetState = properties.forgetState or properties.ForgetState,
 
-        -- fires when the bound key is pressed
+        -- fires when the bound key is pressed (or, in hold mode, with true/false)
         callback = properties.callback or properties.Callback or function() end,
         -- fires when the binding changes (rebind or :Set), gets the new key
         onChanged = properties.onChanged or properties.OnChanged or function() end,
+
+        -- hold mode: callback(true) once the key survives holdThreshold, callback(false) on release.
+        -- the threshold means a quick accidental tap fires nothing.
+        hold = properties.hold or properties.Hold or false,
+        holdThreshold = properties.holdThreshold or properties.HoldThreshold or 0.2,
 
         recording = false,
     }, Keybind)
@@ -207,7 +212,11 @@ function Keybind.new(tab, properties)
             return
         end
         if self:_matches(input) then
-            self.window:_runGuarded(self, self.callback, self.value)
+            if self.hold then
+                self:_beginHold()
+            else
+                self.window:_runGuarded(self, self.callback, self.value)
+            end
         end
     end)
 
@@ -331,6 +340,41 @@ function Keybind:_matches(input)
         return input.UserInputType == v
     end
     return false
+end
+
+-- hold mode: arm after holdThreshold (a quick tap never counts), fire callback(true) then
+-- callback(false) once, edge-triggered off this exact press ending.
+function Keybind:_beginHold()
+    if self._holding or self._holdPress then
+        return -- already tracking a hold
+    end
+    local press = {}
+    self._holdPress = press
+
+    task.delay(self.holdThreshold, function()
+        if self._holdPress ~= press then
+            return -- released (or rebound) before it armed
+        end
+        self._holding = true
+        self.window:_runGuarded(self, self.callback, true)
+    end)
+
+    -- release edge off the global InputEnded for the bound key (robust to synthetic input,
+    -- where the original InputObject's state doesnt always transition)
+    local conn
+    conn = variables.userInputService.InputEnded:Connect(function(ended)
+        if not self:_matches(ended) then
+            return
+        end
+        conn:Disconnect()
+        if self._holdPress == press then
+            self._holdPress = nil
+        end
+        if self._holding then
+            self._holding = false
+            self.window:_runGuarded(self, self.callback, false)
+        end
+    end)
 end
 
 function Keybind:Set(value, skipChanged)
