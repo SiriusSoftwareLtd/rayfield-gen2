@@ -343,6 +343,16 @@ function Tab:CreateDropdown(properties)
     return self:_register(require(script.Parent.dropdown).new(self, properties))
 end
 
+-- Input
+function Tab:CreateInput(properties)
+    return self:_register(require(script.Parent.input).new(self, properties))
+end
+
+-- Keybind
+function Tab:CreateKeybind(properties)
+    return self:_register(require(script.Parent.keybind).new(self, properties))
+end
+
 -- Group (layout container). A row that wraps by default; pass direction="column" for a
 -- column. Nest a row of columns for a grid. Add elements via group:CreateX.
 function Tab:CreateGroup(properties)

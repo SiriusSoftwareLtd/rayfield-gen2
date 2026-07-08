@@ -14,6 +14,8 @@ export type Button = types.Button
 export type Toggle = types.Toggle
 export type Slider = types.Slider
 export type Dropdown = types.Dropdown
+export type Input = types.Input
+export type Keybind = types.Keybind
 export type Stat = types.Stat
 export type Section = types.Section
 

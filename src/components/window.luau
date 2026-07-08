@@ -733,10 +733,10 @@ end
 
 function Window:_bindKeybind()
     self:Connect(variables.userInputService.InputBegan, function(input, processed)
-        if processed then
-            return
+        if processed or self._recordingKeybind then
+            return -- a keybind element is mid-rebind, dont eat its capture
         end
-        if input.KeyCode == self.settings.toggleKeybind then
+        if input.KeyCode == self.settings.toggleKeybind or input.UserInputType == self.settings.toggleKeybind then
             self:ToggleHide()
         end
     end)
@@ -753,6 +753,11 @@ function Window:_bindMouseOverride()
         if not active() then
             return
         end
+        -- hands off while the right button is held: thats the camera panning in third person,
+        -- and it needs to lock the mouse to do it. we free again the moment it lets go.
+        if uis:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+            return
+        end
         if uis.MouseBehavior ~= Enum.MouseBehavior.Default then
             uis.MouseBehavior = Enum.MouseBehavior.Default
         end
@@ -766,6 +771,14 @@ function Window:_bindMouseOverride()
     self:Connect(uis:GetPropertyChangedSignal("MouseBehavior"), free)
     self:Connect(uis:GetPropertyChangedSignal("MouseIconEnabled"), free)
 
+    -- right-release doesnt always flip MouseBehavior back (so the signals above wouldnt fire),
+    -- so re-free explicitly once the pan ends
+    self:Connect(uis.InputEnded, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton2 then
+            free()
+        end
+    end)
+
     -- Show calls this on open to free the cursor immediately (the signals above only fire on change)
     self._freeMouse = free
 end
@@ -773,11 +786,14 @@ end
 function Window:_buildSettingsUI()
     self.rfSettings:CreateSection({ name = "General" })
 
-    self.rfSettings:CreateButton({
-        name = "Toggle Keybind: " .. self.settings.toggleKeybind.Name,
+    self.rfSettings:CreateKeybind({
+        name = "Toggle Keybind",
         icon = 100604009889706,
-        callback = function()
-            print("Rayfield: Keybind changing will be available with the Keybind element.")
+        value = self.settings.toggleKeybind,
+        forgetState = true, -- lives in settings.rfld, not the user's config
+        onChanged = function(key)
+            self.settings.toggleKeybind = key
+            self:SaveSettings()
         end,
     })
 
@@ -1114,6 +1130,50 @@ function Window:CreateGlow(parent, color, blur, transparency)
 
         Parent = parent,
     })
+end
+
+-- Flash an element's inset box + glow to signal a set landed: green for a good set, red for a
+-- rejected one, then settle back to the box's idle look. green/red are our universal accents.
+-- The element supplies `box`, an optional `glow`, and its idle transparencies (_boxIdle/_glowIdle).
+function Window:_flashResult(element, ok)
+    local box = element.box
+    if not box then
+        return
+    end
+    local glow = element.glow
+    local stroke = element.boxStroke
+    local white = Color3.fromRGB(255, 255, 255)
+    local fill = ok and constants.accent.on or self.theme.ErrorColor
+    local edge = ok and constants.accent.onStroke or self.theme.ErrorStrokeColor
+    local inInfo = TweenInfo.new(0.1, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local outInfo = TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
+    -- a quick coloured pulse: box fill tints (transparency untouched), edge + glow brighten
+    variables.tweenService:Create(box, inInfo, { BackgroundColor3 = fill }):Play()
+    if stroke then
+        variables.tweenService:Create(stroke, inInfo, { Color = edge, Transparency = 0.4 }):Play()
+    end
+    if glow then
+        variables.tweenService:Create(glow, inInfo, { Color = edge, Transparency = 0.6 }):Play()
+    end
+
+    -- token so a quick re-set restarts the flash instead of an old revert cutting it short
+    element._flashToken = (element._flashToken or 0) + 1
+    local token = element._flashToken
+    task.delay(0.22, function()
+        if element._flashToken ~= token then
+            return
+        end
+        variables.tweenService:Create(box, outInfo, { BackgroundColor3 = white }):Play()
+        if stroke then
+            variables.tweenService:Create(stroke, outInfo, { Color = white, Transparency = 0.85 }):Play()
+        end
+        if glow then
+            variables.tweenService
+                :Create(glow, outInfo, { Color = white, Transparency = element._glowIdle or 1 })
+                :Play()
+        end
+    end)
 end
 
 -- Additive white hover-brighten overlay filling an element (fill colour comes from the gradient).

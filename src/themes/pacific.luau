@@ -41,6 +41,6 @@ return {
 
     DropdownHighlight = Color3.fromRGB(8, 132, 248),
 
-    ErrorColor = Color3.fromRGB(110, 0, 0),
-    ErrorStrokeColor = Color3.fromRGB(140, 0, 0),
+    ErrorColor = Color3.fromRGB(185, 50, 50),
+    ErrorStrokeColor = Color3.fromRGB(240, 75, 75),
 }

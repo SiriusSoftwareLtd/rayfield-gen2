@@ -129,6 +129,49 @@ generalTab:CreateDropdown({
     end
 })
 
+generalTab:CreateInput({
+    name = 'Player Name',
+    placeholder = 'Enter a name',
+    flag = 'PlayerName',
+    callback = function(text)
+        print('Name:', text)
+    end
+})
+
+generalTab:CreateInput({
+    name = 'Max Players',
+    description = 'Numeric only, commits when you click away or press enter.',
+    placeholder = '0',
+    numeric = true,
+    value = '16',
+    flag = 'MaxPlayers',
+    callback = function(text)
+        print('Max players:', text)
+    end
+})
+
+generalTab:CreateKeybind({
+    name = 'Sprint Key',
+    description = 'Click the box then press a key or mouse button. Backspace clears it.',
+    value = Enum.KeyCode.LeftShift,
+    flag = 'SprintKey',
+    callback = function(key)
+        print('Sprint key pressed:', key.Name)
+    end,
+    onChanged = function(key)
+        print('Sprint key rebound to:', key.Name)
+    end,
+})
+
+generalTab:CreateKeybind({
+    name = 'Crouch Key',
+    value = Enum.KeyCode.C,
+    flag = 'CrouchKey',
+    callback = function(key)
+        print('Crouch key pressed:', key.Name)
+    end,
+})
+
 generalTab:CreateButton({
     name = 'Reset Interface Layout',
     icon = 125823673784681,

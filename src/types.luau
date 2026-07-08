@@ -87,6 +87,30 @@ export type DropdownProps = {
     callback: ((value: any) -> ())?,
 }
 
+export type InputProps = {
+    name: string?,
+    description: string?,
+    icon: (string | number)?,
+    flag: string?,
+    value: string?,
+    placeholder: string?,
+    numeric: boolean?,
+    clearOnFocus: boolean?,
+    forgetState: boolean?,
+    callback: ((value: string) -> ())?,
+}
+
+export type KeybindProps = {
+    name: string?,
+    description: string?,
+    icon: (string | number)?,
+    flag: string?,
+    value: (EnumItem | string)?, -- an Enum.KeyCode / mouse button, or a KeyCode name
+    forgetState: boolean?,
+    callback: ((key: EnumItem) -> ())?, -- fires when the bound key is pressed
+    onChanged: ((key: EnumItem) -> ())?, -- fires when the binding is changed
+}
+
 export type StatProps = {
     name: string?,
     description: string?,
@@ -136,6 +160,16 @@ export type Dropdown = Moveable & {
     Set: (self: Dropdown, value: string | { string }, skipCallback: boolean?) -> (),
 }
 
+export type Input = Moveable & {
+    value: string,
+    Set: (self: Input, value: string, skipCallback: boolean?) -> (),
+}
+
+export type Keybind = Moveable & {
+    value: EnumItem,
+    Set: (self: Keybind, value: EnumItem | string, skipChanged: boolean?) -> (),
+}
+
 export type Stat = Moveable & {
     value: number,
     Set: (self: Stat, value: number) -> (),
@@ -166,6 +200,8 @@ export type Tab = {
     CreateSwitch: (self: Tab, props: ToggleProps) -> Toggle,
     CreateSlider: (self: Tab, props: SliderProps) -> Slider,
     CreateDropdown: (self: Tab, props: DropdownProps) -> Dropdown,
+    CreateInput: (self: Tab, props: InputProps) -> Input,
+    CreateKeybind: (self: Tab, props: KeybindProps) -> Keybind,
     CreateStat: (self: Tab, props: StatProps) -> Stat,
     CreateSection: (self: Tab, props: SectionProps) -> Section,
     CreateGroup: (self: Tab, props: GroupProps?) -> Group,

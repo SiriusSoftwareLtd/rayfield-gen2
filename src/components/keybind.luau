@@ -1,0 +1,361 @@
+local Keybind = {}
+Keybind.__index = Keybind
+Keybind.__type = "Keybind"
+
+-- Utility
+local utility = script.Parent.Parent.utility
+
+-- Variables
+local variables = require(utility.variables)
+local functions = require(utility.functions)
+local moveable = require(utility.moveable)
+
+-- box hugs the key name; tween the width instead of AutomaticSize so it animates
+local resizeInfo = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+local recordInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
+-- shorter labels for the mouse buttons (KeyCodes already read fine)
+local mouseNames = {
+    [Enum.UserInputType.MouseButton1] = "MB1",
+    [Enum.UserInputType.MouseButton2] = "MB2",
+    [Enum.UserInputType.MouseButton3] = "MB3",
+}
+
+local function keyName(value)
+    if typeof(value) ~= "EnumItem" or value == Enum.KeyCode.Unknown then
+        return "None"
+    end
+    return mouseNames[value] or value.Name
+end
+
+-- accept an EnumItem or a KeyCode name string, fall back to unbound
+local function coerceKey(value)
+    if typeof(value) == "EnumItem" then
+        return value
+    end
+    if type(value) == "string" then
+        local ok, key = pcall(function()
+            return Enum.KeyCode[value]
+        end)
+        if ok and key then
+            return key
+        end
+    end
+    return Enum.KeyCode.Unknown
+end
+
+function Keybind.new(tab, properties)
+    properties = if typeof(properties) == "table" then properties else {}
+
+    local self = setmetatable({
+        tab = assert(tab, "Missing argument #1 (Tab expected)"),
+        window = tab.window,
+        name = properties.name or properties.Name or "Keybind",
+        icon = properties.icon or properties.Icon,
+        description = properties.description or properties.Description,
+        forgetState = properties.forgetState or properties.ForgetState,
+
+        -- fires when the bound key is pressed
+        callback = properties.callback or properties.Callback or function() end,
+        -- fires when the binding changes (rebind or :Set), gets the new key
+        onChanged = properties.onChanged or properties.OnChanged or function() end,
+
+        recording = false,
+    }, Keybind)
+
+    self.value = coerceKey(properties.value or properties.Value or properties.default or properties.Default)
+
+    self.flag = properties.flag
+        or properties.Flag
+        or (not self.forgetState and functions.deriveFlagFromName(self.name) or nil)
+    self.window:_registerControl(self)
+
+    self.main = self.window:Create("Frame", {
+        Size = UDim2.new(1, -20, 0, 41),
+        BorderSizePixel = 0,
+        Name = self.name,
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+
+        BackgroundTransparency = 1, -- In = ElementTransparency
+
+        Parent = self.tab.tabPage,
+    }, { BackgroundTransparency = "ElementTransparency" })
+
+    self.stroke = self.window:StyleElementBody(self.main)
+    self.hoverOverlay = self.window:CreateHoverOverlay(self.main)
+
+    -- Left: title (+ icon)
+    self.container = self.window:Create("Frame", {
+        Size = UDim2.new(0, 170, 0, 16),
+        Position = UDim2.new(0, 20, 0.5, 0),
+        AnchorPoint = Vector2.new(0, 0.5),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ZIndex = 5,
+
+        Parent = self.main,
+    })
+
+    self.window:Create("UIListLayout", {
+        Padding = UDim.new(0, 5),
+        FillDirection = Enum.FillDirection.Horizontal,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+
+        Parent = self.container,
+    })
+
+    if self.icon then
+        self.iconLabel = self.window:Create("ImageLabel", {
+            Image = "rbxassetid://" .. tostring(self.icon),
+            ImageColor3 = Color3.fromRGB(255, 255, 255),
+            Size = UDim2.fromOffset(16, 16),
+            BorderSizePixel = 0,
+            BackgroundTransparency = 1,
+            ZIndex = 5,
+
+            ImageTransparency = 1, -- In = 0
+
+            Parent = self.container,
+        }, { ImageColor3 = "ContentColor" })
+    end
+
+    self.title = self.window:Create("TextLabel", {
+        Text = self.name,
+        Size = UDim2.fromOffset(150, 16),
+        AutomaticSize = Enum.AutomaticSize.X,
+        BorderSizePixel = 0,
+        BackgroundTransparency = 1,
+        TextSize = 16,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        LayoutOrder = 1,
+        ZIndex = 5,
+
+        TextTransparency = 1, -- In = 0
+
+        Parent = self.container,
+    }, { TextColor3 = "ContentColor", FontFace = "Font" })
+
+    -- Right: the key box. A faint white pill pinned right that hugs the key name.
+    self.box = self.window:Create("TextButton", {
+        AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, -7, 0, 20),
+        Size = UDim2.fromOffset(40, 30),
+        AutoButtonColor = false,
+        Text = "",
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BorderSizePixel = 0,
+
+        BackgroundTransparency = 1, -- In = 0.9
+
+        Parent = self.main,
+    })
+
+    self.window:Create("UICorner", {
+        CornerRadius = UDim.new(1, 0),
+        Parent = self.box,
+    })
+
+    self.boxStroke = self.window:Create("UIStroke", {
+        Color = Color3.fromRGB(255, 255, 255),
+
+        Transparency = 1, -- In = 0.85
+
+        Parent = self.box,
+    })
+
+    -- soft white glow behind the box: 0.9 idle, 0.7 while recording
+    self.glow = self.window:CreateGlow(self.box, Color3.fromRGB(255, 255, 255), 20, 1)
+    self._glowIdle = 0.9 -- glow Transparency at rest (used by the set-result flash)
+
+    self.keyLabel = self.window:Create("TextLabel", {
+        Text = keyName(self.value),
+        Size = UDim2.fromScale(1, 1),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        TextSize = 15,
+        TextXAlignment = Enum.TextXAlignment.Center,
+        ZIndex = 2,
+
+        TextTransparency = 1, -- In = 0.6
+
+        Parent = self.box,
+    }, { TextColor3 = "ContentColor", FontFace = "Font" })
+
+    self.window:Connect(self.box.MouseButton1Click, function()
+        if self.recording then
+            self:_stopRecording()
+        else
+            self:_startRecording()
+        end
+    end)
+
+    -- one persistent listener: captures the next key while recording, otherwise fires the
+    -- callback when the bound key is pressed. `processed` is Roblox's gameProcessedEvent, true
+    -- when the input was already consumed (typing in a box, core UI), so we skip it either way
+    -- and keybinds never go off mid-type.
+    self.window:Connect(variables.userInputService.InputBegan, function(input, processed)
+        if processed then
+            return
+        end
+        if self.recording then
+            self:_capture(input)
+            return
+        end
+        -- another keybind is mid-rebind: the key being pressed is meant for it, dont let it
+        -- also trigger us
+        if self.window._recordingKeybind then
+            return
+        end
+        if self:_matches(input) then
+            self.window:_runGuarded(self, self.callback, self.value)
+        end
+    end)
+
+    self.window:_wireElementHover(self)
+
+    if self.description then
+        self.descriptor = require(script.Parent.descriptor).new(self.tab, { description = self.description })
+    end
+
+    self:_sizeBox(false) -- initial hug, no animation
+
+    return self
+end
+
+-- width the box needs to hug the current label, floored so a single key still reads as a pill
+function Keybind:_sizeBox(animate)
+    local width = math.clamp(functions.textWidth(self.window.theme.Font, 15, self.keyLabel.Text) + 28, 40, 200)
+    if animate then
+        variables.tweenService:Create(self.box, resizeInfo, { Size = UDim2.fromOffset(width, 30) }):Play()
+    else
+        self.box.Size = UDim2.fromOffset(width, 30)
+    end
+end
+
+-- deepen the glow, light the label fully and prompt for a key
+function Keybind:_startRecording()
+    -- only one keybind records at a time; cancel whoever was listening before us
+    local current = self.window._recordingKeybind
+    if current and current ~= self then
+        current:_stopRecording()
+    end
+    self.recording = true
+    self.window._recordingKeybind = self -- window skips its toggle key while we listen
+    self.keyLabel.Text = "Recording"
+    self:_sizeBox(true)
+    variables.tweenService:Create(self.glow, recordInfo, { Transparency = 0.7 }):Play()
+    variables.tweenService:Create(self.keyLabel, recordInfo, { TextTransparency = 0 }):Play()
+end
+
+-- revert the glow + label and relabel to whatever value we ended up with
+function Keybind:_stopRecording()
+    self.recording = false
+    -- clear next frame, not now: the key that stops us (a toggle-key clash) is still being
+    -- dispatched, and the window's toggle listener may run after us. keep the flag up so it
+    -- still bails instead of hiding the window on the same press.
+    if self.window._recordingKeybind == self then
+        local window = self.window
+        task.defer(function()
+            if window._recordingKeybind == self then
+                window._recordingKeybind = nil
+            end
+        end)
+    end
+    self.keyLabel.Text = keyName(self.value)
+    self:_sizeBox(true)
+    variables.tweenService:Create(self.glow, recordInfo, { Transparency = 0.9 }):Play()
+    variables.tweenService:Create(self.keyLabel, recordInfo, { TextTransparency = 0.6 }):Play()
+end
+
+-- capture the next input while recording. Esc cancels, Backspace clears, MB1 is the click
+-- that opened us so it's ignored
+function Keybind:_capture(input)
+    local key
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        if input.KeyCode == Enum.KeyCode.Escape then
+            self:_stopRecording()
+            return
+        end
+        if input.KeyCode == Enum.KeyCode.Backspace then
+            self:_bind(Enum.KeyCode.Unknown)
+            return
+        end
+        key = input.KeyCode
+    elseif
+        input.UserInputType == Enum.UserInputType.MouseButton2
+        or input.UserInputType == Enum.UserInputType.MouseButton3
+    then
+        key = input.UserInputType
+    end
+    if not key then
+        return
+    end
+
+    -- cant clash with the menu toggle key, else the key would both fire this and open/close
+    -- the window. bail, tell them, and keep the old binding.
+    if key == self.window.settings.toggleKeybind then
+        self.window:Notify({
+            title = "Keybind unavailable",
+            content = keyName(key) .. " is the menu toggle key. Kept " .. keyName(self.value) .. ".",
+        })
+        self:_stopRecording()
+        self.window:_flashResult(self, false) -- red: rejected
+        return
+    end
+
+    self:_bind(key)
+end
+
+-- commit a new binding from the user: store, relabel, notify + autosave
+function Keybind:_bind(key)
+    self.value = key
+    self:_stopRecording()
+    self.window:_runGuarded(self, self.onChanged, key)
+
+    if self.flag and not self.forgetState and self.window.configuration.autoSave then
+        task.spawn(self.window.Save, self.window)
+    end
+
+    self.window:_flashResult(self, true) -- green: bound
+end
+
+-- does this input match the bound key (either a KeyCode or a mouse button)
+function Keybind:_matches(input)
+    local v = self.value
+    if typeof(v) ~= "EnumItem" or v == Enum.KeyCode.Unknown then
+        return false
+    end
+    if v.EnumType == Enum.KeyCode then
+        return input.KeyCode == v
+    elseif v.EnumType == Enum.UserInputType then
+        return input.UserInputType == v
+    end
+    return false
+end
+
+function Keybind:Set(value, skipChanged)
+    self.value = coerceKey(value)
+    if self.recording then
+        self:_stopRecording() -- also relabels + resizes for us
+    else
+        self.keyLabel.Text = keyName(self.value)
+        self:_sizeBox(true)
+    end
+
+    if not skipChanged then
+        self.window:_runGuarded(self, self.onChanged, self.value)
+    end
+end
+
+function Keybind:_setShown(animate)
+    local w = self.window
+    w:_revealCommon(self, animate)
+    w:_reveal(self.box, { BackgroundTransparency = 0.9 }, animate)
+    w:_reveal(self.boxStroke, { Transparency = 0.85 }, animate)
+    w:_reveal(self.keyLabel, { TextTransparency = 0.6 }, animate)
+    w:_reveal(self.glow, { Transparency = 0.9 }, animate)
+end
+
+moveable(Keybind)
+
+return Keybind
