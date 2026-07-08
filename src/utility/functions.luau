@@ -1,6 +1,7 @@
 local functions = {}
 
-local textService = game:GetService("TextService")
+local variables = require(script.Parent.variables)
+local textService = variables.textService
 
 -- Width (px) a string renders at for a given font+size, cached since GetTextBoundsAsync
 -- yields. Elements use this to report how much room they need before they'd overlap,

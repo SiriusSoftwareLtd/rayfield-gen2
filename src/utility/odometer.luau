@@ -9,7 +9,7 @@
 -- pooled and reused (hidden, never destroyed) so window:Create owns their cleanup.
 
 local variables = require(script.Parent.variables)
-local TextService = game:GetService("TextService")
+local TextService = variables.textService
 
 local odometer = {}
 odometer.__index = odometer

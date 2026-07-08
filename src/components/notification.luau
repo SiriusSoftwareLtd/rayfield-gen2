@@ -2,14 +2,13 @@ local Notification = {}
 Notification.__index = Notification
 Notification.__type = "Notification"
 
-local TextService = game:GetService("TextService")
-
 -- Utility
 local utility = script.Parent.Parent.utility
 
 -- Variables
 local variables = require(utility.variables)
 local functions = require(utility.functions)
+local TextService = variables.textService
 
 -- Timings/easings copied from Rayfield Gen1 (all Exponential, Out).
 local growInfo = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)

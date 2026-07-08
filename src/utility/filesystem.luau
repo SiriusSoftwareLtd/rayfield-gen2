@@ -54,7 +54,7 @@ elseif isStudio then
 
     local root = Instance.new("Folder")
     root.Name = "Filesystem"
-    root.Parent = game:GetService("ReplicatedStorage")
+    root.Parent = variables.replicatedStorage
 
     local function splitPath(path)
         local parts = {}
