@@ -11,9 +11,6 @@ local functions = require(utility.functions)
 local moveable = require(utility.moveable)
 local locale = require(utility.locale)
 
--- Compact (row) sizing.
-local compactHeight = 41
-
 function Button.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
 
@@ -103,8 +100,7 @@ function Button:_buildFull()
     end
 
     self.title = self.window:Create("TextLabel", {
-        -- Configurables
-        Text = locale.t(self.name), -- tab name
+        Text = locale.t(self.name),
 
         Size = UDim2.fromOffset(250, 16),
         BorderSizePixel = 0,
@@ -135,7 +131,7 @@ function Button:_buildFull()
     self.window:_wireElementHover(self)
 
     -- press: ghost the stroke + squeeze the width around the callback
-    self.window:Connect(self.interact.MouseButton1Click, function()
+    self.window:ConnectFor(self, self.interact.MouseButton1Click, function()
         variables.tweenService
             :Create(
                 self.stroke,
@@ -176,53 +172,8 @@ end
 function Button:_buildCompact()
     local window = self.window
 
-    self.main = window:Create("Frame", {
-        Name = self.name,
-        Size = UDim2.fromOffset(0, compactHeight),
-        AutomaticSize = Enum.AutomaticSize.X,
-        ClipsDescendants = true, -- overflow guard
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-        BorderSizePixel = 0,
-
-        BackgroundTransparency = 1, -- In = ElementTransparency
-
-        Parent = self.tab.tabPage,
-    }, { BackgroundTransparency = "ElementTransparency" })
-
-    self.stroke = window:StyleElementBody(self.main)
-
-    -- share the row width (grow + shrink)
-    window:Create("UIFlexItem", {
-        FlexMode = Enum.UIFlexMode.Fill,
-        Parent = self.main,
-    })
-
-    -- main flows + fills the interact
-    window:Create("UIListLayout", {
-        FillDirection = Enum.FillDirection.Horizontal,
-        VerticalAlignment = Enum.VerticalAlignment.Center,
-        HorizontalFlex = Enum.UIFlexAlignment.Fill,
-
-        Parent = self.main,
-    })
-
-    -- clickable wrapper, doubles as the hover-brighten surface
-    self.interact = window:Create("TextButton", {
-        Text = "",
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-        BackgroundTransparency = 1, -- hover fades to 0.97
-        AutomaticSize = Enum.AutomaticSize.X,
-        Size = UDim2.fromOffset(0, compactHeight),
-        BorderSizePixel = 0,
-        TextTransparency = 1,
-
-        Parent = self.main,
-    })
+    self.main, self.stroke, self.interact = window:_buildCompactRow(self.tab, self.name)
     self.hoverOverlay = self.interact
-
-    window:Create("UICorner", {
-        Parent = self.interact,
-    }, { CornerRadius = "ElementCornerRadius" })
 
     window:Create("UIPadding", {
         PaddingLeft = UDim.new(0, 16),
@@ -280,7 +231,7 @@ function Button:_buildCompact()
     self.window:_wireElementHover(self)
 
     -- press: ghost the stroke around the callback
-    self.window:Connect(self.interact.MouseButton1Click, function()
+    self.window:ConnectFor(self, self.interact.MouseButton1Click, function()
         variables.tweenService
             :Create(
                 self.stroke,

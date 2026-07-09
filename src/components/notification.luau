@@ -8,7 +8,7 @@ local utility = script.Parent.Parent.utility
 -- Variables
 local variables = require(utility.variables)
 local functions = require(utility.functions)
-local TextService = variables.textService
+local constants = require(utility.constants)
 
 -- Timings/easings copied from Rayfield Gen1 (all Exponential, Out).
 local growInfo = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
@@ -19,14 +19,14 @@ local swipeInInfo = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.Easing
 -- exit "scale": shrink width + collapse height while it fades
 local shrinkInfo = TweenInfo.new(0.9, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 
-local OFFSCREEN_RIGHT = UDim2.new(0.5, 360, 0.5, 0)
-local CENTRED = UDim2.new(0.5, 0, 0.5, 0)
+local offscreenRight = UDim2.new(0.5, 360, 0.5, 0)
+local centred = UDim2.new(0.5, 0, 0.5, 0)
 
 -- Gap between stacked notifications. Applied INSIDE each notification (as top
 -- padding on the outer frame) rather than on the container's UIListLayout, so
 -- removing one collapses its gap with it instead of dropping an external gap
 -- and making the notifications above jump up.
-local STACK_PADDING = 8
+local stackPadding = 8
 
 -- Auto duration from content length, clamped to a sensible window (Gen1-style)
 local function autoDuration(content)
@@ -56,7 +56,7 @@ function Notification.new(window, properties)
         BackgroundTransparency = 1,
         Size = UDim2.new(1, 0, 0, 0),
         BorderSizePixel = 0,
-        ZIndex = 2,
+        ZIndex = constants.zIndex.notification,
 
         Parent = self.window.notifications,
     })
@@ -64,7 +64,7 @@ function Notification.new(window, properties)
     -- Inter-notification gap lives here (not on the stack layout) so it collapses
     -- with the card and its neighbours don't jump when it's removed.
     self.window:Create("UIPadding", {
-        PaddingTop = UDim.new(0, STACK_PADDING),
+        PaddingTop = UDim.new(0, stackPadding),
 
         Parent = self.main,
     })
@@ -74,11 +74,11 @@ function Notification.new(window, properties)
     self.body = self.window:Create("Frame", {
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         Size = UDim2.new(1, 0, 1, 0),
-        Position = OFFSCREEN_RIGHT, -- starts off to the right; _show slides it in
+        Position = offscreenRight, -- starts off to the right; _show slides it in
         AnchorPoint = Vector2.new(0.5, 0.5),
         Active = true, -- receives input for click-to-dismiss
         BorderSizePixel = 0,
-        ZIndex = 2,
+        ZIndex = constants.zIndex.notification,
 
         -- Animation
         BackgroundTransparency = 1, -- In = 0
@@ -131,7 +131,7 @@ function Notification.new(window, properties)
             BackgroundTransparency = 1,
             BorderSizePixel = 0,
             LayoutOrder = 1,
-            ZIndex = 2,
+            ZIndex = constants.zIndex.notification,
 
             -- Animation
             ImageTransparency = 1, -- In = 0
@@ -147,7 +147,7 @@ function Notification.new(window, properties)
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
         LayoutOrder = 2,
-        ZIndex = 2,
+        ZIndex = constants.zIndex.notification,
 
         Parent = self.body,
     })
@@ -169,7 +169,7 @@ function Notification.new(window, properties)
         TextWrapped = true,
         TextXAlignment = Enum.TextXAlignment.Left,
         LayoutOrder = 1,
-        ZIndex = 2,
+        ZIndex = constants.zIndex.notification,
 
         -- Animation
         TextTransparency = 1, -- In = 0
@@ -188,7 +188,7 @@ function Notification.new(window, properties)
             TextXAlignment = Enum.TextXAlignment.Left,
             TextYAlignment = Enum.TextYAlignment.Top,
             LayoutOrder = 2,
-            ZIndex = 2,
+            ZIndex = constants.zIndex.notification,
 
             -- Animation
             TextTransparency = 1, -- In = 0.35
@@ -231,20 +231,10 @@ end
 -- the stack before it's ready to animate).
 function Notification:_measure()
     local colWidth = self.iconLabel and 222 or 260
-    local function textHeight(text, font, size)
-        local params = Instance.new("GetTextBoundsParams")
-        params.Text = text
-        params.Font = font
-        params.Size = size
-        params.Width = colWidth
-        local ok, bounds = pcall(TextService.GetTextBoundsAsync, TextService, params)
-        params:Destroy()
-        return ok and bounds.Y or size
-    end
 
-    local contentH = textHeight(self.title, self.window.theme.TitleFont, 16)
+    local contentH = functions.textHeight(self.window.theme.TitleFont, 16, self.title, colWidth)
     if self.descriptionLabel then
-        contentH = contentH + 4 + textHeight(self.content, self.window.theme.Font, 15)
+        contentH = contentH + 4 + functions.textHeight(self.window.theme.Font, 15, self.content, colWidth)
     end
 
     return math.max(contentH, self.iconLabel and 24 or 0) + 28
@@ -254,26 +244,32 @@ end
 function Notification:_show()
     -- All sizing done before anything is visible: outer is height 0 and the body
     -- is fully transparent until the grow tween starts, so there's no flicker.
-    -- +STACK_PADDING because the outer's top padding holds the inter-card gap.
-    local target = self:_measure() + STACK_PADDING
+    -- +stackPadding because the outer's top padding holds the inter-card gap.
+    local target = self:_measure() + stackPadding
     if not self.main.Parent then
         return
     end
 
     -- Open the slot and slide the card in from the right (body starts off-right), fading as it comes
     variables.tweenService:Create(self.main, growInfo, { Size = UDim2.new(1, 0, 0, target) }):Play()
-    variables.tweenService:Create(self.body, swipeInInfo, { Position = CENTRED }):Play()
+    variables.tweenService:Create(self.body, swipeInInfo, { Position = centred }):Play()
     variables.tweenService:Create(self.body, fadeLong, { BackgroundTransparency = 0 }):Play()
     variables.tweenService:Create(self.titleLabel, fadeShort, { TextTransparency = 0 }):Play()
     variables.tweenService:Create(self.stroke, fadeLong, { Transparency = 0.95 }):Play()
     variables.tweenService:Create(self.shadow, fadeShort, { Transparency = 0.6 }):Play()
 
     task.wait(0.05)
+    if self._dismissed or not self.main.Parent then
+        return -- dismissed mid-stagger; dont fight the exit fade
+    end
     if self.iconLabel then
         variables.tweenService:Create(self.iconLabel, fadeShort, { ImageTransparency = 0 }):Play()
     end
 
     task.wait(0.05)
+    if self._dismissed or not self.main.Parent then
+        return
+    end
     if self.descriptionLabel then
         variables.tweenService:Create(self.descriptionLabel, fadeShort, { TextTransparency = 0.35 }):Play()
     end

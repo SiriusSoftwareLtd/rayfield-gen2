@@ -186,15 +186,15 @@ function Drag.new(window, properties)
 
     -- exponential smoothing per frame instead of a new tween each frame. constant is the
     -- fraction of the gap left after 1s, so smaller = snappier. main lags, the bar tracks tight
-    local MAIN_REMAINING = 1e-7
-    local BAR_REMAINING = 1e-60
+    local mainRemaining = 1e-7
+    local barRemaining = 1e-60
 
     self.window:Connect(variables.runService.RenderStepped, function(dt)
         if dragging and not variables.rayfieldHidden then
             local mainTarget, dragTarget = getTargets()
 
-            self.window.main.Position = self.window.main.Position:Lerp(mainTarget, 1 - MAIN_REMAINING ^ dt)
-            self.drag.Position = self.drag.Position:Lerp(dragTarget, 1 - BAR_REMAINING ^ dt)
+            self.window.main.Position = self.window.main.Position:Lerp(mainTarget, 1 - mainRemaining ^ dt)
+            self.drag.Position = self.drag.Position:Lerp(dragTarget, 1 - barRemaining ^ dt)
         end
     end)
 

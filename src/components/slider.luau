@@ -189,20 +189,22 @@ function Slider.new(tab, properties)
     })
 
     -- Subtle hover on the slider track itself, not the whole element row
-    self.window:Connect(self.main.MouseEnter, function()
+    self.window:ConnectFor(self, self.main.MouseEnter, function()
         if not self.window:_interactive() then
             return -- window still revealing/hiding: dont light up mid-animation
         end
-        variables.tweenService:Create(self.track, tweenInfo, { BackgroundColor3 = Color3.fromRGB(60, 60, 60) }):Play()
+        variables.tweenService
+            :Create(self.track, tweenInfo, { BackgroundColor3 = self.window.theme.SliderBackgroundHover })
+            :Play()
     end)
 
-    self.window:Connect(self.main.MouseLeave, function()
+    self.window:ConnectFor(self, self.main.MouseLeave, function()
         variables.tweenService
             :Create(self.track, tweenInfo, { BackgroundColor3 = self.window.theme.SliderBackground })
             :Play()
     end)
 
-    self.window:Connect(self.interact.InputBegan, function(input)
+    self.window:ConnectFor(self, self.interact.InputBegan, function(input)
         if
             input.UserInputType == Enum.UserInputType.MouseButton1
             or input.UserInputType == Enum.UserInputType.Touch
@@ -232,7 +234,7 @@ function Slider.new(tab, properties)
         end
     end)
 
-    self.window:Connect(variables.userInputService.InputEnded, function(input)
+    self.window:ConnectFor(self, variables.userInputService.InputEnded, function(input)
         if
             (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch)
             and self.dragging
@@ -245,9 +247,7 @@ function Slider.new(tab, properties)
                 self._dragConnection = nil
             end
 
-            if self.flag and not self.forgetState and self.window.configuration.autoSave then
-                task.spawn(self.window.Save, self.window)
-            end
+            self.window:_persist(self)
         end
     end)
 
@@ -257,7 +257,7 @@ function Slider.new(tab, properties)
 
     -- pick wide vs stacked from the real width, and keep it in sync if that width changes
     -- (column resolves its size a frame after we build, and windows can be small)
-    self.window:Connect(self.main:GetPropertyChangedSignal("AbsoluteSize"), function()
+    self.window:ConnectFor(self, self.main:GetPropertyChangedSignal("AbsoluteSize"), function()
         -- Ignore the transient widths the window sweeps through as it collapses/grows on
         -- hide/show/minimise, so the slider just keeps the mode it settled on while visible.
         -- The one time we DO want a hidden-window reflow is the initial layout pass before the
@@ -525,6 +525,7 @@ function Slider:Set(value, skipCallback)
 
     if not skipCallback then
         self:_fireCallback(value)
+        self.window:_persist(self)
     end
 end
 

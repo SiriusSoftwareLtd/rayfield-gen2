@@ -8,19 +8,21 @@ local utility = script.Parent.Parent.utility
 -- Variables
 local variables = require(utility.variables)
 local functions = require(utility.functions)
+local image = require(utility.image)
+local constants = require(utility.constants)
 local locale = require(utility.locale)
 
-local CHEVRON_ICON = 88479147175134
-local CHECK_ICON = 125626312718314
-local DOT_ICON = 91452555903853 -- shown on unselected options
-local SEARCH_ICON = 100604009889706
+local chevronIcon = constants.icons.chevron
+local checkIcon = constants.icons.check
+local dotIcon = constants.icons.dot
+local searchIconAsset = constants.icons.search
 
 -- Per-corner radii: an option's edge is rounded when nothing sits next to it, sharp otherwise
-local ROUND_R = UDim.new(0, 12)
-local FLAT_R = UDim.new(0, 7)
+local roundRadius = UDim.new(0, 12)
+local flatRadius = UDim.new(0, 7)
 
-local SEARCH_COLLAPSED_H = 30
-local SEARCH_EXPANDED_H = 38
+local searchCollapsedHeight = 30
+local searchExpandedHeight = 38
 local searchTween = TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 
 local function dedupStrings(arr)
@@ -126,6 +128,7 @@ function Dropdown.new(tab, properties)
 
     self.stroke = self.window:StyleElementPanel(self.top)
     self.hoverOverlay = self.window:CreateHoverOverlay(self.top)
+    self.flashTarget = self.top -- main is a transparent wrapper, so the error-flash tints the pill
 
     self.container = self.window:Create("Frame", {
         BorderSizePixel = 0,
@@ -210,7 +213,7 @@ function Dropdown.new(tab, properties)
         Size = UDim2.fromOffset(16, 16),
         BorderSizePixel = 0,
         BackgroundTransparency = 1,
-        Image = "rbxassetid://" .. tostring(CHEVRON_ICON),
+        Image = "rbxassetid://" .. tostring(chevronIcon),
         Rotation = 180,
 
         -- Animation
@@ -324,7 +327,7 @@ function Dropdown.new(tab, properties)
         local iconT = if self._isOpen then (selected and 0 or 0.7) else 1
         local strokeT = if self._isOpen then (selected and 0.85 or 0.93) else 1
 
-        data.checkIcon.Image = "rbxassetid://" .. tostring(if selected then CHECK_ICON else DOT_ICON)
+        image.assign(data.checkIcon, "Image", if selected then checkIcon else dotIcon)
 
         if animate then
             local info = TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
@@ -355,32 +358,6 @@ function Dropdown.new(tab, properties)
         end
     end
 
-    local function flashError(result)
-        -- Flash the header card red (the wrapper is transparent, so tint the pill itself).
-        variables.tweenService
-            :Create(
-                self.top,
-                TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-                { BackgroundColor3 = self.window.theme.ErrorColor }
-            )
-            :Play()
-        self.title.Text = locale.resolve("Error, log recorded in console.")
-
-        warn(`Rayfield encountered an error, with the callback for a {self.__type} component named '{self.name}':`)
-        print(result)
-
-        task.wait(1)
-
-        self.title.Text = locale.resolve(self.name)
-        variables.tweenService
-            :Create(
-                self.top,
-                TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In),
-                { BackgroundColor3 = Color3.fromRGB(255, 255, 255) }
-            )
-            :Play()
-    end
-
     self._renderOptionState = renderOptionState
     self._updateSelectedLabel = updateSelectedLabel
 
@@ -394,9 +371,9 @@ function Dropdown.new(tab, properties)
             Parent = self.list,
         }, { BackgroundColor3 = "DropdownHighlight" })
 
-        -- Radius is driven by selection in renderOptionState (5 sharp / 12 rounded)
+        -- Radius is driven by adjacency in _updateCorners (7 flat / 12 rounded)
         local corner = self.window:Create("UICorner", {
-            CornerRadius = UDim.new(0, 5),
+            CornerRadius = flatRadius,
             Parent = frame,
         })
 
@@ -435,7 +412,7 @@ function Dropdown.new(tab, properties)
         })
 
         local checkIcon = self.window:Create("ImageLabel", {
-            Image = "rbxassetid://" .. tostring(CHECK_ICON),
+            Image = "rbxassetid://" .. tostring(checkIcon),
             Size = UDim2.fromOffset(16, 16),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
@@ -469,7 +446,7 @@ function Dropdown.new(tab, properties)
             corner = corner,
         }
 
-        self.window:Connect(frame.MouseEnter, function()
+        self.window:ConnectFor(self, frame.MouseEnter, function()
             if not self._isOpen or not self.window:_interactive() then
                 return
             end
@@ -492,7 +469,7 @@ function Dropdown.new(tab, properties)
                 :Play()
         end)
 
-        self.window:Connect(frame.MouseLeave, function()
+        self.window:ConnectFor(self, frame.MouseLeave, function()
             if not self._isOpen then
                 return
             end
@@ -515,7 +492,7 @@ function Dropdown.new(tab, properties)
                 :Play()
         end)
 
-        self.window:Connect(interact.MouseButton1Click, function()
+        self.window:ConnectFor(self, interact.MouseButton1Click, function()
             local sel = isOptionSelected(optionName)
 
             if not self.multiSelect then
@@ -542,19 +519,8 @@ function Dropdown.new(tab, properties)
 
             updateSelectedLabel()
 
-            task.spawn(function()
-                local success, result = pcall(function()
-                    self.callback(if self.multiSelect then self.value else self.value[1])
-                end)
-
-                if not success then
-                    flashError(result)
-                end
-            end)
-
-            if self.flag and not self.forgetState and self.window.configuration.autoSave then
-                task.spawn(self.window.Save, self.window)
-            end
+            self.window:_runGuarded(self, self.callback, if self.multiSelect then self.value else self.value[1])
+            self.window:_persist(self)
 
             if not self.multiSelect then
                 task.wait(0.1)
@@ -576,7 +542,7 @@ function Dropdown.new(tab, properties)
     self:_updateCorners()
 
     -- Function
-    self.window:Connect(self.interact.MouseButton1Click, function()
+    self.window:ConnectFor(self, self.interact.MouseButton1Click, function()
         if self._isOpen then
             self:_close()
         else
@@ -586,7 +552,7 @@ function Dropdown.new(tab, properties)
 
     -- Hover feedback via the overlay + title only. The card uses a gradient stroke (white
     -- base tinted by the gradient), so tweening stroke.Color here would fight the gradient.
-    self.window:Connect(self.main.MouseEnter, function()
+    self.window:ConnectFor(self, self.main.MouseEnter, function()
         if self._isOpen or not self.window:_interactive() then
             return
         end
@@ -606,7 +572,7 @@ function Dropdown.new(tab, properties)
             :Play()
     end)
 
-    self.window:Connect(self.main.MouseLeave, function()
+    self.window:ConnectFor(self, self.main.MouseLeave, function()
         variables.tweenService
             :Create(
                 self.title,
@@ -638,7 +604,7 @@ function Dropdown:_buildSearch()
 
     self.searchbar = self.window:Create("Frame", {
         Name = "Search",
-        Size = UDim2.new(1, -12, 0, SEARCH_COLLAPSED_H),
+        Size = UDim2.new(1, -12, 0, searchCollapsedHeight),
         BorderSizePixel = 0,
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         BackgroundTransparency = 1, -- expanded = 0.92
@@ -694,7 +660,7 @@ function Dropdown:_buildSearch()
     }, { TextColor3 = "ContentColor", FontFace = "Font" })
 
     self.searchIcon = self.window:Create("ImageButton", {
-        Image = "rbxassetid://" .. tostring(SEARCH_ICON),
+        Image = "rbxassetid://" .. tostring(searchIconAsset),
         Size = UDim2.fromOffset(20, 20),
         Position = UDim2.new(0, 24, 0.5, 0), -- left-aligned (centre at x=24, edge at 14)
         AnchorPoint = Vector2.new(0.5, 0.5),
@@ -708,22 +674,22 @@ function Dropdown:_buildSearch()
         Parent = self.searchbar,
     }, { ImageColor3 = "ContentColor" })
 
-    self.window:Connect(self.searchToggle.MouseButton1Click, function()
+    self.window:ConnectFor(self, self.searchToggle.MouseButton1Click, function()
         if not self._searchOpen then
             self:_expandSearch()
         end
     end)
-    self.window:Connect(self.searchIcon.MouseButton1Click, function()
+    self.window:ConnectFor(self, self.searchIcon.MouseButton1Click, function()
         if self._searchOpen then
             self:_collapseSearch()
         else
             self:_expandSearch()
         end
     end)
-    self.window:Connect(self.searchInput:GetPropertyChangedSignal("Text"), function()
+    self.window:ConnectFor(self, self.searchInput:GetPropertyChangedSignal("Text"), function()
         self:_applyFilter(self.searchInput.Text)
     end)
-    self.window:Connect(self.searchInput.FocusLost, function()
+    self.window:ConnectFor(self, self.searchInput.FocusLost, function()
         if self.searchInput.Text == "" then
             self:_collapseSearch()
         end
@@ -742,7 +708,7 @@ function Dropdown:_expandSearch()
         :Create(
             self.searchbar,
             searchTween,
-            { Size = UDim2.new(1, -12, 0, SEARCH_EXPANDED_H), BackgroundTransparency = 0.92 }
+            { Size = UDim2.new(1, -12, 0, searchExpandedHeight), BackgroundTransparency = 0.92 }
         )
         :Play()
     variables.tweenService:Create(self.searchStroke, searchTween, { Transparency = 0.86 }):Play()
@@ -766,7 +732,7 @@ function Dropdown:_collapseSearch()
         :Create(
             self.searchbar,
             searchTween,
-            { Size = UDim2.new(1, -12, 0, SEARCH_COLLAPSED_H), BackgroundTransparency = 1 }
+            { Size = UDim2.new(1, -12, 0, searchCollapsedHeight), BackgroundTransparency = 1 }
         )
         :Play()
     variables.tweenService:Create(self.searchStroke, searchTween, { Transparency = 1 }):Play()
@@ -795,13 +761,21 @@ function Dropdown:_updateCorners()
     end
 
     for i, data in visible do
-        local topR = if i == 1 then ROUND_R else FLAT_R
-        local botR = if i == #visible then ROUND_R else FLAT_R
+        local topR = if i == 1 then roundRadius else flatRadius
+        local botR = if i == #visible then roundRadius else flatRadius
         data.corner.TopLeftRadius = topR
         data.corner.TopRightRadius = topR
         data.corner.BottomLeftRadius = botR
         data.corner.BottomRightRadius = botR
     end
+end
+
+-- Open height sized to the options (header + search + paddings + rows), capped so long lists
+-- scroll instead of running off the window. Short lists open just tall enough, no dead space.
+function Dropdown:_openHeight()
+    local n = #self.options
+    local rows = n * 38 + math.max(0, n - 1) * 5 + 2
+    return math.min(180, 95 + rows)
 end
 
 function Dropdown:_open()
@@ -838,7 +812,7 @@ function Dropdown:_open()
         :Create(
             self.main,
             TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
-            { Size = UDim2.new(1, -20, 0, 180) }
+            { Size = UDim2.new(1, -20, 0, self:_openHeight()) }
         )
         :Play()
     variables.tweenService

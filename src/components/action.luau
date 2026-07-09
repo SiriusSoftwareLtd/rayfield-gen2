@@ -7,6 +7,7 @@ local utility = script.Parent.Parent.utility
 
 -- Variables
 local variables = require(utility.variables)
+local log = require(utility.log)
 
 function Action.new(window, properties)
     properties = if typeof(properties) == "table" then properties else {}
@@ -76,10 +77,10 @@ function Action.new(window, properties)
         task.spawn(function()
             local success, result = pcall(self.callback)
             if not success then
-                warn(
+                log.warn(
                     `Rayfield encountered an error, with the callback for a {self.__type} component named '{self.name}':`
                 )
-                print(result)
+                log.print(result)
             end
             -- undo the hover brighten now (the callback has run, so selectedTab is up to date),
             -- otherwise the icon stays lit until the mouse happens to move off it

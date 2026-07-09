@@ -10,9 +10,9 @@ local variables = require(utility.variables)
 local functions = require(utility.functions)
 local moveable = require(utility.moveable)
 local locale = require(utility.locale)
+local constants = require(utility.constants)
 
--- the field hugs its text; tween the width instead of AutomaticSize so it animates
-local resizeInfo = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+local resizeInfo = constants.pillResizeInfo
 -- text is muted at rest, opaque while typing
 local focusInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
@@ -156,7 +156,7 @@ function Input.new(tab, properties)
     }, { TextColor3 = "ContentColor", FontFace = "Font" })
 
     -- resize to hug the text; numeric mode also strips non-number chars as they're typed
-    self.window:Connect(self.input:GetPropertyChangedSignal("Text"), function()
+    self.window:ConnectFor(self, self.input:GetPropertyChangedSignal("Text"), function()
         if self.numeric then
             local cleaned = (self.input.Text:gsub("[^%d%.%-]", ""))
             if cleaned ~= self.input.Text then
@@ -168,12 +168,12 @@ function Input.new(tab, properties)
     end)
 
     -- opaque while the field is focused, back to muted when you click away
-    self.window:Connect(self.input.Focused, function()
+    self.window:ConnectFor(self, self.input.Focused, function()
         variables.tweenService:Create(self.input, focusInfo, { TextTransparency = 0 }):Play()
     end)
 
     -- commit on focus loss (enter or click away)
-    self.window:Connect(self.input.FocusLost, function()
+    self.window:ConnectFor(self, self.input.FocusLost, function()
         variables.tweenService:Create(self.input, focusInfo, { TextTransparency = 0.6 }):Play()
         self:_commit(self.input.Text)
     end)
@@ -201,34 +201,34 @@ function Input:_sizeBox(animate)
     end
 end
 
--- store + fire the callback + autosave, shared by typing and :Set
-function Input:_commit(text)
+-- store + fire the callback + autosave, shared by typing and :Set. silent skips the
+-- callback/persist/flash so config loads restore quietly.
+function Input:_commit(text, silent)
+    text = tostring(text)
+    if self.numeric then
+        -- a numeric field commits an actual number; malformed input (1.2.3, --5) clears
+        local n = tonumber(text)
+        text = if n then tostring(n) else ""
+    end
+
     local changed = text ~= self.value
     self.value = text
     if self.input.Text ~= text then
         self.input.Text = text
     end
 
-    self.window:_runGuarded(self, self.callback, text)
-
-    if self.flag and not self.forgetState and self.window.configuration.autoSave then
-        task.spawn(self.window.Save, self.window)
-    end
-
-    -- green flash to confirm the value landed (only when it actually changed)
-    if changed then
-        self.window:_flashResult(self, true)
+    if not silent then
+        self.window:_runGuarded(self, self.callback, text)
+        self.window:_persist(self)
+        -- green flash to confirm the value landed (only when it actually changed)
+        if changed then
+            self.window:_flashResult(self, true)
+        end
     end
 end
 
 function Input:Set(value, skipCallback)
-    value = tostring(value)
-    self.value = value
-    self.input.Text = value
-
-    if not skipCallback then
-        self.window:_runGuarded(self, self.callback, value)
-    end
+    self:_commit(value, skipCallback)
 end
 
 function Input:_setShown(shown, animate)

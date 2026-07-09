@@ -12,9 +12,6 @@ local moveable = require(utility.moveable)
 local constants = require(utility.constants)
 local locale = require(utility.locale)
 
--- Compact (row) sizing.
-local compactHeight = 41
-
 function Toggle.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
 
@@ -149,10 +146,7 @@ function Toggle:_performToggle()
     self:_animateIndicator()
 
     self.window:_runGuarded(self, self.callback, self.value)
-
-    if self.flag and not self.forgetState and self.window.configuration.autoSave then
-        task.spawn(self.window.Save, self.window)
-    end
+    self.window:_persist(self)
 end
 
 -- full-width: title/icon left, pill pinned right, width-bounce
@@ -243,7 +237,7 @@ function Toggle:_buildFull()
 
     self.window:_wireElementHover(self)
 
-    self.window:Connect(self.interact.MouseButton1Click, function()
+    self.window:ConnectFor(self, self.interact.MouseButton1Click, function()
         if self.locked then
             return
         end
@@ -288,52 +282,9 @@ end
 function Toggle:_buildCompact()
     local window = self.window
 
-    self.main = window:Create("Frame", {
-        Name = self.name,
-        Size = UDim2.fromOffset(0, compactHeight),
-        AutomaticSize = Enum.AutomaticSize.X,
-        ClipsDescendants = true,
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-        BorderSizePixel = 0,
-
-        BackgroundTransparency = 1,
-
-        Parent = self.tab.tabPage,
-    }, { BackgroundTransparency = "ElementTransparency" })
-
-    self.stroke = window:StyleElementBody(self.main)
-
-    window:Create("UIFlexItem", {
-        FlexMode = Enum.UIFlexMode.Fill,
-        Parent = self.main,
-    })
-
-    window:Create("UIListLayout", {
-        FillDirection = Enum.FillDirection.Horizontal,
-        VerticalAlignment = Enum.VerticalAlignment.Center,
-        HorizontalFlex = Enum.UIFlexAlignment.Fill,
-
-        Parent = self.main,
-    })
-
-    -- clickable wrapper, doubles as the hover-brighten surface (see button.luau).
-    self.interact = window:Create("TextButton", {
-        Text = "",
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-        BackgroundTransparency = 1, -- hover fades to 0.97
-        AutomaticSize = Enum.AutomaticSize.X,
-        Size = UDim2.fromOffset(0, compactHeight),
-        BorderSizePixel = 0,
-        TextTransparency = 1,
-        ZIndex = 10,
-
-        Parent = self.main,
-    })
+    -- interact sits at ZIndex 10 so the switch pill layers cleanly over the row (see button.luau)
+    self.main, self.stroke, self.interact = window:_buildCompactRow(self.tab, self.name, 10)
     self.hoverOverlay = self.interact
-
-    window:Create("UICorner", {
-        Parent = self.interact,
-    }, { CornerRadius = "ElementCornerRadius" })
 
     window:Create("UIPadding", {
         PaddingLeft = UDim.new(0, 15),
@@ -420,7 +371,7 @@ function Toggle:_buildCompact()
 
     self.window:_wireElementHover(self)
 
-    self.window:Connect(self.interact.MouseButton1Click, function()
+    self.window:ConnectFor(self, self.interact.MouseButton1Click, function()
         if self.locked then
             return
         end
@@ -488,7 +439,7 @@ function Toggle:_buildLock()
     })
 
     window:Create("ImageLabel", {
-        Image = "rbxassetid://78137979054938",
+        Image = constants.icons.toggle,
         Size = UDim2.fromOffset(20, 20),
         BorderSizePixel = 0,
         BackgroundTransparency = 1,
@@ -591,12 +542,8 @@ function Toggle:Set(value, skipCallback)
     self:_animateIndicator()
 
     if not skipCallback then
-        task.spawn(self.callback, self.value)
-
-        -- persist like a click does; skipped on load (Load passes skipCallback)
-        if self.flag and not self.forgetState and self.window.configuration.autoSave then
-            task.spawn(self.window.Save, self.window)
-        end
+        self.window:_runGuarded(self, self.callback, self.value)
+        self.window:_persist(self) -- skipped on load (Load passes skipCallback)
     end
 end
 
@@ -611,7 +558,7 @@ function Toggle:Lock(message)
         -- compact/row toggles have no overlay (no room in the flex row), so swap the
         -- title to the lock message. clicks are already blocked by self.locked.
         self._unlockedTitle = self._unlockedTitle or self.title.Text
-        self.title.Text = message or "Locked"
+        self.title.Text = message or locale.resolve("Locked")
     end
 end
 

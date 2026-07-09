@@ -12,6 +12,7 @@ local odometer = require(utility.odometer)
 local moveable = require(utility.moveable)
 local constants = require(utility.constants)
 local locale = require(utility.locale)
+local log = require(utility.log)
 
 -- Accent gradients per direction (fill drives the card + glow, stroke is the brighter edge)
 local accents = constants.statAccents
@@ -24,6 +25,11 @@ local accentTransparency = NumberSequence.new({
 local compactHeight = 41
 
 local accentTweenInfo = TweenInfo.new(0.6, Enum.EasingStyle.Exponential)
+
+-- UIShadow glows take one colour, so the halo uses the brightest stop of the direction's fill.
+local function glowColor(accent)
+    return accent.fill.Keypoints[1].Value
+end
 
 local function formatPct(pct)
     if pct > 0 then
@@ -67,8 +73,6 @@ function Statistic.new(tab, properties)
         icon = properties.icon or properties.Icon,
         description = properties.description or properties.Description,
 
-        callback = properties.callback or properties.Callback or function() end,
-
         value = if (properties.value or properties.Value) ~= nil then (properties.value or properties.Value) else 0,
         -- did we start with a real value, or is the displayed number just a placeholder?
         -- the first Set on a placeholder establishes the baseline instead of showing a change
@@ -102,8 +106,12 @@ function Statistic.new(tab, properties)
         self:_buildFull()
     end
 
-    if self.description and not self.compact then
-        self.descriptor = require(script.Parent.descriptor).new(self.tab, { description = self.description })
+    if self.description then
+        if self.compact then
+            log.warn(`Rayfield: a compact stat has no room for a description, ignoring it on '{self.name}'.`)
+        else
+            self.descriptor = require(script.Parent.descriptor).new(self.tab, { description = self.description })
+        end
     end
 
     return self
@@ -168,31 +176,9 @@ function Statistic:_buildFull()
         Parent = self.main,
     })
 
-    self.glowContainer = window:Create("Frame", {
-        Size = UDim2.new(1, 35, 1, 35),
-        Position = UDim2.fromScale(0.5, 0.5),
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        BorderSizePixel = 0,
-        BackgroundTransparency = 1,
-        ZIndex = 4,
-
-        Parent = self.main,
-    })
-
-    self.glowImage = window:Create("ImageLabel", {
-        Image = "rbxassetid://5587865193",
-        ImageColor3 = Color3.fromRGB(255, 255, 255),
-        Size = UDim2.fromScale(1.15, 1),
-
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.fromScale(0.5, 0.5),
-        BackgroundTransparency = 1,
-        ZIndex = 4,
-
-        ImageTransparency = 1, -- In = 0.6
-
-        Parent = self.glowContainer,
-    })
+    -- Soft accent halo behind the card. UIShadow (no image) is our glow standard; its colour
+    -- follows the stat direction and it reveals from hidden to 0.7 like the rest of the card.
+    self.glow = window:CreateGlow(self.main, glowColor(accents.neutral), 10, 1)
 
     self.title = window:Create("TextLabel", {
         Text = locale.t(self.name),
@@ -218,15 +204,6 @@ function Statistic:_buildFull()
         Transparency = accentTransparency,
 
         Parent = self.gradientContainer,
-    })
-
-    self.glowGradient = window:Create("UIGradient", {
-        Rotation = 2,
-        Offset = Vector2.new(0, 0.5),
-        Color = accents.neutral.fill,
-        Transparency = accentTransparency,
-
-        Parent = self.glowImage,
     })
 
     window:Create("UICorner", {
@@ -296,7 +273,7 @@ function Statistic:_buildFull()
     })
     self.changeOdo:snap(self:_formatChange(0))
 
-    self._accentGradients = { self.strokeGradient, self.mainGradient, self.glowGradient }
+    self._accentGradients = { self.strokeGradient, self.mainGradient }
 end
 
 -- compact 41px card: icon+title left, one readout right. accent gradient sits on
@@ -491,8 +468,8 @@ function Statistic:_setAccent(key, direction)
     local accent = accents[key]
     self.strokeGradient.Color = accent.stroke
     self.mainGradient.Color = accent.fill
-    if self.glowGradient then
-        self.glowGradient.Color = accent.fill
+    if self.glow then
+        self.glow.Color = glowColor(accent)
     end
 
     -- Subtle rotation + offset shift to give the gradient a bit of life
@@ -651,13 +628,13 @@ function Statistic:_setShown(shown, animate)
     if shown then
         w:_revealCommon(self, animate)
         w:_reveal(self.gradientContainer, { BackgroundTransparency = 0 }, animate)
-        w:_reveal(self.glowImage, { ImageTransparency = 0.6 }, animate)
+        w:_reveal(self.glow, { Transparency = 0.7 }, animate)
         self.valueOdo:reveal(0, animate)
         self.changeOdo:reveal(0, animate)
     else
         w:_hideCommon(self, animate)
         w:_reveal(self.gradientContainer, { BackgroundTransparency = 1 }, animate)
-        w:_reveal(self.glowImage, { ImageTransparency = 1 }, animate)
+        w:_reveal(self.glow, { Transparency = 1 }, animate)
         self.valueOdo:reveal(1, animate)
         self.changeOdo:reveal(1, animate)
     end

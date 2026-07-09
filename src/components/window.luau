@@ -7,6 +7,7 @@ local functions = require(utility.functions)
 local persistence = require(utility.persistence)
 local constants = require(utility.constants)
 local locale = require(utility.locale)
+local log = require(utility.log)
 local chrome = require(script.Parent.chrome)
 
 -- Variables
@@ -20,16 +21,19 @@ local Window = {}
 Window.__index = Window
 
 -- Default entrance-reveal tween (elements override with their own where needed)
-local REVEAL_INFO = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+local revealInfo = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 
 -- The collapsed "pill" main morphs into on Hide, top-anchored the way the old standalone
 -- restore button used to sit.
-local COLLAPSED_SIZE = UDim2.fromOffset(185, 50)
-local COLLAPSED_TOP = UDim2.new(0.5, 0, 0, 20)
+local collapsedSize = UDim2.fromOffset(185, 50)
+local collapsedTop = UDim2.new(0.5, 0, 0, 20)
 
 -- Width of the top-centre toast stack container. Toasts hug their own content and centre
--- within it, so this just needs to be at least the toast's own MAX_WIDTH.
-local MAX_TOAST_WIDTH = 320
+-- within it, so this just needs to be at least the toast's own max width.
+local maxToastWidth = 320
+
+-- Standard element row height, shared by the compact button/toggle scaffold.
+local compactRowHeight = 41
 
 -- Resolve a theme arg (table or name) to a fresh table. We copy so ChangeTheme never
 -- mutates the required theme module, which require() caches and shares between windows.
@@ -61,13 +65,13 @@ function Window.new(properties)
     local self = setmetatable({
         name = properties.name or properties.Name or "Rayfield Window",
         subheading = properties.subtitle or properties.Subtitle,
-        size = UDim2.fromOffset(475, 500), -- calculate sizing for mobile. use formula based on viewport?
+        size = UDim2.fromOffset(475, 500),
         instances = {},
         connections = {},
 
         icon = properties.icon or properties.Icon,
         showName = properties.showName or properties.ShowName or "Rayfield",
-        showIcon = properties.showIcon or properties.ShowIcon or 80387863064905,
+        showIcon = properties.showIcon or properties.ShowIcon or constants.icons.rayfield,
 
         themeProperties = {},
         localeProperties = {},
@@ -91,6 +95,34 @@ function Window.new(properties)
             }
         end)(),
     }, Window)
+
+    -- Public, always-live view of every saved control, keyed by flag. Reading returns the
+    -- control's current value; assigning routes through its Set so the UI and callback fire.
+    self.Flags = setmetatable({}, {
+        __index = function(_, flag)
+            local control = self.controls[flag]
+            return control and control.value
+        end,
+        __newindex = function(_, flag, value)
+            local control = self.controls[flag]
+            if not control then
+                log.warn("Rayfield: no flag '" .. tostring(flag) .. "' to set")
+                return
+            end
+            control:Set(value)
+        end,
+        __iter = function()
+            local flag
+            return function()
+                local control
+                flag, control = next(self.controls, flag)
+                if flag then
+                    return flag, control.value
+                end
+                return nil
+            end
+        end,
+    })
 
     -- Rayfield Gen2 Screen
     self.screenGui = self:Create("ScreenGui", {
@@ -343,6 +375,12 @@ function Window.new(properties)
         HorizontalAlignment = Enum.HorizontalAlignment.Center,
         SortOrder = Enum.SortOrder.LayoutOrder,
 
+        -- Tabs switch via the topbar only. Kill the built-in input so scrolling a long page
+        -- (or a nudge on a controller) never flips to another tab under you.
+        ScrollWheelInputEnabled = false,
+        GamepadInputEnabled = false,
+        TouchInputEnabled = false,
+
         EasingStyle = Enum.EasingStyle.Exponential,
         TweenTime = 0.4,
 
@@ -414,7 +452,7 @@ function Window.new(properties)
 
     require(script.Parent.action).new(self, {
         name = "Close",
-        icon = 83277910885129,
+        icon = constants.icons.close,
         order = 1,
 
         callback = function()
@@ -424,7 +462,7 @@ function Window.new(properties)
 
     self.minimiseAction = require(script.Parent.action).new(self, {
         name = "Minimise",
-        icon = 108115485663409,
+        icon = constants.icons.minimise,
         order = 2,
 
         callback = function()
@@ -434,7 +472,7 @@ function Window.new(properties)
 
     self.settingsAction = require(script.Parent.action).new(self, {
         name = "Settings",
-        icon = 129180860773723,
+        icon = constants.icons.settings,
         order = 3,
         linkedTab = self.rfSettings,
 
@@ -445,7 +483,7 @@ function Window.new(properties)
 
     require(script.Parent.action).new(self, {
         name = "Search",
-        icon = 100604009889706,
+        icon = constants.icons.search,
         order = 4,
 
         callback = function()
@@ -483,10 +521,12 @@ function Window.new(properties)
                     Rotation = (if out then 220 else 280),
                 })
 
+                self._liveTween = tweenW
                 tweenW:Play()
                 tweenW.Completed:Wait()
                 out = not out
             end
+            self._liveTween = nil
         end)
     end
 
@@ -561,12 +601,35 @@ function Window:_registerControl(control)
             n += 1
         end
         flag = flag .. n
-        warn("Rayfield: duplicate config flag '" .. control.flag .. "', saving this one as '" .. flag .. "'")
+        log.warn(
+            "Rayfield: duplicate config flag '"
+                .. control.flag
+                .. "', saving this one as '"
+                .. flag
+                .. "'. Set a unique flag to keep it stable across sessions."
+        )
     end
 
     control.flag = flag
     self.controls[flag] = control
     return flag
+end
+
+-- Autosave a control's value after an interactive or programmatic change, when the window is
+-- set to autoSave and the control opts into persistence. Every Set/commit path funnels here so
+-- persistence stays uniform across elements.
+function Window:_persist(control)
+    if control.flag and not control.forgetState and self.configuration.autoSave then
+        task.spawn(self.Save, self)
+    end
+end
+
+-- Drop a control from the flag registry when its element is removed, so Save/Load and the
+-- Flags view never touch a destroyed instance.
+function Window:_unregisterControl(control)
+    if control.flag and self.controls[control.flag] == control then
+        self.controls[control.flag] = nil
+    end
 end
 
 -- find a keybind element currently bound to `key`, skipping `exclude` and unbound keys. lets
@@ -620,7 +683,7 @@ function Window:Toast(properties)
     if not self.toasts then
         self.toasts = self:Create("Frame", {
             Name = "Toasts",
-            Size = UDim2.new(0, MAX_TOAST_WIDTH, 1, -24),
+            Size = UDim2.new(0, maxToastWidth, 1, -24),
             Position = UDim2.new(0.5, 0, 0, 12),
             AnchorPoint = Vector2.new(0.5, 0),
             BackgroundTransparency = 1,
@@ -658,7 +721,7 @@ function Window:Hide()
     -- to agree with that
     if self.minimised then
         self.minimised = false
-        self.minimiseAction.iconLabel.Image = "rbxassetid://108115485663409" -- back to the minimise icon
+        image.assign(self.minimiseAction.iconLabel, "Image", constants.icons.minimise) -- back to the minimise icon
     end
 
     -- remember where the window sat so Show grows it back to the same spot
@@ -768,7 +831,7 @@ function Window:ToggleMinimise()
 
     if self.minimised then
         self.minimised = false
-        self.minimiseAction.iconLabel.Image = "rbxassetid://108115485663409" -- back to the minimise icon
+        image.assign(self.minimiseAction.iconLabel, "Image", constants.icons.minimise) -- back to the minimise icon
 
         variables.tweenService:Create(self.main, sizeInfo, { Size = self.size }):Play()
         variables.tweenService:Create(self.windowShadow, fadeInfo, { Transparency = 0.6 }):Play()
@@ -809,7 +872,7 @@ function Window:ToggleMinimise()
         end)
     else
         self.minimised = true
-        self.minimiseAction.iconLabel.Image = "rbxassetid://88738500661569" -- maximise icon while minimised
+        image.assign(self.minimiseAction.iconLabel, "Image", constants.icons.maximise) -- maximise icon while minimised
 
         -- fade the content + tab pills out instead of cutting them, then hide them once faded
         -- so they don't sit clipped under the collapsed bar
@@ -911,7 +974,7 @@ function Window:_buildSettingsUI()
 
     self.rfSettings:CreateKeybind({
         name = "Toggle Keybind",
-        icon = 100604009889706,
+        icon = constants.icons.search,
         value = self.settings.toggleKeybind,
         isMenuToggle = true, -- reject keys already owned by an element keybind
         forgetState = true, -- lives in settings.rfld, not the user's config
@@ -993,7 +1056,7 @@ function Window:_buildSettingsUI()
 
         configDropdown = self.rfSettings:CreateDropdown({
             name = "Saved Configurations",
-            icon = 125823673784681,
+            icon = constants.icons.config,
             options = self:ListConfigs(),
             value = selected,
             placeholder = "No saved configurations",
@@ -1015,23 +1078,27 @@ function Window:_buildSettingsUI()
 
         actions:CreateButton({
             name = "Save",
-            icon = 125823673784681,
+            icon = constants.icons.config,
             callback = function()
                 local name = nameInput.value
                 if name == "" then
                     name = selected
                 end
                 if not name or name == "" then
-                    self:Toast({ title = "Name your configuration first" })
+                    self:Toast({ title = locale.resolve("Name your configuration first") })
                     return
                 end
                 if self:Save(name) then
                     nameInput:Set("")
                     selected = name
                     refreshConfigs()
-                    self:Toast({ title = "Saved configuration", subtitle = name, icon = 125823673784681 })
+                    self:Toast({
+                        title = locale.resolve("Saved configuration"),
+                        subtitle = name,
+                        icon = constants.icons.config,
+                    })
                 else
-                    self:Toast({ title = "Couldn't save configuration", subtitle = name })
+                    self:Toast({ title = locale.resolve("Couldn't save configuration"), subtitle = name })
                 end
             end,
         })
@@ -1040,13 +1107,13 @@ function Window:_buildSettingsUI()
             name = "Load",
             callback = function()
                 if not selected or selected == "" then
-                    self:Toast({ title = "Pick a configuration to load" })
+                    self:Toast({ title = locale.resolve("Pick a configuration to load") })
                     return
                 end
                 if self:Load(selected) then
-                    self:Toast({ title = "Loaded configuration", subtitle = selected })
+                    self:Toast({ title = locale.resolve("Loaded configuration"), subtitle = selected })
                 else
-                    self:Toast({ title = "Couldn't load configuration", subtitle = selected })
+                    self:Toast({ title = locale.resolve("Couldn't load configuration"), subtitle = selected })
                 end
             end,
         })
@@ -1056,14 +1123,14 @@ function Window:_buildSettingsUI()
             callback = function()
                 local deleting = selected
                 if not deleting or deleting == "" then
-                    self:Toast({ title = "Pick a configuration to delete" })
+                    self:Toast({ title = locale.resolve("Pick a configuration to delete") })
                     return
                 end
                 if self:DeleteConfig(deleting) then
                     refreshConfigs()
-                    self:Toast({ title = "Deleted configuration", subtitle = deleting })
+                    self:Toast({ title = locale.resolve("Deleted configuration"), subtitle = deleting })
                 else
-                    self:Toast({ title = "Couldn't delete configuration", subtitle = deleting })
+                    self:Toast({ title = locale.resolve("Couldn't delete configuration"), subtitle = deleting })
                 end
             end,
         })
@@ -1136,7 +1203,10 @@ function Window:Show()
     end
     self.animating = true
 
-    if self.configuration.autoLoad and self.hidden then
+    -- autoLoad reflects the saved config once, on first open. Re-loading on every show would
+    -- wipe any changes the user made and closed without saving.
+    if self.configuration.autoLoad and not self._autoLoaded then
+        self._autoLoaded = true
         self:Load()
     end
 
@@ -1393,15 +1463,44 @@ function Window:DeleteConfig(name)
     return persistence.delete(self, name)
 end
 
+-- Read a flag's current value, or nil if nothing is registered under it.
+function Window:Get(flag)
+    local control = self.controls[flag]
+    return control and control.value
+end
+
+-- Set a flag's value, routing through the control so the UI updates and the callback fires.
+-- Returns false if no control is registered under the flag.
+function Window:Set(flag, value)
+    local control = self.controls[flag]
+    if not control then
+        return false
+    end
+    control:Set(value)
+    return true
+end
+
+-- Jump to a tab by handle, name, or its page instance. No-ops on an unknown tab rather
+-- than handing JumpTo something it cant resolve.
 function Window:Navigate(tab)
-    if typeof(tab) == "string" then
-        local found = self.elements:FindFirstChild(tab)
-        if found then
-            tab = found
+    local page
+    if typeof(tab) == "Instance" then
+        page = tab
+    elseif typeof(tab) == "table" then
+        page = tab.tabPage
+    elseif typeof(tab) == "string" then
+        for _, candidate in self.tabs do
+            if candidate.name == tab then
+                page = candidate.tabPage
+                break
+            end
         end
     end
 
-    self.elementsLayout:JumpTo(tab)
+    if not page then
+        return
+    end
+    self.elementsLayout:JumpTo(page)
 end
 
 function Window:Create(className, properties, themeProperties)
@@ -1585,7 +1684,8 @@ function Window:_wireElementHover(element)
 end
 
 -- run a callback with the red error-flash on failure, debounced via element._errored so a
--- slider firing every frame flashes once. shared by button/toggle/slider
+-- slider firing every frame flashes once. shared by every interactive element. elements whose
+-- `main` is a transparent wrapper (the dropdown) set `flashTarget` to the frame to tint.
 function Window:_runGuarded(element, fn, ...)
     local args = table.pack(...)
     task.spawn(function()
@@ -1597,22 +1697,23 @@ function Window:_runGuarded(element, fn, ...)
         end
         element._errored = true
 
+        local flashFrame = element.flashTarget or element.main
         local quickOut = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-        variables.tweenService:Create(element.main, quickOut, { BackgroundColor3 = self.theme.ErrorColor }):Play()
+        variables.tweenService:Create(flashFrame, quickOut, { BackgroundColor3 = self.theme.ErrorColor }):Play()
         variables.tweenService:Create(element.stroke, quickOut, { Color = self.theme.ErrorStrokeColor }):Play()
         element.title.Text = locale.resolve("Error, log recorded in console.")
 
-        warn(
+        log.warn(
             `Rayfield encountered an error, with the callback for a {element.__type} component named '{element.name}':`
         )
-        print(err)
+        log.print(err)
 
         task.wait(1)
 
         element.title.Text = locale.resolve(element.name)
         variables.tweenService
             :Create(
-                element.main,
+                flashFrame,
                 TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.In),
                 { BackgroundColor3 = Color3.fromRGB(255, 255, 255) }
             )
@@ -1646,6 +1747,61 @@ function Window:StyleElementBody(main)
 
         Parent = main,
     }, { Color = "ElementStroke", Transparency = "ElementStrokeTransparency" })
+end
+
+-- Shared scaffold for the compact button/toggle row: the white body + stroke, the fill flex
+-- so it shares the row width, and the click surface. Callers add their own padding + content
+-- into the returned interact, keeping the two elements identical where they should be.
+function Window:_buildCompactRow(host, name, interactZIndex)
+    local main = self:Create("Frame", {
+        Name = name,
+        Size = UDim2.fromOffset(0, compactRowHeight),
+        AutomaticSize = Enum.AutomaticSize.X,
+        ClipsDescendants = true, -- overflow guard
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BorderSizePixel = 0,
+
+        BackgroundTransparency = 1, -- In = ElementTransparency
+
+        Parent = host.tabPage,
+    }, { BackgroundTransparency = "ElementTransparency" })
+
+    local stroke = self:StyleElementBody(main)
+
+    -- share the row width (grow + shrink)
+    self:Create("UIFlexItem", {
+        FlexMode = Enum.UIFlexMode.Fill,
+        Parent = main,
+    })
+
+    -- main flows + fills the interact
+    self:Create("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        HorizontalFlex = Enum.UIFlexAlignment.Fill,
+
+        Parent = main,
+    })
+
+    -- clickable wrapper, doubles as the hover-brighten surface
+    local interact = self:Create("TextButton", {
+        Text = "",
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BackgroundTransparency = 1, -- hover fades to 0.97
+        AutomaticSize = Enum.AutomaticSize.X,
+        Size = UDim2.fromOffset(0, compactRowHeight),
+        BorderSizePixel = 0,
+        TextTransparency = 1,
+        ZIndex = interactZIndex or 1,
+
+        Parent = main,
+    })
+
+    self:Create("UICorner", {
+        Parent = interact,
+    }, { CornerRadius = "ElementCornerRadius" })
+
+    return main, stroke, interact
 end
 
 -- Like StyleElementBody but with a gradient stroke (subtle sheen) instead of a flat one.
@@ -1684,7 +1840,7 @@ function Window:_reveal(instance, props, animate, info)
         return
     end
     if animate then
-        variables.tweenService:Create(instance, info or REVEAL_INFO, props):Play()
+        variables.tweenService:Create(instance, info or revealInfo, props):Play()
     else
         for property, value in props do
             instance[property] = value
@@ -1722,12 +1878,12 @@ end
 -- restore pill used to sit at, translated into main's own centre-anchored space (main never
 -- changes AnchorPoint, so its Position always addresses its centre, not its top edge).
 function Window:_collapsedRect()
-    local size = COLLAPSED_SIZE
+    local size = collapsedSize
     local home = UDim2.new(
-        COLLAPSED_TOP.X.Scale,
-        COLLAPSED_TOP.X.Offset,
-        COLLAPSED_TOP.Y.Scale,
-        COLLAPSED_TOP.Y.Offset + size.Y.Offset / 2
+        collapsedTop.X.Scale,
+        collapsedTop.X.Offset,
+        collapsedTop.Y.Scale,
+        collapsedTop.Y.Offset + size.Y.Offset / 2
     )
     return home, size
 end
@@ -1741,6 +1897,16 @@ end
 function Window:Connect(signal, callback)
     local connection = signal:Connect(callback)
     table.insert(self.connections, connection)
+    return connection
+end
+
+-- Like Connect, but also files the connection on the element that owns it, so Tab:Remove can
+-- tear an element's connections down instead of leaving them tracked until Unload. Every
+-- persistent element connection funnels through here.
+function Window:ConnectFor(owner, signal, callback)
+    local connection = self:Connect(signal, callback)
+    owner.connections = owner.connections or {}
+    table.insert(owner.connections, connection)
     return connection
 end
 
@@ -1784,6 +1950,10 @@ end
 
 function Window:Unload()
     self.unloaded = true
+    if self._liveTween then
+        self._liveTween:Cancel() -- unparks the LiveAnimation loop before we destroy the gradient
+        self._liveTween = nil
+    end
     for i = #self.connections, 1, -1 do
         self.connections[i]:Disconnect()
     end

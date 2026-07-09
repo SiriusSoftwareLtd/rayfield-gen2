@@ -2,6 +2,7 @@
 
 local variables = require(script.Parent.variables)
 local filesystem = require(script.Parent.filesystem)
+local log = require(script.Parent.log)
 
 local persistence = {}
 
@@ -35,8 +36,16 @@ function persistence.getPath(window, name)
         dir = dir .. "/" .. sanitizeFolder(window.configuration.customFolder)
     end
     local base = name or window.configuration.fileName or window.name
-    local fileName = sanitizeFile(base) .. ".rfld"
-    return dir, dir .. "/" .. fileName
+    -- a name of only dots/slashes sanitizes to nothing, which would leave a bare ".rfld";
+    -- fall back to the window name, then a constant, so there's always a real filename
+    local safe = sanitizeFile(base)
+    if safe == "" then
+        safe = sanitizeFile(window.name)
+    end
+    if safe == "" then
+        safe = "Configuration"
+    end
+    return dir, dir .. "/" .. safe .. ".rfld"
 end
 
 function persistence.save(window, name)
@@ -58,13 +67,13 @@ function persistence.save(window, name)
         if ok then
             flags[flag] = value
         else
-            warn("Rayfield: Failed to serialize flag '" .. tostring(flag) .. "' - " .. tostring(value))
+            log.warn("Rayfield: Failed to serialize flag '" .. tostring(flag) .. "' - " .. tostring(value))
         end
     end
 
     local encodeSuccess, encoded = pcall(variables.httpService.JSONEncode, variables.httpService, flags)
     if not encodeSuccess then
-        warn("Rayfield: Failed to encode configuration - " .. tostring(encoded))
+        log.warn("Rayfield: Failed to encode configuration - " .. tostring(encoded))
         return false
     end
 
@@ -74,7 +83,7 @@ function persistence.save(window, name)
     end)
 
     if not ok then
-        warn("Rayfield: Failed to save configuration - " .. tostring(err))
+        log.warn("Rayfield: Failed to save configuration - " .. tostring(err))
         return false
     end
 
@@ -90,7 +99,7 @@ function persistence.load(window, name)
 
     local readOk, config = pcall(filesystem.readfile, fullPath)
     if not readOk or not config then
-        warn("Rayfield: Failed to read configuration file")
+        log.warn("Rayfield: Failed to read configuration file")
         return false
     end
 
@@ -98,7 +107,7 @@ function persistence.load(window, name)
 
     if not decodeOk then
         -- Backup the corrupt file and remove the original
-        warn("Rayfield: Configuration file has an invalid format, backing up and resetting")
+        log.warn("Rayfield: Configuration file has an invalid format, backing up and resetting")
         local backupPath = dir
             .. "/"
             .. sanitizeFile(name or window.configuration.fileName or window.name)
@@ -131,7 +140,7 @@ function persistence.load(window, name)
                 control:Set(value, true)
             end)
             if not ok then
-                warn("Rayfield: Failed to restore flag '" .. tostring(flag) .. "' - " .. tostring(err))
+                log.warn("Rayfield: Failed to restore flag '" .. tostring(flag) .. "' - " .. tostring(err))
             end
         end
     end
@@ -204,7 +213,7 @@ function persistence.saveSettings(window)
     end)
 
     if not writeOk then
-        warn("Rayfield: Failed to save settings - " .. tostring(err))
+        log.warn("Rayfield: Failed to save settings - " .. tostring(err))
         return false
     end
 

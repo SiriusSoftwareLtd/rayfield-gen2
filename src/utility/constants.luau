@@ -5,6 +5,28 @@ local constants = {}
 -- brand font asset (themes reference this too)
 constants.fontAsset = "rbxassetid://12187365364"
 
+-- the input/keybind fields hug their text, tweening width instead of AutomaticSize so it animates
+constants.pillResizeInfo = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+
+-- Every built-in icon Rayfield ships, by name. Single source of truth: secure mode caches
+-- exactly these (see utility/image) so the UI never has to fall back to a raw asset id at
+-- runtime. Add a new built-in icon here and it's cached automatically.
+constants.icons = {
+    close = 83277910885129,
+    minimise = 108115485663409,
+    maximise = 88738500661569,
+    settings = 129180860773723,
+    search = 100604009889706,
+    chevron = 88479147175134,
+    check = 125626312718314,
+    dot = 91452555903853, -- unselected dropdown option
+    toggle = 78137979054938,
+    colorpicker = 128242943430630,
+    banner = 111263549366178,
+    config = 125823673784681, -- saved-configurations picker
+    rayfield = 80387863064905, -- default show icon on the sign-in toast
+}
+
 -- Accent used by the toggle switch + slider glow when active.
 constants.accent = {
     on = Color3.fromRGB(23, 153, 110),
@@ -31,6 +53,8 @@ constants.statAccents = {
 -- Named stacking layers for window furniture (assumes Global ZIndexBehavior)
 constants.zIndex = {
     bottomFade = 100,
+    -- bottom-right notification cards sit just above the window content
+    notification = 2,
     drag = 1000,
     -- top-centre toasts float over the whole window
     toast = 2000,

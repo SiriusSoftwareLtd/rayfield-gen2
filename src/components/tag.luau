@@ -8,6 +8,7 @@ local utility = script.Parent.Parent.utility
 -- Variables
 local variables = require(utility.variables)
 local functions = require(utility.functions)
+local image = require(utility.image)
 
 local defaultColor = Color3.fromRGB(255, 175, 15)
 local setTweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
@@ -109,12 +110,15 @@ function Tag.new(window, properties)
     return self
 end
 
-function Tag:_setShown(shown, tweenInfo)
+-- animate is a boolean like every other element's _setShown, or a TweenInfo when a caller
+-- (the window's show/hide) wants its own timing. true uses the tag's default fade.
+function Tag:_setShown(shown, animate)
     local target = if shown then 0 else 1
-    if tweenInfo then
-        variables.tweenService:Create(self.main, tweenInfo, { BackgroundTransparency = target }):Play()
-        variables.tweenService:Create(self.iconLabel, tweenInfo, { ImageTransparency = target }):Play()
-        variables.tweenService:Create(self.title, tweenInfo, { TextTransparency = target }):Play()
+    local info = if typeof(animate) == "TweenInfo" then animate elseif animate then setTweenInfo else nil
+    if info then
+        variables.tweenService:Create(self.main, info, { BackgroundTransparency = target }):Play()
+        variables.tweenService:Create(self.iconLabel, info, { ImageTransparency = target }):Play()
+        variables.tweenService:Create(self.title, info, { TextTransparency = target }):Play()
     else
         self.main.BackgroundTransparency = target
         self.iconLabel.ImageTransparency = target
@@ -138,7 +142,7 @@ end
 
 function Tag:SetIcon(icon)
     self.icon = icon
-    self.iconLabel.Image = if icon then "rbxassetid://" .. tostring(icon) else ""
+    image.assign(self.iconLabel, "Image", icon)
     self.iconLabel.Visible = icon ~= nil
 end
 

@@ -7,6 +7,7 @@ local utility = script.Parent.Parent.utility
 local variables = require(utility.variables)
 local functions = require(utility.functions)
 local constants = require(utility.constants)
+local image = require(utility.image)
 
 -- Timings (Exponential Out, matching the notification feel).
 local slideInfo = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out) -- entry travel
@@ -17,23 +18,23 @@ local shrinkInfo = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingD
 
 -- title weight is fixed (semibold) rather than themed, and the measure below uses the same
 -- font so the hug-width always matches what actually renders
-local TITLE_FONT = Font.new(constants.fontAsset, Enum.FontWeight.SemiBold)
+local titleFont = Font.new(constants.fontAsset, Enum.FontWeight.SemiBold)
 
-local ICON_SIZE = 24 -- a glyph icon
-local AVATAR_SIZE = 32 -- a user headshot (matches the old "signed in as" card)
-local LEFT_PADDING = 18 -- inside the pill, before the icon/text
-local RIGHT_PADDING = 18 -- trailing room after the text
+local iconSize = 24 -- a glyph icon
+local avatarSize = 32 -- a user headshot (matches the old "signed in as" card)
+local leftPadding = 18 -- inside the pill, before the icon/text
+local rightPadding = 18 -- trailing room after the text
 -- the avatar (profile-chip) variant sits its headshot closer to the edge like the old card
 -- and gives the text extra trailing room
-local AVATAR_LEFT_PADDING = 10
-local AVATAR_RIGHT_PADDING = 28
-local ICON_GAP = 12 -- icon to text
-local STACK_PADDING = 8 -- gap between stacked toasts (lives inside each, so it collapses on exit)
+local avatarLeftPadding = 10
+local avatarRightPadding = 28
+local iconGap = 12 -- icon to text
+local stackPadding = 8 -- gap between stacked toasts (lives inside each, so it collapses on exit)
 local MIN_WIDTH, MAX_WIDTH = 140, 320
 
 -- how far above its slot the pill starts, so it flies in from off the top of the screen
-local OFFSCREEN_ABOVE = UDim2.new(0.5, 0, 0.5, -180)
-local CENTRED = UDim2.new(0.5, 0, 0.5, 0)
+local offscreenAbove = UDim2.new(0.5, 0, 0.5, -180)
+local centred = UDim2.new(0.5, 0, 0.5, 0)
 
 -- Auto duration from the text length, clamped to a sensible window (matches notifications).
 local function autoDuration(text)
@@ -75,13 +76,19 @@ function Toast.new(window, properties)
     -- is the compact glyph. these drive both the build below and _measure.
     local hasAvatar = self.avatar ~= nil and self.avatar ~= 0
     local hasIcon = hasAvatar or (self.icon ~= nil and self.icon ~= 0 and self.icon ~= "")
+    -- headshots resolve to a local getcustomasset file in secure mode, fetched async - so it may
+    -- land after the toast builds, hence the onReady that fills the icon in once it's ready
     self._iconImage = if hasAvatar
-        then `rbxthumb://type=AvatarHeadShot&id={self.avatar}&w=48&h=48`
+        then image.avatar(self.avatar, function(uri)
+            if self.iconLabel then
+                image.assign(self.iconLabel, "Image", uri)
+            end
+        end)
         elseif hasIcon then resolveImage(self.icon)
         else nil
-    self._iconSize = if hasAvatar then AVATAR_SIZE else ICON_SIZE
-    self._leftPad = if hasAvatar then AVATAR_LEFT_PADDING else LEFT_PADDING
-    self._rightPad = if hasAvatar then AVATAR_RIGHT_PADDING else RIGHT_PADDING
+    self._iconSize = if hasAvatar then avatarSize else iconSize
+    self._leftPad = if hasAvatar then avatarLeftPadding else leftPadding
+    self._rightPad = if hasAvatar then avatarRightPadding else rightPadding
     self._minWidth = math.max(self.minWidth or 0, MIN_WIDTH)
     local hasSubtitle = self.subtitle ~= nil and self.subtitle ~= ""
 
@@ -99,7 +106,7 @@ function Toast.new(window, properties)
 
     -- inter-toast gap lives here (not on the stack layout) so it collapses with the card
     self.window:Create("UIPadding", {
-        PaddingTop = UDim.new(0, STACK_PADDING),
+        PaddingTop = UDim.new(0, stackPadding),
 
         Parent = self.main,
     })
@@ -108,7 +115,7 @@ function Toast.new(window, properties)
     self.body = self.window:Create("Frame", {
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         Size = UDim2.new(1, 0, 1, 0),
-        Position = OFFSCREEN_ABOVE,
+        Position = offscreenAbove,
         AnchorPoint = Vector2.new(0.5, 0.5),
         Active = true, -- takes clicks for click-to-dismiss
         BorderSizePixel = 0,
@@ -153,7 +160,7 @@ function Toast.new(window, properties)
         VerticalAlignment = Enum.VerticalAlignment.Center,
         HorizontalAlignment = Enum.HorizontalAlignment.Left,
         SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDim.new(0, ICON_GAP),
+        Padding = UDim.new(0, iconGap),
 
         Parent = self.body,
     })
@@ -209,7 +216,7 @@ function Toast.new(window, properties)
         AutomaticSize = Enum.AutomaticSize.X,
         Size = UDim2.fromOffset(0, 16),
         BackgroundTransparency = 1,
-        FontFace = TITLE_FONT,
+        FontFace = titleFont,
         TextSize = 16,
         TextXAlignment = Enum.TextXAlignment.Left,
         LayoutOrder = if self.subtitleAbove then 2 else 1,
@@ -268,13 +275,13 @@ end
 -- Width the pill needs to hug its content, measured without rendering so it grows into place
 -- rather than snapping wide first. Height is fixed by line count (icon dictates the minimum).
 function Toast:_measure()
-    local titleWidth = functions.textWidth(TITLE_FONT, 16, self.title)
+    local titleWidth = functions.textWidth(titleFont, 16, self.title)
     local subtitleWidth = if self.subtitleLabel
         then functions.textWidth(self.window.theme.Font, 14, self.subtitle)
         else 0
     local textWidth = math.max(titleWidth, subtitleWidth)
 
-    local left = if self.iconLabel then self._leftPad + self._iconSize + ICON_GAP else self._leftPad
+    local left = if self.iconLabel then self._leftPad + self._iconSize + iconGap else self._leftPad
     local width = math.clamp(left + textWidth + self._rightPad, self._minWidth, MAX_WIDTH)
 
     local textHeight = if self.subtitleLabel then 16 + 1 + 14 else 16
@@ -293,21 +300,27 @@ function Toast:_show()
     local width, height = self:_measure()
     self.main.Size = UDim2.new(0, width, 0, 0)
 
-    -- +STACK_PADDING because the outer's top padding holds the inter-toast gap
-    variables.tweenService:Create(self.main, growInfo, { Size = UDim2.new(0, width, 0, height + STACK_PADDING) }):Play()
-    variables.tweenService:Create(self.body, slideInfo, { Position = CENTRED }):Play()
+    -- +stackPadding because the outer's top padding holds the inter-toast gap
+    variables.tweenService:Create(self.main, growInfo, { Size = UDim2.new(0, width, 0, height + stackPadding) }):Play()
+    variables.tweenService:Create(self.body, slideInfo, { Position = centred }):Play()
     variables.tweenService:Create(self.body, fadeLong, { BackgroundTransparency = 0 }):Play()
     variables.tweenService:Create(self.stroke, fadeLong, { Transparency = 0.9 }):Play()
     variables.tweenService:Create(self.shadow, fadeShort, { Transparency = 0.6 }):Play()
     variables.tweenService:Create(self.titleLabel, fadeShort, { TextTransparency = 0 }):Play()
 
     task.wait(0.05)
+    if self._dismissed or not self.main.Parent then
+        return -- dismissed mid-stagger; dont fight the exit fade
+    end
     if self.iconLabel then
         variables.tweenService:Create(self.iconLabel, fadeShort, { BackgroundTransparency = 0.95 }):Play()
         variables.tweenService:Create(self.iconLabel, fadeShort, { ImageTransparency = 0 }):Play()
     end
 
     task.wait(0.05)
+    if self._dismissed or not self.main.Parent then
+        return
+    end
     if self.subtitleLabel then
         variables.tweenService:Create(self.subtitleLabel, fadeShort, { TextTransparency = 0.5 }):Play()
     end

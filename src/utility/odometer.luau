@@ -70,6 +70,10 @@ function odometer.new(window, container, opts)
 
     self.roll = TweenInfo.new(self.duration, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
+    -- Cells sit above the container so the digits never get hidden by it under Global
+    -- ZIndexBehavior, wherever the container itself is stacked (floored at the old default).
+    self.zIndex = math.max(container.ZIndex + 1, 6)
+
     -- Height tracks the text size (not the taller text-bounds height) so the readout
     -- keeps a plain-label footprint; neighbour digits sit one cell away, outside the clip.
     self.height = math.ceil(self.textSize)
@@ -109,7 +113,7 @@ function odometer:_reel(index)
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
         ClipsDescendants = true,
-        ZIndex = 6,
+        ZIndex = self.zIndex,
 
         Parent = self.container,
     })
@@ -120,7 +124,7 @@ function odometer:_reel(index)
         Position = UDim2.new(0.5, 0, 0, 0),
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
-        ZIndex = 6,
+        ZIndex = self.zIndex,
 
         Parent = cell,
     })
@@ -136,7 +140,7 @@ function odometer:_reel(index)
             TextXAlignment = Enum.TextXAlignment.Center,
             TextYAlignment = Enum.TextYAlignment.Center,
             TextTransparency = self.transparency,
-            ZIndex = 6,
+            ZIndex = self.zIndex,
 
             Parent = strip,
         }, { TextColor3 = "ContentColor", FontFace = "Font" })
@@ -165,7 +169,7 @@ function odometer:_static(index)
         TextXAlignment = Enum.TextXAlignment.Center,
         TextYAlignment = Enum.TextYAlignment.Center,
         TextTransparency = self.transparency,
-        ZIndex = 6,
+        ZIndex = self.zIndex,
 
         Parent = self.container,
     }, { TextColor3 = "ContentColor", FontFace = "Font" })

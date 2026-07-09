@@ -1,6 +1,7 @@
 local rayfield = {}
 local variables = require(script.utility.variables)
 local image = require(script.utility.image)
+local locale = require(script.utility.locale)
 local constants = require(script.utility.constants)
 local types = require(script.types)
 
@@ -39,7 +40,7 @@ local function createBanner()
     banner.BackgroundTransparency = 1
     banner.BorderColor3 = Color3.fromRGB(0, 0, 0)
     banner.BorderSizePixel = 0
-    banner.Image = image.resolve(111263549366178)
+    banner.Image = image.resolve(constants.icons.banner)
     banner.Position = UDim2.fromScale(0.5, 0.5)
     banner.Size = UDim2.fromOffset(262, 60)
     banner.Parent = ui
@@ -47,16 +48,14 @@ local function createBanner()
     return ui
 end
 
--- maybe add localization options with set languages ?
--- add menu to choose language before continuing if there's no built-in service to check region
-
 function rayfield:CreateWindow(properties: types.WindowProps): types.Window
     local banner = createBanner()
 
+    local cacheFailures = 0
     if variables.secureMode then
         -- cache assets locally so secureMode doesnt leak asset ids
-        -- TODO: notify on partial cache failure once notifications land
-        image.preload()
+        local _, failed = image.preload()
+        cacheFailures = failed or 0
     end
 
     local window = require(script.components.window).new(properties)
@@ -68,6 +67,18 @@ function rayfield:CreateWindow(properties: types.WindowProps): types.Window
 
         task.wait(0.5)
         window:Show()
+
+        -- uncached assets resolve blank in secureMode, so tell the dev instead of leaving
+        -- them to wonder why icons are missing. on-screen only: secureMode exists to stay
+        -- quiet, so we never touch the console here
+        if cacheFailures > 0 then
+            window:Notify({
+                title = locale.resolve("Secure mode"),
+                content = if cacheFailures == 1
+                    then locale.resolve("An asset couldn't be cached and won't appear.")
+                    else locale.resolve("Some assets couldn't be cached and won't appear."),
+            })
+        end
     end)
 
     return window :: any

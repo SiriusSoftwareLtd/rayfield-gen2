@@ -13,6 +13,8 @@ Group.__type = "Group"
 -- The public API calls these "row"/"column"; "horizontal"/"vertical" work too.
 
 local moveable = require(script.Parent.Parent.utility.moveable)
+local log = require(script.Parent.Parent.utility.log)
+local assignOrder = require(script.Parent.Parent.utility.ordering)
 
 local elementPadding = 8
 
@@ -24,13 +26,6 @@ local compactCapable = {
     stat = true,
     slider = true,
 }
-
-local function assignOrder(element, order)
-    element.main.LayoutOrder = order
-    if element.descriptor then
-        element.descriptor.main.LayoutOrder = order + 1
-    end
-end
 
 function Group.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
@@ -90,7 +85,7 @@ end
 
 function Group:_add(componentName, properties)
     if self.compact and not compactCapable[componentName] then
-        warn(
+        log.warn(
             `Rayfield: a row only holds compact elements (button/toggle/stat/slider), ignoring '{componentName}'. Use a column for it.`
         )
         return nil

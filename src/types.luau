@@ -146,9 +146,8 @@ export type StatProps = {
     display: string?, -- "value" | "change"
     compact: boolean?,
     changeMode: string?, -- "percentage" | "absolute"
-    changeBaseline: string?,
+    changeBaseline: string?, -- "previous" | "initial"
     numberEasing: boolean?,
-    callback: ((value: number) -> ())?,
 }
 
 export type NotifyProps = {
@@ -221,7 +220,8 @@ export type Stat = Moveable & {
 export type Section = Moveable & {}
 
 -- A group lays elements along one axis and nests, so a row of columns builds a grid.
--- A row accepts the compact elements + slider; a column accepts anything.
+-- A row accepts the compact elements (button/toggle/stat) + slider; a column also takes
+-- dropdown and section. Input, keybind and colorpicker stay tab-level for now.
 export type Group = Moveable & {
     CreateButton: (self: Group, props: ButtonProps) -> Button,
     CreateToggle: (self: Group, props: ToggleProps) -> Toggle,

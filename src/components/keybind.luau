@@ -10,9 +10,9 @@ local variables = require(utility.variables)
 local functions = require(utility.functions)
 local moveable = require(utility.moveable)
 local locale = require(utility.locale)
+local constants = require(utility.constants)
 
--- box hugs the key name; tween the width instead of AutomaticSize so it animates
-local resizeInfo = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+local resizeInfo = constants.pillResizeInfo
 local recordInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
 -- shorter labels for the mouse buttons (KeyCodes already read fine)
@@ -191,7 +191,7 @@ function Keybind.new(tab, properties)
         Parent = self.box,
     }, { TextColor3 = "ContentColor", FontFace = "Font" })
 
-    self.window:Connect(self.box.MouseButton1Click, function()
+    self.window:ConnectFor(self, self.box.MouseButton1Click, function()
         if self.recording then
             self:_stopRecording()
         else
@@ -203,7 +203,7 @@ function Keybind.new(tab, properties)
     -- callback when the bound key is pressed. `processed` is Roblox's gameProcessedEvent, true
     -- when the input was already consumed (typing in a box, core UI), so we skip it either way
     -- and keybinds never go off mid-type.
-    self.window:Connect(variables.userInputService.InputBegan, function(input, processed)
+    self.window:ConnectFor(self, variables.userInputService.InputBegan, function(input, processed)
         if processed then
             return
         end
@@ -218,7 +218,7 @@ function Keybind.new(tab, properties)
         end
         if self:_matches(input) then
             if self.hold then
-                self:_beginHold()
+                self:_beginHold(input)
             else
                 self.window:_runGuarded(self, self.callback, self.value)
             end
@@ -311,8 +311,13 @@ function Keybind:_capture(input)
         local clash = self.window:_keybindUsing(key, self)
         if clash then
             self.window:Notify({
-                title = "Keybind unavailable",
-                content = keyName(key) .. " is bound to " .. clash.name .. ". Kept " .. keyName(self.value) .. ".",
+                title = locale.resolve("Keybind unavailable"),
+                content = string.format(
+                    locale.resolve("%s is bound to %s. Kept %s."),
+                    keyName(key),
+                    clash.name,
+                    keyName(self.value)
+                ),
             })
             self:_stopRecording()
             self.window:_flashResult(self, false) -- red: rejected
@@ -322,8 +327,12 @@ function Keybind:_capture(input)
         -- an element keybind cant clash with the menu toggle key, same double-fire problem the
         -- other way round. bail, tell them, and keep the old binding.
         self.window:Notify({
-            title = "Keybind unavailable",
-            content = keyName(key) .. " is the menu toggle key. Kept " .. keyName(self.value) .. ".",
+            title = locale.resolve("Keybind unavailable"),
+            content = string.format(
+                locale.resolve("%s is the menu toggle key. Kept %s."),
+                keyName(key),
+                keyName(self.value)
+            ),
         })
         self:_stopRecording()
         self.window:_flashResult(self, false) -- red: rejected
@@ -338,10 +347,7 @@ function Keybind:_bind(key)
     self.value = key
     self:_stopRecording()
     self.window:_runGuarded(self, self.onChanged, key)
-
-    if self.flag and not self.forgetState and self.window.configuration.autoSave then
-        task.spawn(self.window.Save, self.window)
-    end
+    self.window:_persist(self)
 
     self.window:_flashResult(self, true) -- green: bound
 end
@@ -362,12 +368,17 @@ end
 
 -- hold mode: arm after holdThreshold (a quick tap never counts), fire callback(true) then
 -- callback(false) once, edge-triggered off this exact press ending.
-function Keybind:_beginHold()
+function Keybind:_beginHold(input)
     if self._holding or self._holdPress then
         return -- already tracking a hold
     end
     local press = {}
     self._holdPress = press
+
+    -- match the release against the exact key that started this hold, not self.value, so a
+    -- rebind mid-hold still lets the original key release and fire callback(false).
+    local heldKeyCode = input.KeyCode
+    local heldInputType = input.UserInputType
 
     task.delay(self.holdThreshold, function()
         if self._holdPress ~= press then
@@ -377,14 +388,18 @@ function Keybind:_beginHold()
         self.window:_runGuarded(self, self.callback, true)
     end)
 
-    -- release edge off the global InputEnded for the bound key (robust to synthetic input,
-    -- where the original InputObject's state doesnt always transition)
+    -- release edge off the global InputEnded (robust to synthetic input, where the original
+    -- InputObject's state doesnt always transition). tracked on the window so it cant outlive
+    -- Unload.
     local conn
-    conn = variables.userInputService.InputEnded:Connect(function(ended)
-        if not self:_matches(ended) then
+    conn = self.window:Connect(variables.userInputService.InputEnded, function(ended)
+        local released = if heldKeyCode ~= Enum.KeyCode.Unknown
+            then ended.KeyCode == heldKeyCode
+            else ended.UserInputType == heldInputType
+        if not released then
             return
         end
-        conn:Disconnect()
+        self.window:Disconnect(conn)
         if self._holdPress == press then
             self._holdPress = nil
         end
@@ -406,6 +421,7 @@ function Keybind:Set(value, skipChanged)
 
     if not skipChanged then
         self.window:_runGuarded(self, self.onChanged, self.value)
+        self.window:_persist(self)
     end
 end
 

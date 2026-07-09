@@ -9,6 +9,38 @@ local utility = script.Parent.Parent.utility
 local variables = require(utility.variables)
 local functions = require(utility.functions)
 local locale = require(utility.locale)
+local assignOrder = require(utility.ordering)
+
+-- Walk a tab or group's children (groups nest) and tear each element down: drop its flag from
+-- the window registry and disconnect every connection it owns, so nothing outlives the
+-- instances we're about to destroy.
+local function teardownElements(window, elements)
+    for _, element in elements do
+        if element.__type == "Group" then
+            teardownElements(window, element.elements)
+        else
+            window:_unregisterControl(element)
+        end
+
+        -- persistent connections filed via window:ConnectFor
+        if element.connections then
+            for _, connection in element.connections do
+                window:Disconnect(connection)
+            end
+            element.connections = nil
+        end
+
+        -- transient, self-managed connections that may still be live if removed mid-interaction
+        if element._dragConnection then
+            element._dragConnection:Disconnect()
+            element._dragConnection = nil
+        end
+        if element._outsideClickConn then
+            window:Disconnect(element._outsideClickConn)
+            element._outsideClickConn = nil
+        end
+    end
+end
 
 -- Pill transparencies per state. Gradient stays constant (theme TabBackground/TabStroke), selection is just transparency.
 local tabStates = {
@@ -29,15 +61,14 @@ function Tab.new(window, properties)
         name = properties.name or properties.Name,
         icon = properties.icon or properties.Icon,
         neglectSelector = properties.neglectSelector or properties.NeglectSelector or false,
-        customOrder = properties.customOrder or properties.CustomOrder or 0, -- make this maybe not 0.
+        customOrder = properties.customOrder or properties.CustomOrder or 0,
 
         elements = {},
         connections = {}, -- tracked so Remove can drop them without waiting for Unload
     }, Tab)
 
-    -- fix this message.
-    -- this adds support for nameless/iconless tabs
-    assert(self.name or self.icon, "Missing Icon or Name.")
+    -- a tab needs at least one of a name or an icon to show in the selector
+    assert(self.name or self.icon, "A tab needs a name or an icon.")
 
     if not self.neglectSelector then -- Allow for tabs to be hidden from the tab selector, for Rayfield Settings.
         -- Topbar Item
@@ -308,13 +339,6 @@ function Tab:Deselect(noAnimation)
     end
 end
 
-local function assignOrder(element, order)
-    element.main.LayoutOrder = order
-    if element.descriptor then
-        element.descriptor.main.LayoutOrder = order + 1
-    end
-end
-
 -- shared tail for every CreateX: track it, order it, and reveal it if the window is
 -- already open. without this, elements added after Window:Show stay fully transparent.
 function Tab:_register(element)
@@ -427,6 +451,10 @@ function Tab:Remove()
             end
         end
     end
+
+    -- Tear every element down (flags + connections) so nothing points at, or fires on, what
+    -- we're about to destroy. Groups nest, so walk their children too.
+    teardownElements(window, self.elements)
 
     -- Tear down the UI; nil the refs so _applyVisual (which guards on self.topbarItem)
     -- no-ops instead of touching a destroyed instance.
