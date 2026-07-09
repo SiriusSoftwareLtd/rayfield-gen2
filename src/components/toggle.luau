@@ -10,6 +10,7 @@ local variables = require(utility.variables)
 local functions = require(utility.functions)
 local moveable = require(utility.moveable)
 local constants = require(utility.constants)
+local locale = require(utility.locale)
 
 -- Compact (row) sizing.
 local compactHeight = 41
@@ -206,7 +207,7 @@ function Toggle:_buildFull()
     end
 
     self.title = window:Create("TextLabel", {
-        Text = self.name,
+        Text = locale.t(self.name),
         Size = UDim2.fromOffset(250, 16),
         BorderSizePixel = 0,
         BackgroundTransparency = 1,
@@ -392,7 +393,7 @@ function Toggle:_buildCompact()
     end
 
     self.title = window:Create("TextLabel", {
-        Text = self.name,
+        Text = locale.t(self.name),
         Size = UDim2.fromOffset(0, 16),
         AutomaticSize = Enum.AutomaticSize.X,
         BorderSizePixel = 0,
@@ -498,7 +499,7 @@ function Toggle:_buildLock()
     })
 
     self.lockLabel = window:Create("TextLabel", {
-        Text = "This element is locked.",
+        Text = locale.t("This element is locked."),
         Size = UDim2.fromScale(0, 1),
         AutomaticSize = Enum.AutomaticSize.X,
         BackgroundTransparency = 1,
@@ -547,15 +548,25 @@ local toggleReveal = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.Easin
 -- glow delayed so it doesn't bleed through the fill fade-in on window open
 local toggleGlowReveal = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out, 0, false, 0.35)
 
-function Toggle:_setShown(animate)
+function Toggle:_setShown(shown, animate)
     local w = self.window
-    w:_revealCommon(self, animate)
-    w:_reveal(self.indicator, { BackgroundTransparency = self.value and 0 or 0.8 }, animate, toggleReveal)
-    w:_reveal(self.indicatorStroke, { Transparency = self.value and 0 or 0.7 }, animate, toggleReveal)
-    w:_reveal(self.indicatorGlow, { Transparency = self.value and 0.4 or 1 }, animate, toggleGlowReveal)
-    w:_reveal(self.overlay, { BackgroundTransparency = 0 }, animate, toggleReveal)
-    w:_reveal(self.containerStroke, { Transparency = 0.85 }, animate, toggleReveal)
-    w:_reveal(self.functionContainer, { BackgroundTransparency = 0.9 }, animate, toggleReveal)
+    if shown then
+        w:_revealCommon(self, animate)
+        w:_reveal(self.indicator, { BackgroundTransparency = self.value and 0 or 0.8 }, animate, toggleReveal)
+        w:_reveal(self.indicatorStroke, { Transparency = self.value and 0 or 0.7 }, animate, toggleReveal)
+        w:_reveal(self.indicatorGlow, { Transparency = self.value and 0.4 or 1 }, animate, toggleGlowReveal)
+        w:_reveal(self.overlay, { BackgroundTransparency = 0 }, animate, toggleReveal)
+        w:_reveal(self.containerStroke, { Transparency = 0.85 }, animate, toggleReveal)
+        w:_reveal(self.functionContainer, { BackgroundTransparency = 0.9 }, animate, toggleReveal)
+    else
+        w:_hideCommon(self, animate)
+        w:_reveal(self.indicator, { BackgroundTransparency = 1 }, animate, toggleReveal)
+        w:_reveal(self.indicatorStroke, { Transparency = 1 }, animate, toggleReveal)
+        w:_reveal(self.indicatorGlow, { Transparency = 1 }, animate, toggleGlowReveal)
+        w:_reveal(self.overlay, { BackgroundTransparency = 1 }, animate, toggleReveal)
+        w:_reveal(self.containerStroke, { Transparency = 1 }, animate, toggleReveal)
+        w:_reveal(self.functionContainer, { BackgroundTransparency = 1 }, animate, toggleReveal)
+    end
 end
 
 -- Room the compact toggle needs: side padding + icon (and gap) if shown + title text

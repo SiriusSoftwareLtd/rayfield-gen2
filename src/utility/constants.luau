@@ -32,7 +32,9 @@ constants.statAccents = {
 constants.zIndex = {
     bottomFade = 100,
     drag = 1000,
-    restoreBase = 100000,
+    -- top-centre toasts float over the whole window
+    toast = 2000,
+    toastContent = 2001,
     restoreContent = 100001,
     restoreInteract = 100002,
 }

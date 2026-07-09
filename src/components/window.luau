@@ -6,6 +6,7 @@ local image = require(utility.image)
 local functions = require(utility.functions)
 local persistence = require(utility.persistence)
 local constants = require(utility.constants)
+local locale = require(utility.locale)
 local chrome = require(script.Parent.chrome)
 
 -- Variables
@@ -20,6 +21,15 @@ Window.__index = Window
 
 -- Default entrance-reveal tween (elements override with their own where needed)
 local REVEAL_INFO = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+
+-- The collapsed "pill" main morphs into on Hide, top-anchored the way the old standalone
+-- restore button used to sit.
+local COLLAPSED_SIZE = UDim2.fromOffset(185, 50)
+local COLLAPSED_TOP = UDim2.new(0.5, 0, 0, 20)
+
+-- Width of the top-centre toast stack container. Toasts hug their own content and centre
+-- within it, so this just needs to be at least the toast's own MAX_WIDTH.
+local MAX_TOAST_WIDTH = 320
 
 -- Resolve a theme arg (table or name) to a fresh table. We copy so ChangeTheme never
 -- mutates the required theme module, which require() caches and shares between windows.
@@ -37,6 +47,17 @@ end
 function Window.new(properties)
     properties = if typeof(properties) == "table" then properties else {}
 
+    -- Localization is global to the running UI: a dev translator (if any) and the active locale
+    -- live on the locale module. Default the locale to the player's language unless the dev pins
+    -- one. Set before any label is built so the first render is already in the right language.
+    if properties.translations or properties.Translations then
+        locale.register(properties.translations or properties.Translations)
+    end
+    if properties.translator or properties.Translator then
+        locale.translator = properties.translator or properties.Translator
+    end
+    locale.setActive(properties.locale or properties.Locale or locale.detect())
+
     local self = setmetatable({
         name = properties.name or properties.Name or "Rayfield Window",
         subheading = properties.subtitle or properties.Subtitle,
@@ -49,6 +70,7 @@ function Window.new(properties)
         showIcon = properties.showIcon or properties.ShowIcon or 80387863064905,
 
         themeProperties = {},
+        localeProperties = {},
         tabs = {},
         tags = {},
         selectedTab = nil,
@@ -99,7 +121,7 @@ function Window.new(properties)
 
     self.drag = require(script.Parent.drag).new(self)
 
-    self:Create("UICorner", {
+    self.windowCorner = self:Create("UICorner", {
 
         Parent = self.main,
     }, { CornerRadius = "CornerRoundness" })
@@ -205,11 +227,11 @@ function Window.new(properties)
     if self.name then
         self.title = self:Create("TextLabel", {
             -- Configurables
-            Text = self.name, -- window name
+            Text = locale.t(self.name), -- window name
 
             -- Theming
             TextColor3 = Color3.fromRGB(255, 255, 255),
-            FontFace = Font.new(constants.fontAsset, Enum.FontWeight.SemiBold),
+            FontFace = Font.new(constants.fontAsset, Enum.FontWeight.Medium),
 
             Size = UDim2.fromOffset(50, 20),
             AutomaticSize = Enum.AutomaticSize.X,
@@ -223,7 +245,7 @@ function Window.new(properties)
             TextTransparency = 1, -- In = 0
 
             Parent = self.titleContainer,
-        }, { FontFace = "TitleFont", TextColor3 = "TitlingColor" })
+        }, { FontFace = "Font", TextColor3 = "TitlingColor" })
     end
 
     if self.icon then
@@ -243,7 +265,7 @@ function Window.new(properties)
     if self.subheading then
         self.subtitle = self:Create("TextLabel", {
             -- Configurables
-            Text = self.subheading, -- window name
+            Text = locale.t(self.subheading), -- window name
 
             Size = UDim2.fromOffset(50, 12),
             AutomaticSize = Enum.AutomaticSize.X,
@@ -400,7 +422,7 @@ function Window.new(properties)
         end,
     })
 
-    require(script.Parent.action).new(self, {
+    self.minimiseAction = require(script.Parent.action).new(self, {
         name = "Minimise",
         icon = 108115485663409,
         order = 2,
@@ -441,14 +463,14 @@ function Window.new(properties)
         toggleKeybind = Enum.KeyCode.K,
         mouseOverride = true, -- free the cursor while the menu is open (for FPS games that lock it)
         keepOnScreen = true, -- clamp the drag so the window cant be pulled off screen
+        welcomeToast = true, -- the "signed in as" toast on first open for a new/changed account
     }
 
     self:LoadSettings()
-    chrome.buildRestoreButton(self)
+    chrome.buildCollapsedFace(self)
     self:_bindKeybind()
     self:_bindMouseOverride()
     self:_buildSettingsUI()
-    chrome.buildLicense(self)
 
     if self.theme.LiveAnimation then
         task.spawn(function()
@@ -547,6 +569,23 @@ function Window:_registerControl(control)
     return flag
 end
 
+-- find a keybind element currently bound to `key`, skipping `exclude` and unbound keys. lets
+-- the menu-toggle keybind refuse a key an element keybind already owns. keybinds only live at
+-- tab level (groups dont hold them), so a scan over each tab's elements catches them all.
+function Window:_keybindUsing(key, exclude)
+    if typeof(key) ~= "EnumItem" or key == Enum.KeyCode.Unknown then
+        return nil
+    end
+    for _, tab in self.tabs do
+        for _, element in tab.elements do
+            if element ~= exclude and element.__type == "Keybind" and element.value == key then
+                return element
+            end
+        end
+    end
+    return nil
+end
+
 function Window:Notify(properties)
     if not self.notifications then
         self.notifications = self:Create("Frame", {
@@ -575,6 +614,36 @@ function Window:Notify(properties)
     return require(script.Parent.notification).new(self, properties)
 end
 
+-- Top-centre toast stack. Like Notify but for brief, centred messages that drop in from the
+-- top of the screen (newest on top). Each toast takes { title, subtitle?, icon?, duration? }.
+function Window:Toast(properties)
+    if not self.toasts then
+        self.toasts = self:Create("Frame", {
+            Name = "Toasts",
+            Size = UDim2.new(0, MAX_TOAST_WIDTH, 1, -24),
+            Position = UDim2.new(0.5, 0, 0, 12),
+            AnchorPoint = Vector2.new(0.5, 0),
+            BackgroundTransparency = 1,
+            ZIndex = constants.zIndex.toast,
+
+            Parent = self.screenGui,
+        })
+
+        self:Create("UIListLayout", {
+            FillDirection = Enum.FillDirection.Vertical,
+            VerticalAlignment = Enum.VerticalAlignment.Top,
+            HorizontalAlignment = Enum.HorizontalAlignment.Center,
+            SortOrder = Enum.SortOrder.LayoutOrder,
+            -- gap lives inside each toast so removing one collapses its gap with it
+            Padding = UDim.new(0, 0),
+
+            Parent = self.toasts,
+        })
+    end
+
+    return require(script.Parent.toast).new(self, properties)
+end
+
 function Window:Hide()
     if self.animating then
         return
@@ -582,12 +651,42 @@ function Window:Hide()
     self.animating = true
     self.hidden = true
     variables.rayfieldHidden = true
+    self.collapsedInteract.Visible = false -- re-shown once the collapse settles, below
 
-    local fadeInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    -- closing while minimised closes properly rather than leaving a stale minimised state -
+    -- Show always grows back to the full (non-minimised) layout, so the flag and icon need
+    -- to agree with that
+    if self.minimised then
+        self.minimised = false
+        self.minimiseAction.iconLabel.Image = "rbxassetid://108115485663409" -- back to the minimise icon
+    end
 
-    self.drag.drag.Visible = false
+    -- remember where the window sat so Show grows it back to the same spot
+    self._restorePosition = self.main.Position
 
-    variables.tweenService:Create(self.main, fadeInfo, { BackgroundTransparency = 1 }):Play()
+    local home, size = self:_collapsedRect()
+
+    local fadeInfo = TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    -- one continuous move for the whole collapse: size and position tween together on the
+    -- same curve so they stay perfectly in sync, no seam between separate legs
+    local moveInfo = TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut)
+    local cornerInfo = TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut)
+    local faceInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
+    -- shrink the drag bar back down the same way it grows in on first reveal, instead of
+    -- just cutting it
+    variables.tweenService
+        :Create(self.drag.dragCosmetic, fadeInfo, { Size = UDim2.fromOffset(0, 4), BackgroundTransparency = 1 })
+        :Play()
+    task.delay(0.18, function()
+        if not self.hidden then
+            return
+        end
+        self.drag.drag.Visible = false
+    end)
+
+    -- fade the window's own chrome out; main keeps its own background/gradient/corner the
+    -- whole time, it just reshapes underneath - there's nothing to hand off to
     variables.tweenService:Create(self.windowShadow, fadeInfo, { Transparency = 1 }):Play()
     variables.tweenService:Create(self.bottomFade, fadeInfo, { BackgroundTransparency = 1 }):Play()
 
@@ -617,21 +716,32 @@ function Window:Hide()
         end
     end
 
-    task.delay(0.3, function()
-        self.main.Visible = false
+    self:_fadeSelectedElementsOut()
 
+    -- collapse into the pill in one continuous move - size and position tweened together
+    -- so they stay perfectly in sync throughout
+    variables.tweenService:Create(self.main, moveInfo, { Size = size, Position = home }):Play()
+    variables.tweenService:Create(self.windowCorner, cornerInfo, { CornerRadius = UDim.new(1, 0) }):Play()
+
+    -- once the chrome's faded, drop it and the scrolling content so nothing squashes/pokes
+    -- out as the frame shrinks around it, then bring the collapsed face up over the top
+    task.delay(0.18, function()
+        if not self.hidden then
+            return
+        end
+        self.topbar.Visible = false
         self.elements.Visible = false
         self.tabList.Visible = false
-        for _, tab in pairs(self.tabs) do
-            if not tab.neglectSelector and tab.topbarItem then
-                tab.topbarItem.Visible = false
-            end
-        end
 
-        if self.restoreButton then
-            self.restoreButton.Visible = true
-        end
+        chrome.setCollapsedShown(self, true, faceInfo)
+    end)
 
+    -- once the move's settled the pill is done morphing: hand clicks to it
+    task.delay(0.35, function()
+        if not self.hidden then
+            return
+        end
+        self.collapsedInteract.Visible = true
         self.animating = false
     end)
 end
@@ -653,22 +763,19 @@ function Window:ToggleMinimise()
     end
     self.animating = true
 
+    local sizeInfo = TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+    local fadeInfo = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+
     if self.minimised then
         self.minimised = false
+        self.minimiseAction.iconLabel.Image = "rbxassetid://108115485663409" -- back to the minimise icon
 
-        local fadeInfo = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
-
-        variables.tweenService
-            :Create(self.main, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
-                Size = self.size,
-            })
-            :Play()
-
+        variables.tweenService:Create(self.main, sizeInfo, { Size = self.size }):Play()
         variables.tweenService:Create(self.windowShadow, fadeInfo, { Transparency = 0.6 }):Play()
         variables.tweenService:Create(self.bottomFade, fadeInfo, { BackgroundTransparency = 0 }):Play()
 
         variables.tweenService
-            :Create(self.drag.drag, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+            :Create(self.drag.drag, sizeInfo, {
                 Position = UDim2.new(
                     self.main.Position.X.Scale,
                     self.main.Position.X.Offset,
@@ -678,7 +785,12 @@ function Window:ToggleMinimise()
             })
             :Play()
 
+        -- once the window's grown back, fade the content and tab pills in rather than
+        -- snapping them visible
         task.delay(0.2, function()
+            if self.minimised or self.hidden then
+                return -- re-minimised or hidden mid animation
+            end
             self.elements.Visible = true
             self.tabList.Visible = true
 
@@ -688,6 +800,8 @@ function Window:ToggleMinimise()
                     tab:_applyVisual(if self.selectedTab == tab then "selected" else "unselected", fadeInfo)
                 end
             end
+
+            self:_revealElements(0.035, 0.4)
         end)
 
         task.delay(0.5, function()
@@ -695,27 +809,36 @@ function Window:ToggleMinimise()
         end)
     else
         self.minimised = true
+        self.minimiseAction.iconLabel.Image = "rbxassetid://88738500661569" -- maximise icon while minimised
 
-        self.elements.Visible = false
-        self.tabList.Visible = false
+        -- fade the content + tab pills out instead of cutting them, then hide them once faded
+        -- so they don't sit clipped under the collapsed bar
+        self:_fadeSelectedElementsOut()
         for _, tab in pairs(self.tabs) do
             if not tab.neglectSelector and tab.topbarItem then
-                tab.topbarItem.Visible = false
+                tab:_applyVisual("hidden", fadeInfo)
             end
         end
 
-        local fadeOutInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-        variables.tweenService:Create(self.windowShadow, fadeOutInfo, { Transparency = 1 }):Play()
-        variables.tweenService:Create(self.bottomFade, fadeOutInfo, { BackgroundTransparency = 1 }):Play()
+        task.delay(0.3, function()
+            if not self.minimised then
+                return -- restored mid animation
+            end
+            self.elements.Visible = false
+            self.tabList.Visible = false
+            for _, tab in pairs(self.tabs) do
+                if not tab.neglectSelector and tab.topbarItem then
+                    tab.topbarItem.Visible = false
+                end
+            end
+        end)
+
+        variables.tweenService:Create(self.windowShadow, fadeInfo, { Transparency = 1 }):Play()
+        variables.tweenService:Create(self.bottomFade, fadeInfo, { BackgroundTransparency = 1 }):Play()
+        variables.tweenService:Create(self.main, sizeInfo, { Size = UDim2.fromOffset(self.size.X.Offset, 66) }):Play()
 
         variables.tweenService
-            :Create(self.main, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
-                Size = UDim2.fromOffset(self.size.X.Offset, 66),
-            })
-            :Play()
-
-        variables.tweenService
-            :Create(self.drag.drag, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+            :Create(self.drag.drag, sizeInfo, {
                 Position = UDim2.new(
                     self.main.Position.X.Scale,
                     self.main.Position.X.Offset,
@@ -790,6 +913,7 @@ function Window:_buildSettingsUI()
         name = "Toggle Keybind",
         icon = 100604009889706,
         value = self.settings.toggleKeybind,
+        isMenuToggle = true, -- reject keys already owned by an element keybind
         forgetState = true, -- lives in settings.rfld, not the user's config
         onChanged = function(key)
             self.settings.toggleKeybind = key
@@ -804,6 +928,17 @@ function Window:_buildSettingsUI()
         forgetState = true, -- lives in settings.rfld, not the user's config
         callback = function(state)
             self.settings.mouseOverride = state
+            self:SaveSettings()
+        end,
+    })
+
+    self.rfSettings:CreateToggle({
+        name = "Welcome toast",
+        description = "Shows a 'Signed in as' toast the first time you open the menu on a new account.",
+        value = self.settings.welcomeToast,
+        forgetState = true, -- lives in settings.rfld, not the user's config
+        callback = function(state)
+            self.settings.welcomeToast = state
             self:SaveSettings()
         end,
     })
@@ -836,6 +971,103 @@ function Window:_buildSettingsUI()
                 :Play()
         end,
     })
+
+    -- Configurations: save the current setup under a name and switch between saved ones.
+    -- Only shown once the developer opts into config saving.
+    if next(self.configuration) ~= nil then
+        self.rfSettings:CreateSection({ name = "Configurations" })
+
+        local selected = self:ListConfigs()[1]
+        local configDropdown, nameInput
+
+        local function refreshConfigs()
+            local names = self:ListConfigs()
+            configDropdown:Refresh(names)
+            if selected and not table.find(names, selected) then
+                selected = names[1]
+            end
+            if selected then
+                configDropdown:Set(selected, true)
+            end
+        end
+
+        configDropdown = self.rfSettings:CreateDropdown({
+            name = "Saved Configurations",
+            icon = 125823673784681,
+            options = self:ListConfigs(),
+            value = selected,
+            placeholder = "No saved configurations",
+            forgetState = true, -- the picker itself isnt part of the user's config
+            callback = function(value)
+                selected = value
+            end,
+        })
+
+        nameInput = self.rfSettings:CreateInput({
+            name = "Configuration Name",
+            description = "Name a new configuration, or leave blank to overwrite the selected one.",
+            placeholder = "e.g. PvP Loadout",
+            forgetState = true,
+            clearOnFocus = false,
+        })
+
+        local actions = self.rfSettings:CreateGroup()
+
+        actions:CreateButton({
+            name = "Save",
+            icon = 125823673784681,
+            callback = function()
+                local name = nameInput.value
+                if name == "" then
+                    name = selected
+                end
+                if not name or name == "" then
+                    self:Toast({ title = "Name your configuration first" })
+                    return
+                end
+                if self:Save(name) then
+                    nameInput:Set("")
+                    selected = name
+                    refreshConfigs()
+                    self:Toast({ title = "Saved configuration", subtitle = name, icon = 125823673784681 })
+                else
+                    self:Toast({ title = "Couldn't save configuration", subtitle = name })
+                end
+            end,
+        })
+
+        actions:CreateButton({
+            name = "Load",
+            callback = function()
+                if not selected or selected == "" then
+                    self:Toast({ title = "Pick a configuration to load" })
+                    return
+                end
+                if self:Load(selected) then
+                    self:Toast({ title = "Loaded configuration", subtitle = selected })
+                else
+                    self:Toast({ title = "Couldn't load configuration", subtitle = selected })
+                end
+            end,
+        })
+
+        actions:CreateButton({
+            name = "Delete",
+            callback = function()
+                local deleting = selected
+                if not deleting or deleting == "" then
+                    self:Toast({ title = "Pick a configuration to delete" })
+                    return
+                end
+                if self:DeleteConfig(deleting) then
+                    refreshConfigs()
+                    self:Toast({ title = "Deleted configuration", subtitle = deleting })
+                else
+                    self:Toast({ title = "Couldn't delete configuration", subtitle = deleting })
+                end
+            end,
+        })
+    end
 end
 
 function Window:SaveSettings()
@@ -846,10 +1078,54 @@ function Window:LoadSettings()
     return persistence.loadSettings(self)
 end
 
-function Window:_setElementsShown()
+-- Fade the open tab's elements out - the only ones actually on screen, since the page
+-- navigation keeps the other tabs' elements invisible. Shared by Hide and minimise.
+function Window:_fadeSelectedElementsOut()
+    if self.selectedTab then
+        for _, element in ipairs(self.selectedTab.elements) do
+            element:_setShown(false, true)
+        end
+    end
+end
+
+-- Reveal the open tab's elements with a quick top-to-bottom stagger, but only for the ones
+-- actually within the scroll viewport - whatever's scrolled off (above or below) just snaps in,
+-- since nobody's looking at it. So reopening a page scrolled halfway down animates from where
+-- you left off, not from the very top. Everything is measured live off the scrolling frame's
+-- real viewport + each element's real position, so it's correct at any window size, any scroll.
+-- Other tabs snap ready off-screen too. `budget` caps how long the stagger runs before the
+-- remaining on-screen elements come in together, so a tall viewport doesn't crawl.
+function Window:_revealElements(perElementDelay, budget)
     for _, tab in pairs(self.tabs) do
-        for _, element in ipairs(tab.elements) do
-            element:_setShown(false)
+        if tab ~= self.selectedTab then
+            for _, element in ipairs(tab.elements) do
+                element:_setShown(true, false)
+            end
+        end
+    end
+
+    local tab = self.selectedTab
+    if not tab then
+        return
+    end
+
+    local page = tab.tabPage
+    local viewTop = page.AbsolutePosition.Y
+    local viewBottom = viewTop + page.AbsoluteWindowSize.Y
+
+    local maxStaggered = math.floor(budget / perElementDelay)
+    local staggered = 0
+    for _, element in ipairs(tab.elements) do
+        local top = element.main.AbsolutePosition.Y
+        local onScreen = (top + element.main.AbsoluteSize.Y) > viewTop and top < viewBottom
+        if onScreen then
+            element:_setShown(true, true)
+            staggered += 1
+            if staggered <= maxStaggered then
+                task.wait(perElementDelay)
+            end
+        else
+            element:_setShown(true, false) -- off-screen: no point animating what isn't visible
         end
     end
 end
@@ -867,13 +1143,10 @@ function Window:Show()
     self.hidden = false
     self.minimised = false
     variables.rayfieldHidden = false
+    self.collapsedInteract.Visible = false -- first thing on click: stop it eating any more input
 
     if self._freeMouse then
         self._freeMouse()
-    end
-
-    if self.restoreButton then
-        self.restoreButton.Visible = false
     end
 
     if self.hasShownOnce then
@@ -885,52 +1158,80 @@ function Window:Show()
 end
 
 function Window:_quickRestore()
-    local fadeInfo = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+    local target = self._restorePosition or UDim2.new(0.5, 0, 0.5, 0)
 
-    self.main.Size = self.size
-    self.main.Visible = true
-    self.elements.Visible = true
-    self.tabList.Visible = true
+    local growInfo = TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut)
+    local cornerInfo = TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut)
+    local fadeInfo = TweenInfo.new(0.28, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 
-    self:_setElementsShown()
+    -- Phase 1: nothing but the pill morphing back into the window frame. The collapsed face
+    -- fades off, main grows + un-rounds. No chrome, no content - so you never see the topbar,
+    -- tabs or bottom fade floating over a frame that isn't a window yet.
+    chrome.setCollapsedShown(self, false, TweenInfo.new(0.15, Enum.EasingStyle.Quint, Enum.EasingDirection.Out))
+    variables.tweenService:Create(self.main, growInfo, { Size = self.size, Position = target }):Play()
+    variables.tweenService:Create(self.windowCorner, cornerInfo, { CornerRadius = self.theme.CornerRoundness }):Play()
 
-    variables.tweenService:Create(self.main, fadeInfo, { BackgroundTransparency = 0 }):Play()
-    variables.tweenService:Create(self.windowShadow, fadeInfo, { Transparency = 0.6 }):Play()
-    variables.tweenService:Create(self.bottomFade, fadeInfo, { BackgroundTransparency = 0 }):Play()
+    -- Phase 2: once the frame actually reads as a window, fade its chrome in and stagger the
+    -- open tab's elements. Other tabs snap ready off-screen - nobody's looking, so no animation.
+    task.delay(0.22, function()
+        self.topbar.Visible = true
+        self.tabList.Visible = true
+        self.elements.Visible = true
 
-    if self.topbarIcon then
-        variables.tweenService:Create(self.topbarIcon, fadeInfo, { ImageTransparency = 0 }):Play()
-    end
-    if self.title then
-        variables.tweenService:Create(self.title, fadeInfo, { TextTransparency = 0 }):Play()
-    end
-    if self.subtitle then
-        variables.tweenService:Create(self.subtitle, fadeInfo, { TextTransparency = 0.7 }):Play()
-    end
+        variables.tweenService:Create(self.windowShadow, fadeInfo, { Transparency = 0.6 }):Play()
+        variables.tweenService:Create(self.bottomFade, fadeInfo, { BackgroundTransparency = 0 }):Play()
 
-    for _, action in ipairs(self.actionContainer:GetChildren()) do
-        if action:IsA("Frame") then
-            variables.tweenService:Create(action.ImageLabel, fadeInfo, { ImageTransparency = 0.6 }):Play()
+        if self.topbarIcon then
+            variables.tweenService:Create(self.topbarIcon, fadeInfo, { ImageTransparency = 0 }):Play()
         end
-    end
-
-    for _, tag in self.tags do
-        tag:_setShown(true, fadeInfo)
-    end
-
-    for _, tab in pairs(self.tabs) do
-        if not tab.neglectSelector and tab.topbarItem then
-            tab.topbarItem.Visible = true
-            tab:_applyVisual(if self.selectedTab == tab then "selected" else "unselected", fadeInfo)
+        if self.title then
+            variables.tweenService:Create(self.title, fadeInfo, { TextTransparency = 0 }):Play()
         end
-    end
+        if self.subtitle then
+            variables.tweenService:Create(self.subtitle, fadeInfo, { TextTransparency = 0.7 }):Play()
+        end
 
-    -- Drag handle
-    self.drag.drag.Visible = true
-    self.drag.dragCosmetic.Size = UDim2.fromOffset(100, 4)
-    variables.tweenService:Create(self.drag.dragCosmetic, fadeInfo, { BackgroundTransparency = 0.7 }):Play()
+        for _, action in ipairs(self.actionContainer:GetChildren()) do
+            if action:IsA("Frame") then
+                variables.tweenService:Create(action.ImageLabel, fadeInfo, { ImageTransparency = 0.6 }):Play()
+            end
+        end
 
-    task.delay(0.4, function()
+        -- if we were hidden with the settings page open, bring its cog back lit (its open
+        -- state) rather than the default resting brightness the loop above just set
+        if self.settingsAction and self.selectedTab == self.rfSettings then
+            variables.tweenService:Create(self.settingsAction.iconLabel, fadeInfo, { ImageTransparency = 0.2 }):Play()
+        end
+
+        for _, tag in self.tags do
+            tag:_setShown(true, fadeInfo)
+        end
+
+        for _, tab in pairs(self.tabs) do
+            if not tab.neglectSelector and tab.topbarItem then
+                tab.topbarItem.Visible = true
+                tab:_applyVisual(if self.selectedTab == tab then "selected" else "unselected", fadeInfo)
+            end
+        end
+
+        self:_revealElements(0.035, 0.4)
+    end)
+
+    -- Drag handle grows in with the chrome, same width sweep it uses on first reveal. Position
+    -- is recalculated against the full restored size - if the window was minimised (a shorter
+    -- bar-hang offset) before hiding, it would otherwise reappear at the old, wrong height.
+    task.delay(0.22, function()
+        self.drag.drag.Position =
+            UDim2.new(target.X.Scale, target.X.Offset, target.Y.Scale, target.Y.Offset + self.size.Y.Offset / 2 + 15)
+        self.drag.dragCosmetic.Size = UDim2.fromOffset(0, 4)
+        self.drag.dragCosmetic.BackgroundTransparency = 1
+        self.drag.drag.Visible = true
+        variables.tweenService
+            :Create(self.drag.dragCosmetic, growInfo, { Size = UDim2.fromOffset(100, 4), BackgroundTransparency = 0.7 })
+            :Play()
+    end)
+
+    task.delay(0.6, function()
         self.animating = false
     end)
 end
@@ -949,7 +1250,7 @@ function Window:_firstShow()
             { BackgroundTransparency = 0, Size = self.size }
         )
         :Play()
-    task.wait(0.5)
+    task.wait(0.85) -- let the frame actually read as a window before anything shows on top of it
     variables.tweenService
         :Create(
             self.windowShadow,
@@ -1022,30 +1323,14 @@ function Window:_firstShow()
                     if self.selectedTab == tab then "selected" else "unselected",
                     TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
                 )
+                tab:_spinGradients()
 
                 task.wait(0.15)
             end
         end
     end)
 
-    for _, tab in pairs(self.tabs) do
-        if self.selectedTab == tab then
-            local perElementDelay = 0.03
-            local maxStaggeredElements = math.floor(2 / perElementDelay)
-
-            for elementIndex, element in ipairs(tab.elements) do
-                element:_setShown(true)
-
-                if elementIndex <= maxStaggeredElements then
-                    task.wait(perElementDelay)
-                end
-            end
-        else
-            for _, element in ipairs(tab.elements) do
-                element:_setShown(false)
-            end
-        end
-    end
+    self:_revealElements(0.03, 2)
 
     task.wait(1)
 
@@ -1067,9 +1352,16 @@ function Window:_firstShow()
 
     self.animating = false
 
-    -- Welcome the user once if this is a new/changed account on this device.
-    if chrome.isNewUser() then
-        chrome.playLicenseBanner(self)
+    -- Welcome the user once if this is a new/changed account on this device (unless they've
+    -- turned it off in settings). Just a toast now - the profile chip is a toast like any other.
+    if self.settings.welcomeToast and chrome.isNewUser() then
+        self:Toast({
+            title = variables.localPlayer.DisplayName,
+            subtitle = locale.resolve("Signed in as"),
+            subtitleAbove = true, -- reads "Signed in as" / name, label over value
+            avatar = variables.localPlayer.UserId,
+            minWidth = 220, -- match the old license card's width for that roomy right-hand space
+        })
     end
 end
 
@@ -1077,12 +1369,28 @@ function Window:GetPath()
     return persistence.getPath(self)
 end
 
-function Window:Save()
-    return persistence.save(self)
+-- name saves to a specific config; omit it to save the default file.
+function Window:Save(name)
+    if name ~= nil and (type(name) ~= "string" or name == "") then
+        return false
+    end
+    return persistence.save(self, name)
 end
 
-function Window:Load()
-    return persistence.load(self)
+-- name loads a specific config; omit it to load the default file.
+function Window:Load(name)
+    if name ~= nil and (type(name) ~= "string" or name == "") then
+        return false
+    end
+    return persistence.load(self, name)
+end
+
+function Window:ListConfigs()
+    return persistence.list(self)
+end
+
+function Window:DeleteConfig(name)
+    return persistence.delete(self, name)
 end
 
 function Window:Navigate(tab)
@@ -1112,12 +1420,55 @@ function Window:Create(className, properties, themeProperties)
 
     if properties then
         for property, value in properties do
-            image.assign(instance, property, value)
+            if locale.isToken(value) then
+                self:_bindLocale(instance, property, locale.sourceOf(value))
+            else
+                image.assign(instance, property, value)
+            end
         end
     end
 
     table.insert(self.instances, instance)
     return instance
+end
+
+-- Bind instance[property] to a source string: set it to the active locale's form now and remember
+-- it so SetLocale can re-resolve in place without rebuilding anything. Mirrors how themeProperties
+-- lets ChangeTheme re-apply themed values later.
+function Window:_bindLocale(instance, property, source)
+    instance[property] = locale.resolve(source)
+
+    local entries = self.localeProperties[instance]
+    if not entries then
+        entries = {}
+        self.localeProperties[instance] = entries
+    end
+    entries[property] = source
+end
+
+-- Swap every localized label to `localeId` in place. Element values, slider readouts and other
+-- data aren't copy, so they're untouched. AutomaticSize reflows widths for us; the few manually
+-- measured labels (toasts) are transient enough not to need a re-measure.
+function Window:SetLocale(localeId)
+    locale.setActive(localeId)
+    for instance, entries in self.localeProperties do
+        for property, source in entries do
+            instance[property] = locale.resolve(source)
+        end
+    end
+end
+
+-- Swap the dev translation hook (source, localeId) -> string?. Follow with SetLocale (or pass the
+-- same locale back) to re-resolve everything already on screen through the new hook.
+function Window:SetTranslator(translator)
+    locale.translator = translator
+end
+
+-- Merge more translation tables in at runtime ({ [localeId] = { [source] = translated } }) and
+-- re-apply the active locale, so a language pack added after the UI is built lands immediately.
+function Window:RegisterTranslations(tables)
+    locale.register(tables)
+    self:SetLocale(locale.current)
 end
 
 -- Soft glow behind a GuiObject via a native UIShadow (no image). ZIndex -1 keeps it behind.
@@ -1202,6 +1553,9 @@ function Window:_wireElementHover(element)
     local theme = self.theme
 
     self:Connect(element.main.MouseEnter, function()
+        if not self:_interactive() then
+            return -- window still revealing/hiding: dont light up mid-animation
+        end
         variables.tweenService
             :Create(
                 element.stroke,
@@ -1246,7 +1600,7 @@ function Window:_runGuarded(element, fn, ...)
         local quickOut = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
         variables.tweenService:Create(element.main, quickOut, { BackgroundColor3 = self.theme.ErrorColor }):Play()
         variables.tweenService:Create(element.stroke, quickOut, { Color = self.theme.ErrorStrokeColor }):Play()
-        element.title.Text = "Error, log recorded in console."
+        element.title.Text = locale.resolve("Error, log recorded in console.")
 
         warn(
             `Rayfield encountered an error, with the callback for a {element.__type} component named '{element.name}':`
@@ -1255,7 +1609,7 @@ function Window:_runGuarded(element, fn, ...)
 
         task.wait(1)
 
-        element.title.Text = element.name
+        element.title.Text = locale.resolve(element.name)
         variables.tweenService
             :Create(
                 element.main,
@@ -1351,6 +1705,39 @@ function Window:_revealCommon(element, animate)
     end
 end
 
+-- The reverse of _revealCommon: fade the same shared parts back out to fully transparent.
+function Window:_hideCommon(element, animate)
+    self:_reveal(element.stroke, { Transparency = 1 }, animate)
+    self:_reveal(element.title, { TextTransparency = 1 }, animate)
+    self:_reveal(element.main, { BackgroundTransparency = 1 }, animate)
+    if element.iconLabel then
+        self:_reveal(element.iconLabel, { ImageTransparency = 1 }, animate)
+    end
+    if element.descriptor then
+        self:_reveal(element.descriptor.titleLabel, { TextTransparency = 1 }, animate)
+    end
+end
+
+-- The rect main morphs into once collapsed: the same top-centre spot the old standalone
+-- restore pill used to sit at, translated into main's own centre-anchored space (main never
+-- changes AnchorPoint, so its Position always addresses its centre, not its top edge).
+function Window:_collapsedRect()
+    local size = COLLAPSED_SIZE
+    local home = UDim2.new(
+        COLLAPSED_TOP.X.Scale,
+        COLLAPSED_TOP.X.Offset,
+        COLLAPSED_TOP.Y.Scale,
+        COLLAPSED_TOP.Y.Offset + size.Y.Offset / 2
+    )
+    return home, size
+end
+
+-- true only when the window is fully shown and idle. hover/press animations gate on this so
+-- nothing lights up mid show/hide/minimise reveal, while elements are still tweening in.
+function Window:_interactive()
+    return not self.animating and not self.hidden
+end
+
 function Window:Connect(signal, callback)
     local connection = signal:Connect(callback)
     table.insert(self.connections, connection)
@@ -1388,6 +1775,7 @@ function Window:DestroySubtree(root)
         if inSubtree[instance] then
             table.remove(self.instances, i)
             self.themeProperties[instance] = nil
+            self.localeProperties[instance] = nil
         end
     end
 

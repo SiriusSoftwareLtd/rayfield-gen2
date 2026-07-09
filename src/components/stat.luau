@@ -11,6 +11,7 @@ local functions = require(utility.functions)
 local odometer = require(utility.odometer)
 local moveable = require(utility.moveable)
 local constants = require(utility.constants)
+local locale = require(utility.locale)
 
 -- Accent gradients per direction (fill drives the card + glow, stroke is the brighter edge)
 local accents = constants.statAccents
@@ -194,7 +195,7 @@ function Statistic:_buildFull()
     })
 
     self.title = window:Create("TextLabel", {
-        Text = self.name,
+        Text = locale.t(self.name),
 
         Size = UDim2.fromOffset(300, 19),
         BorderSizePixel = 0,
@@ -442,7 +443,7 @@ function Statistic:_buildCompact()
     end
 
     self.title = window:Create("TextLabel", {
-        Text = self.name,
+        Text = locale.t(self.name),
         Size = UDim2.fromOffset(0, 16),
         AutomaticSize = Enum.AutomaticSize.X,
         BorderSizePixel = 0,
@@ -624,26 +625,42 @@ function Statistic:ResetBaseline(newBaseline)
     self:_setAccent("neutral", 0)
 end
 
-function Statistic:_setShown(animate)
+function Statistic:_setShown(shown, animate)
     local w = self.window
 
     if self.compact then
-        w:_reveal(self.main, { BackgroundTransparency = self.window.theme.ElementTransparency or 0 }, animate)
-        w:_reveal(self.stroke, { Transparency = self.window.theme.ElementStrokeTransparency }, animate)
-        w:_reveal(self.card, { BackgroundTransparency = 0 }, animate)
-        w:_reveal(self.title, { TextTransparency = 0 }, animate)
+        w:_reveal(
+            self.main,
+            { BackgroundTransparency = if shown then (self.window.theme.ElementTransparency or 0) else 1 },
+            animate
+        )
+        w:_reveal(
+            self.stroke,
+            { Transparency = if shown then self.window.theme.ElementStrokeTransparency else 1 },
+            animate
+        )
+        w:_reveal(self.card, { BackgroundTransparency = if shown then 0 else 1 }, animate)
+        w:_reveal(self.title, { TextTransparency = if shown then 0 else 1 }, animate)
         if self.iconLabel then
-            w:_reveal(self.iconLabel, { ImageTransparency = 0 }, animate)
+            w:_reveal(self.iconLabel, { ImageTransparency = if shown then 0 else 1 }, animate)
         end
-        self.readoutOdo:reveal(0, animate)
+        self.readoutOdo:reveal(if shown then 0 else 1, animate)
         return
     end
 
-    w:_revealCommon(self, animate)
-    w:_reveal(self.gradientContainer, { BackgroundTransparency = 0 }, animate)
-    w:_reveal(self.glowImage, { ImageTransparency = 0.6 }, animate)
-    self.valueOdo:reveal(0, animate)
-    self.changeOdo:reveal(0, animate)
+    if shown then
+        w:_revealCommon(self, animate)
+        w:_reveal(self.gradientContainer, { BackgroundTransparency = 0 }, animate)
+        w:_reveal(self.glowImage, { ImageTransparency = 0.6 }, animate)
+        self.valueOdo:reveal(0, animate)
+        self.changeOdo:reveal(0, animate)
+    else
+        w:_hideCommon(self, animate)
+        w:_reveal(self.gradientContainer, { BackgroundTransparency = 1 }, animate)
+        w:_reveal(self.glowImage, { ImageTransparency = 1 }, animate)
+        self.valueOdo:reveal(1, animate)
+        self.changeOdo:reveal(1, animate)
+    end
 end
 
 -- Room the compact card needs: padding + icon (and gap) if shown + title text + the gap

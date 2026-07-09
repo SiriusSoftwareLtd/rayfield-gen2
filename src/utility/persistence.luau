@@ -27,17 +27,20 @@ end
 
 -- config -----------------------------------------------------------------
 
-function persistence.getPath(window)
+-- name picks a specific config; nil falls back to the window's default file. Both live in
+-- the same folder so a named config sits right next to the auto-saved one.
+function persistence.getPath(window, name)
     local dir = "Rayfield/Configurations"
     if window.configuration.customFolder then
         dir = dir .. "/" .. sanitizeFolder(window.configuration.customFolder)
     end
-    local fileName = sanitizeFile(window.configuration.fileName or window.name) .. ".rfld"
+    local base = name or window.configuration.fileName or window.name
+    local fileName = sanitizeFile(base) .. ".rfld"
     return dir, dir .. "/" .. fileName
 end
 
-function persistence.save(window)
-    local dir, fullPath = persistence.getPath(window)
+function persistence.save(window, name)
+    local dir, fullPath = persistence.getPath(window, name)
 
     local flags = {}
     for flag, control in window.controls do
@@ -45,7 +48,8 @@ function persistence.save(window)
         local ok, value = pcall(function()
             local v = control.value
             if control.__type == "ColorPicker" then
-                return v:ToHex()
+                -- RRGGBB plus an alpha byte (AA), so alpha round-trips; old 6-char configs still load
+                return v:ToHex() .. string.format("%02x", math.clamp(math.round((control.alpha or 1) * 255), 0, 255))
             elseif control.__type == "Keybind" then
                 return { tostring(v.EnumType), v.Value }
             end
@@ -77,8 +81,8 @@ function persistence.save(window)
     return true
 end
 
-function persistence.load(window)
-    local dir, fullPath = persistence.getPath(window)
+function persistence.load(window, name)
+    local dir, fullPath = persistence.getPath(window, name)
 
     if not filesystem.isfile(fullPath) then
         return false
@@ -97,7 +101,7 @@ function persistence.load(window)
         warn("Rayfield: Configuration file has an invalid format, backing up and resetting")
         local backupPath = dir
             .. "/"
-            .. sanitizeFile(window.configuration.fileName or window.name)
+            .. sanitizeFile(name or window.configuration.fileName or window.name)
             .. " (Incorrect Format).rfld"
         pcall(function()
             ensureDir(dir)
@@ -113,7 +117,13 @@ function persistence.load(window)
             -- one bad control shouldnt abort the rest
             local ok, err = pcall(function()
                 if control.__type == "ColorPicker" and value ~= nil then
-                    value = Color3.fromHex(value)
+                    -- split off the optional alpha byte, restore it, then load the RRGGBB colour
+                    local hex = tostring(value)
+                    if #hex >= 8 then
+                        control:SetAlpha((tonumber(hex:sub(7, 8), 16) or 255) / 255, true)
+                        hex = hex:sub(1, 6)
+                    end
+                    value = Color3.fromHex(hex)
                 end
                 if control.__type == "Keybind" and value ~= nil then
                     value = Enum[value[1]]:FromValue(value[2])
@@ -127,6 +137,43 @@ function persistence.load(window)
     end
 
     return true
+end
+
+-- list the loadable config names in the window's folder, sorted. skips the corrupt-format
+-- backups so only configs a user can actually load show up.
+function persistence.list(window)
+    local dir = persistence.getPath(window)
+
+    local names = {}
+    local ok, files = pcall(filesystem.listfiles, dir)
+    if not ok or type(files) ~= "table" then
+        return names
+    end
+
+    for _, path in files do
+        local file = tostring(path):match("[^/\\]+$") or tostring(path)
+        local base = file:match("^(.+)%.rfld$")
+        if base and not base:find(" %(Incorrect Format%)$") then
+            table.insert(names, base)
+        end
+    end
+
+    table.sort(names)
+    return names
+end
+
+-- delete a named config. returns false if it wasnt there or the delete failed.
+function persistence.delete(window, name)
+    if type(name) ~= "string" or name == "" then
+        return false
+    end
+
+    local _, fullPath = persistence.getPath(window, name)
+    if not filesystem.isfile(fullPath) then
+        return false
+    end
+
+    return (pcall(filesystem.delfile, fullPath))
 end
 
 -- settings ---------------------------------------------------------------
@@ -143,6 +190,7 @@ function persistence.saveSettings(window)
         toggleKeybind = { tostring(window.settings.toggleKeybind.EnumType), window.settings.toggleKeybind.Value },
         mouseOverride = window.settings.mouseOverride,
         keepOnScreen = window.settings.keepOnScreen,
+        welcomeToast = window.settings.welcomeToast,
     }
 
     local ok, encoded = pcall(variables.httpService.JSONEncode, variables.httpService, data)
@@ -196,6 +244,10 @@ function persistence.loadSettings(window)
 
     if type(parsed.keepOnScreen) == "boolean" then
         window.settings.keepOnScreen = parsed.keepOnScreen
+    end
+
+    if type(parsed.welcomeToast) == "boolean" then
+        window.settings.welcomeToast = parsed.welcomeToast
     end
 
     return true

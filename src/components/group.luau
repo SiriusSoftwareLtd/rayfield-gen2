@@ -204,9 +204,9 @@ end
 
 -- children live in group.elements, not tab.elements, so forward the reveal down.
 -- nested groups forward it again, so a whole grid reveals in one call.
-function Group:_setShown(animate)
+function Group:_setShown(shown, animate)
     for _, el in self.elements do
-        el:_setShown(animate)
+        el:_setShown(shown, animate)
     end
 end
 

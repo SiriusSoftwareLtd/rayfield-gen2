@@ -9,6 +9,7 @@ local utility = script.Parent.Parent.utility
 local variables = require(utility.variables)
 local functions = require(utility.functions)
 local moveable = require(utility.moveable)
+local locale = require(utility.locale)
 
 -- box hugs the key name; tween the width instead of AutomaticSize so it animates
 local resizeInfo = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
@@ -54,6 +55,10 @@ function Keybind.new(tab, properties)
         icon = properties.icon or properties.Icon,
         description = properties.description or properties.Description,
         forgetState = properties.forgetState or properties.ForgetState,
+
+        -- the settings' menu-toggle keybind. it drives settings.toggleKeybind, so its clash
+        -- check runs the other way: reject keys an element keybind already owns.
+        isMenuToggle = properties.isMenuToggle or properties.IsMenuToggle or false,
 
         -- fires when the bound key is pressed (or, in hold mode, with true/false)
         callback = properties.callback or properties.Callback or function() end,
@@ -125,7 +130,7 @@ function Keybind.new(tab, properties)
     end
 
     self.title = self.window:Create("TextLabel", {
-        Text = self.name,
+        Text = locale.t(self.name),
         Size = UDim2.fromOffset(150, 16),
         AutomaticSize = Enum.AutomaticSize.X,
         BorderSizePixel = 0,
@@ -250,7 +255,7 @@ function Keybind:_startRecording()
     end
     self.recording = true
     self.window._recordingKeybind = self -- window skips its toggle key while we listen
-    self.keyLabel.Text = "Recording"
+    self.keyLabel.Text = locale.resolve("Recording")
     self:_sizeBox(true)
     variables.tweenService:Create(self.glow, recordInfo, { Transparency = 0.7 }):Play()
     variables.tweenService:Create(self.keyLabel, recordInfo, { TextTransparency = 0 }):Play()
@@ -300,9 +305,22 @@ function Keybind:_capture(input)
         return
     end
 
-    -- cant clash with the menu toggle key, else the key would both fire this and open/close
-    -- the window. bail, tell them, and keep the old binding.
-    if key == self.window.settings.toggleKeybind then
+    if self.isMenuToggle then
+        -- the menu toggle cant land on a key an element keybind already owns, else that press
+        -- would both fire the element and open/close the window. bail and keep the old binding.
+        local clash = self.window:_keybindUsing(key, self)
+        if clash then
+            self.window:Notify({
+                title = "Keybind unavailable",
+                content = keyName(key) .. " is bound to " .. clash.name .. ". Kept " .. keyName(self.value) .. ".",
+            })
+            self:_stopRecording()
+            self.window:_flashResult(self, false) -- red: rejected
+            return
+        end
+    elseif key == self.window.settings.toggleKeybind then
+        -- an element keybind cant clash with the menu toggle key, same double-fire problem the
+        -- other way round. bail, tell them, and keep the old binding.
         self.window:Notify({
             title = "Keybind unavailable",
             content = keyName(key) .. " is the menu toggle key. Kept " .. keyName(self.value) .. ".",
@@ -391,13 +409,21 @@ function Keybind:Set(value, skipChanged)
     end
 end
 
-function Keybind:_setShown(animate)
+function Keybind:_setShown(shown, animate)
     local w = self.window
-    w:_revealCommon(self, animate)
-    w:_reveal(self.box, { BackgroundTransparency = 0.9 }, animate)
-    w:_reveal(self.boxStroke, { Transparency = 0.85 }, animate)
-    w:_reveal(self.keyLabel, { TextTransparency = 0.6 }, animate)
-    w:_reveal(self.glow, { Transparency = 0.9 }, animate)
+    if shown then
+        w:_revealCommon(self, animate)
+        w:_reveal(self.box, { BackgroundTransparency = 0.9 }, animate)
+        w:_reveal(self.boxStroke, { Transparency = 0.85 }, animate)
+        w:_reveal(self.keyLabel, { TextTransparency = 0.6 }, animate)
+        w:_reveal(self.glow, { Transparency = 0.9 }, animate)
+    else
+        w:_hideCommon(self, animate)
+        w:_reveal(self.box, { BackgroundTransparency = 1 }, animate)
+        w:_reveal(self.boxStroke, { Transparency = 1 }, animate)
+        w:_reveal(self.keyLabel, { TextTransparency = 1 }, animate)
+        w:_reveal(self.glow, { Transparency = 1 }, animate)
+    end
 end
 
 moveable(Keybind)

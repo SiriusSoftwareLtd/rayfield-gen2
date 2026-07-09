@@ -9,6 +9,7 @@ local utility = script.Parent.Parent.utility
 local variables = require(utility.variables)
 local functions = require(utility.functions)
 local moveable = require(utility.moveable)
+local locale = require(utility.locale)
 
 -- the field hugs its text; tween the width instead of AutomaticSize so it animates
 local resizeInfo = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
@@ -90,7 +91,7 @@ function Input.new(tab, properties)
     end
 
     self.title = self.window:Create("TextLabel", {
-        Text = self.name,
+        Text = locale.t(self.name),
         Size = UDim2.fromOffset(150, 16),
         AutomaticSize = Enum.AutomaticSize.X,
         BorderSizePixel = 0,
@@ -137,7 +138,7 @@ function Input.new(tab, properties)
 
     self.input = self.window:Create("TextBox", {
         Text = self.value,
-        PlaceholderText = self.placeholder,
+        PlaceholderText = locale.t(self.placeholder),
         PlaceholderColor3 = Color3.fromRGB(178, 178, 178),
         Size = UDim2.new(1, -15, 0, 15),
         Position = UDim2.new(0.5, 0, 0.5, 0),
@@ -230,12 +231,19 @@ function Input:Set(value, skipCallback)
     end
 end
 
-function Input:_setShown(animate)
+function Input:_setShown(shown, animate)
     local w = self.window
-    w:_revealCommon(self, animate)
-    w:_reveal(self.box, { BackgroundTransparency = 0.9 }, animate)
-    w:_reveal(self.boxStroke, { Transparency = 0.85 }, animate)
-    w:_reveal(self.input, { TextTransparency = 0.6 }, animate)
+    if shown then
+        w:_revealCommon(self, animate)
+        w:_reveal(self.box, { BackgroundTransparency = 0.9 }, animate)
+        w:_reveal(self.boxStroke, { Transparency = 0.85 }, animate)
+        w:_reveal(self.input, { TextTransparency = 0.6 }, animate)
+    else
+        w:_hideCommon(self, animate)
+        w:_reveal(self.box, { BackgroundTransparency = 1 }, animate)
+        w:_reveal(self.boxStroke, { Transparency = 1 }, animate)
+        w:_reveal(self.input, { TextTransparency = 1 }, animate)
+    end
 end
 
 moveable(Input)

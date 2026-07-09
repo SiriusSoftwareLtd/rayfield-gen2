@@ -57,6 +57,21 @@ function Action.new(window, properties)
         Parent = self.action,
     })
 
+    -- drop the icon back to its resting brightness, unless this action opens a tab that's
+    -- currently selected (the settings cog stays lit while its page is open)
+    local function settleIcon()
+        if self.linkedTab and self.window.selectedTab == self.linkedTab then
+            return
+        end
+        variables.tweenService
+            :Create(
+                self.iconLabel,
+                TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+                { ImageTransparency = 0.6 }
+            )
+            :Play()
+    end
+
     self.window:Connect(self.interact.MouseButton1Click, function()
         task.spawn(function()
             local success, result = pcall(self.callback)
@@ -66,10 +81,16 @@ function Action.new(window, properties)
                 )
                 print(result)
             end
+            -- undo the hover brighten now (the callback has run, so selectedTab is up to date),
+            -- otherwise the icon stays lit until the mouse happens to move off it
+            settleIcon()
         end)
     end)
 
     self.window:Connect(self.interact.MouseEnter, function()
+        if not self.window:_interactive() then
+            return -- window still revealing/hiding: dont light up mid-animation
+        end
         variables.tweenService
             :Create(
                 self.iconLabel,
@@ -79,17 +100,7 @@ function Action.new(window, properties)
             :Play()
     end)
 
-    self.window:Connect(self.interact.MouseLeave, function()
-        if not (self.linkedTab and self.window.selectedTab == self.linkedTab) then
-            variables.tweenService
-                :Create(
-                    self.iconLabel,
-                    TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-                    { ImageTransparency = 0.6 }
-                )
-                :Play()
-        end
-    end)
+    self.window:Connect(self.interact.MouseLeave, settleIcon)
 
     return self
 end

@@ -2,6 +2,8 @@ local Descriptor = {}
 Descriptor.__index = Descriptor
 Descriptor.__type = "Descriptor"
 
+local locale = require(script.Parent.Parent.utility.locale)
+
 function Descriptor.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
 
@@ -29,7 +31,7 @@ function Descriptor.new(tab, properties)
         BackgroundTransparency = 1,
         RichText = true,
         Size = UDim2.new(1, -90, 0, 0),
-        Text = self.description,
+        Text = locale.t(self.description),
         TextSize = 12,
         TextWrapped = true,
         TextXAlignment = Enum.TextXAlignment.Left,

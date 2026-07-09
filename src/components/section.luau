@@ -3,6 +3,7 @@ Section.__index = Section
 Section.__type = "Section"
 
 local moveable = require(script.Parent.Parent.utility.moveable)
+local locale = require(script.Parent.Parent.utility.locale)
 
 function Section.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
@@ -14,13 +15,24 @@ function Section.new(tab, properties)
         icon = properties.icon or properties.Icon,
     }, Section)
 
+    -- first element in a tab shouldn't get extra space above it, only sections that
+    -- follow something. this section isn't registered yet so an empty list means first.
+    local topSpace = if #self.tab.elements == 0 then 0 else 13
+
     self.main = self.window:Create("Frame", {
-        Size = UDim2.new(1, -40, 0, 20),
+        Size = UDim2.new(1, -40, 0, 20 + topSpace),
         BorderSizePixel = 0,
         Name = self.name,
         BackgroundTransparency = 1,
         Parent = self.tab.tabPage,
     })
+
+    if topSpace > 0 then
+        self.window:Create("UIPadding", {
+            PaddingTop = UDim.new(0, topSpace),
+            Parent = self.main,
+        })
+    end
 
     self.window:Create("UIListLayout", {
         FillDirection = Enum.FillDirection.Horizontal,
@@ -51,7 +63,7 @@ function Section.new(tab, properties)
 
     self.title = self.window:Create("TextLabel", {
         -- Configurables
-        Text = self.name,
+        Text = locale.t(self.name),
 
         Size = UDim2.fromOffset(0, 16),
         BorderSizePixel = 0,
@@ -71,11 +83,11 @@ function Section.new(tab, properties)
     return self
 end
 
-function Section:_setShown(animate)
+function Section:_setShown(shown, animate)
     local w = self.window
-    w:_reveal(self.title, { TextTransparency = 0.6 }, animate)
+    w:_reveal(self.title, { TextTransparency = if shown then 0.6 else 1 }, animate)
     if self.iconLabel then
-        w:_reveal(self.iconLabel, { ImageTransparency = 0.65 }, animate)
+        w:_reveal(self.iconLabel, { ImageTransparency = if shown then 0.65 else 1 }, animate)
     end
 end
 

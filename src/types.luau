@@ -3,6 +3,14 @@
 
 export type Theme = string | { [string]: any }
 
+-- Optional dev hook: given a source string (the English copy, which doubles as its key) and the
+-- active locale id, return the translation, or nil/"" to fall through to the built-in tables.
+export type Translator = (source: string, localeId: string) -> string?
+
+-- Translation tables keyed by locale id, each mapping a source string to its translation, e.g.
+-- { fr = { ["Close"] = "Fermer" }, ["pt-br"] = { ["Close"] = "Fechar" } }.
+export type Translations = { [string]: { [string]: string } }
+
 export type WindowConfiguration = {
     autoSave: boolean?,
     autoLoad: boolean?,
@@ -18,6 +26,9 @@ export type WindowProps = {
     showName: string?,
     showIcon: (string | number)?,
     configuration: WindowConfiguration?,
+    locale: string?, -- pin the UI language; defaults to the player's Roblox locale
+    translations: Translations?, -- language tables keyed by locale id; the easy, table-first path
+    translator: Translator?, -- resolve copy yourself; falls back to the built-in tables
 }
 
 export type TabProps = {
@@ -107,10 +118,22 @@ export type KeybindProps = {
     flag: string?,
     value: (EnumItem | string)?, -- an Enum.KeyCode / mouse button, or a KeyCode name
     forgetState: boolean?,
+    isMenuToggle: boolean?, -- internal: the settings menu-toggle keybind, clash check runs in reverse
     hold: boolean?, -- fire callback(true) once held, callback(false) on release
     holdThreshold: number?, -- seconds to hold before it counts (default 0.2)
     callback: ((value: EnumItem | boolean) -> ())?, -- bound key on press, or true/false in hold mode
     onChanged: ((key: EnumItem) -> ())?, -- fires when the binding is changed
+}
+
+export type ColorPickerProps = {
+    name: string?,
+    description: string?,
+    icon: (string | number)?,
+    flag: string?,
+    color: Color3?, -- initial colour (accepts a hex string too)
+    alpha: number?, -- initial alpha 0..1 (default 1)
+    forgetState: boolean?,
+    callback: ((value: Color3, alpha: number) -> ())?,
 }
 
 export type StatProps = {
@@ -132,6 +155,16 @@ export type NotifyProps = {
     title: string?,
     content: string?,
     icon: (string | number)?,
+    duration: number?,
+}
+
+export type ToastProps = {
+    title: string?,
+    subtitle: string?, -- optional second line
+    subtitleAbove: boolean?, -- render the subtitle above the title (label-over-value)
+    icon: (string | number)?, -- optional; asset id or ready image string (rbxthumb works)
+    avatar: number?, -- optional user id; shows that user's headshot as a larger avatar
+    minWidth: number?, -- floor the pill width; slack becomes right-hand room (content is left-aligned)
     duration: number?,
 }
 
@@ -172,6 +205,13 @@ export type Keybind = Moveable & {
     Set: (self: Keybind, value: EnumItem | string, skipChanged: boolean?) -> (),
 }
 
+export type ColorPicker = Moveable & {
+    value: Color3,
+    alpha: number,
+    Set: (self: ColorPicker, value: Color3 | string, skipCallback: boolean?) -> (),
+    SetAlpha: (self: ColorPicker, alpha: number, skipCallback: boolean?) -> (),
+}
+
 export type Stat = Moveable & {
     value: number,
     Set: (self: Stat, value: number) -> (),
@@ -204,6 +244,7 @@ export type Tab = {
     CreateDropdown: (self: Tab, props: DropdownProps) -> Dropdown,
     CreateInput: (self: Tab, props: InputProps) -> Input,
     CreateKeybind: (self: Tab, props: KeybindProps) -> Keybind,
+    CreateColorPicker: (self: Tab, props: ColorPickerProps) -> ColorPicker,
     CreateStat: (self: Tab, props: StatProps) -> Stat,
     CreateSection: (self: Tab, props: SectionProps) -> Section,
     CreateGroup: (self: Tab, props: GroupProps?) -> Group,
@@ -215,14 +256,20 @@ export type Window = {
     CreateTab: (self: Window, props: TabProps) -> Tab,
     CreateTag: (self: Window, props: TagProps) -> any,
     Notify: (self: Window, props: NotifyProps) -> (),
+    Toast: (self: Window, props: ToastProps) -> (),
     Show: (self: Window) -> (),
     Hide: (self: Window) -> (),
     ToggleHide: (self: Window) -> (),
     ToggleMinimise: (self: Window) -> (),
     Navigate: (self: Window, tab: string | Tab) -> (),
     ChangeTheme: (self: Window, theme: Theme) -> (),
-    Save: (self: Window) -> boolean,
-    Load: (self: Window) -> boolean,
+    SetLocale: (self: Window, localeId: string) -> (),
+    SetTranslator: (self: Window, translator: Translator?) -> (),
+    RegisterTranslations: (self: Window, translations: Translations) -> (),
+    Save: (self: Window, name: string?) -> boolean,
+    Load: (self: Window, name: string?) -> boolean,
+    ListConfigs: (self: Window) -> { string },
+    DeleteConfig: (self: Window, name: string) -> boolean,
     Unload: (self: Window) -> (),
 }
 

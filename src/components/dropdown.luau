@@ -8,6 +8,7 @@ local utility = script.Parent.Parent.utility
 -- Variables
 local variables = require(utility.variables)
 local functions = require(utility.functions)
+local locale = require(utility.locale)
 
 local CHEVRON_ICON = 88479147175134
 local CHECK_ICON = 125626312718314
@@ -77,7 +78,7 @@ function Dropdown.new(tab, properties)
 
         options = dedupStrings(options),
         multiSelect = multiSelect,
-        placeholderText = properties.placeholder or properties.Placeholder or "None",
+        placeholderText = locale.resolve(properties.placeholder or properties.Placeholder or "None"),
         value = normalizeValue(
             properties.value or properties.Value or properties.currentOption or properties.CurrentOption,
             multiSelect
@@ -168,7 +169,7 @@ function Dropdown.new(tab, properties)
 
     self.title = self.window:Create("TextLabel", {
         -- Configurables
-        Text = self.name,
+        Text = locale.t(self.name),
 
         Size = UDim2.fromOffset(150, 16),
         BorderSizePixel = 0,
@@ -347,7 +348,7 @@ function Dropdown.new(tab, properties)
             elseif n == 1 then
                 self.selectedLabel.Text = self.value[1]
             else
-                self.selectedLabel.Text = "Various"
+                self.selectedLabel.Text = locale.resolve("Various")
             end
         else
             self.selectedLabel.Text = self.value[1] or self.placeholderText
@@ -363,14 +364,14 @@ function Dropdown.new(tab, properties)
                 { BackgroundColor3 = self.window.theme.ErrorColor }
             )
             :Play()
-        self.title.Text = "Error, log recorded in console."
+        self.title.Text = locale.resolve("Error, log recorded in console.")
 
         warn(`Rayfield encountered an error, with the callback for a {self.__type} component named '{self.name}':`)
         print(result)
 
         task.wait(1)
 
-        self.title.Text = self.name
+        self.title.Text = locale.resolve(self.name)
         variables.tweenService
             :Create(
                 self.top,
@@ -469,7 +470,7 @@ function Dropdown.new(tab, properties)
         }
 
         self.window:Connect(frame.MouseEnter, function()
-            if not self._isOpen then
+            if not self._isOpen or not self.window:_interactive() then
                 return
             end
             if isOptionSelected(optionName) then
@@ -586,7 +587,7 @@ function Dropdown.new(tab, properties)
     -- Hover feedback via the overlay + title only. The card uses a gradient stroke (white
     -- base tinted by the gradient), so tweening stroke.Color here would fight the gradient.
     self.window:Connect(self.main.MouseEnter, function()
-        if self._isOpen then
+        if self._isOpen or not self.window:_interactive() then
             return
         end
         variables.tweenService
@@ -674,7 +675,7 @@ function Dropdown:_buildSearch()
 
     self.searchInput = self.window:Create("TextBox", {
         Text = "",
-        PlaceholderText = "Search...",
+        PlaceholderText = locale.t("Search..."),
         PlaceholderColor3 = Color3.fromRGB(150, 150, 150),
         Size = UDim2.new(1, -58, 0, 16),
         Position = UDim2.new(0, 44, 0.5, 0),
@@ -1025,21 +1026,21 @@ function Dropdown:Set(value, skipCallback)
     end
 end
 
-function Dropdown:_setShown(animate)
+function Dropdown:_setShown(shown, animate)
     -- Custom reveal: main is a transparent wrapper, so reveal the header card (self.top)
     -- rather than main. The options card fades in on open, not here.
     local w = self.window
-    w:_reveal(self.stroke, { Transparency = w.theme.ElementStrokeTransparency }, animate)
-    w:_reveal(self.title, { TextTransparency = 0 }, animate)
-    w:_reveal(self.top, { BackgroundTransparency = w.theme.ElementTransparency or 0 }, animate)
+    w:_reveal(self.stroke, { Transparency = if shown then w.theme.ElementStrokeTransparency else 1 }, animate)
+    w:_reveal(self.title, { TextTransparency = if shown then 0 else 1 }, animate)
+    w:_reveal(self.top, { BackgroundTransparency = if shown then (w.theme.ElementTransparency or 0) else 1 }, animate)
     if self.iconLabel then
-        w:_reveal(self.iconLabel, { ImageTransparency = 0 }, animate)
+        w:_reveal(self.iconLabel, { ImageTransparency = if shown then 0 else 1 }, animate)
     end
     if self.descriptor then
-        w:_reveal(self.descriptor.titleLabel, { TextTransparency = 0.7 }, animate)
+        w:_reveal(self.descriptor.titleLabel, { TextTransparency = if shown then 0.7 else 1 }, animate)
     end
-    w:_reveal(self.selectedLabel, { TextTransparency = 0.5 }, animate)
-    w:_reveal(self.chevron, { ImageTransparency = 0.5 }, animate)
+    w:_reveal(self.selectedLabel, { TextTransparency = if shown then 0.5 else 1 }, animate)
+    w:_reveal(self.chevron, { ImageTransparency = if shown then 0.5 else 1 }, animate)
 end
 
 function Dropdown:MoveTo(index)

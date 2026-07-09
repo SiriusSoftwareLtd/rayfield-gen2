@@ -11,6 +11,7 @@ local functions = require(utility.functions)
 local odometer = require(utility.odometer)
 local moveable = require(utility.moveable)
 local constants = require(utility.constants)
+local locale = require(utility.locale)
 
 -- Decimal places implied by an increment (0.1 -> 1, 0.25 -> 2, 1 -> 0). Used so
 -- the readout formats mid-roll floats to the same precision as landed values.
@@ -27,10 +28,12 @@ local tweenInfo = TweenInfo.new(0.45, Enum.EasingStyle.Exponential, Enum.EasingD
 local heldInfo = TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 local followInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
--- below this element width there's no room for title-left + track-right side by side,
--- so we reflow to a stacked layout (title/value on top, full-width track under it).
--- keeps the slider usable in a narrow column or a small window instead of overlapping.
-local narrowWidth = 430
+-- Below this element width we reflow to the stacked layout (title/value on top, full-width
+-- track under it) so the slider stays usable in a narrow column or small window instead of
+-- overlapping. Sits well below a full-width slider (~435) - including the slightly narrower
+-- width it has before the window's intro grow finishes - and well above a grid column (~180),
+-- so those two cases land cleanly on either side and open/close transients never straddle it.
+local narrowWidth = 300
 
 function Slider.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
@@ -187,6 +190,9 @@ function Slider.new(tab, properties)
 
     -- Subtle hover on the slider track itself, not the whole element row
     self.window:Connect(self.main.MouseEnter, function()
+        if not self.window:_interactive() then
+            return -- window still revealing/hiding: dont light up mid-animation
+        end
         variables.tweenService:Create(self.track, tweenInfo, { BackgroundColor3 = Color3.fromRGB(60, 60, 60) }):Play()
     end)
 
@@ -252,6 +258,14 @@ function Slider.new(tab, properties)
     -- pick wide vs stacked from the real width, and keep it in sync if that width changes
     -- (column resolves its size a frame after we build, and windows can be small)
     self.window:Connect(self.main:GetPropertyChangedSignal("AbsoluteSize"), function()
+        -- Ignore the transient widths the window sweeps through as it collapses/grows on
+        -- hide/show/minimise, so the slider just keeps the mode it settled on while visible.
+        -- The one time we DO want a hidden-window reflow is the initial layout pass before the
+        -- first open (the element sizes to its real/column width while the window's still
+        -- hidden) - so only block hidden reflows once the window has been shown at least once.
+        if self.window.animating or (self.window.hidden and self.window.hasShownOnce) then
+            return
+        end
         self:_applyLayout()
     end)
     self:_applyLayout()
@@ -334,7 +348,7 @@ function Slider:_buildLabel()
     end
 
     self.title = self.window:Create("TextLabel", {
-        Text = self.name,
+        Text = locale.t(self.name),
         Size = UDim2.new(1, 0, 0, 16),
         BorderSizePixel = 0,
         BackgroundTransparency = 1,
@@ -391,6 +405,10 @@ end
 
 -- wide: title over value on the left, fixed track on the right.
 -- narrow: title + value share the top row (value pushed right), full-width track below.
+-- Chosen from the slider's real width, so a slider in a narrow column (a grid) stacks while a
+-- full-width one stays wide. The AbsoluteSize handler that calls this ignores the transient
+-- widths the window sweeps through as it opens/closes, so this only ever runs on a settled
+-- width (see the guard where it's connected).
 function Slider:_applyLayout()
     if self.minimal then
         return -- bare mode has a fixed slim layout, nothing to reflow
@@ -513,17 +531,29 @@ end
 -- glows delayed so they don't float in before the bar during the window-open fade
 local sliderGlowReveal = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out, 0, false, 0.35)
 
-function Slider:_setShown(animate)
+function Slider:_setShown(shown, animate)
     local w = self.window
-    w:_revealCommon(self, animate)
-    w:_reveal(self.track, { BackgroundTransparency = 0 }, animate)
-    w:_reveal(self.progress, { BackgroundTransparency = 0 }, animate)
-    w:_reveal(self.handle, { BackgroundTransparency = 0 }, animate)
-    if self.valueOdo then
-        self.valueOdo:reveal(0.3, animate)
+    if shown then
+        w:_revealCommon(self, animate)
+        w:_reveal(self.track, { BackgroundTransparency = 0 }, animate)
+        w:_reveal(self.progress, { BackgroundTransparency = 0 }, animate)
+        w:_reveal(self.handle, { BackgroundTransparency = 0 }, animate)
+        if self.valueOdo then
+            self.valueOdo:reveal(0.3, animate)
+        end
+        w:_reveal(self.progressGlow, { Transparency = 0.55 }, animate, sliderGlowReveal)
+        w:_reveal(self.handleGlow, { Transparency = 0.8 }, animate, sliderGlowReveal)
+    else
+        w:_hideCommon(self, animate)
+        w:_reveal(self.track, { BackgroundTransparency = 1 }, animate)
+        w:_reveal(self.progress, { BackgroundTransparency = 1 }, animate)
+        w:_reveal(self.handle, { BackgroundTransparency = 1 }, animate)
+        if self.valueOdo then
+            self.valueOdo:reveal(1, animate)
+        end
+        w:_reveal(self.progressGlow, { Transparency = 1 }, animate, sliderGlowReveal)
+        w:_reveal(self.handleGlow, { Transparency = 1 }, animate, sliderGlowReveal)
     end
-    w:_reveal(self.progressGlow, { Transparency = 0.55 }, animate, sliderGlowReveal)
-    w:_reveal(self.handleGlow, { Transparency = 0.8 }, animate, sliderGlowReveal)
 end
 
 -- Room the slider needs in a row: its narrow layout puts title + value on the top row,

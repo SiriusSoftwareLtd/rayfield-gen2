@@ -9,6 +9,7 @@ local utility = script.Parent.Parent.utility
 local variables = require(utility.variables)
 local functions = require(utility.functions)
 local moveable = require(utility.moveable)
+local locale = require(utility.locale)
 
 -- Compact (row) sizing.
 local compactHeight = 41
@@ -103,7 +104,7 @@ function Button:_buildFull()
 
     self.title = self.window:Create("TextLabel", {
         -- Configurables
-        Text = self.name, -- tab name
+        Text = locale.t(self.name), -- tab name
 
         Size = UDim2.fromOffset(250, 16),
         BorderSizePixel = 0,
@@ -255,7 +256,7 @@ function Button:_buildCompact()
     end
 
     self.title = window:Create("TextLabel", {
-        Text = self.name,
+        Text = locale.t(self.name),
         Size = UDim2.fromOffset(0, 16),
         AutomaticSize = Enum.AutomaticSize.X,
         BorderSizePixel = 0,
@@ -302,8 +303,12 @@ function Button:_buildCompact()
     end)
 end
 
-function Button:_setShown(animate)
-    self.window:_revealCommon(self, animate)
+function Button:_setShown(shown, animate)
+    if shown then
+        self.window:_revealCommon(self, animate)
+    else
+        self.window:_hideCommon(self, animate)
+    end
 end
 
 -- Room the compact button needs before its label would clip: side padding + icon

@@ -29,6 +29,7 @@ variables.tweenService = getService("TweenService")
 variables.httpService = getService("HttpService")
 variables.textService = getService("TextService")
 variables.replicatedStorage = getService("ReplicatedStorage")
+variables.localizationService = getService("LocalizationService")
 variables.guiContainer = if variables.runService:IsStudio()
     then variables.localPlayer.PlayerGui
     elseif gethui then gethui()

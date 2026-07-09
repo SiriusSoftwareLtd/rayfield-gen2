@@ -8,6 +8,7 @@ local utility = script.Parent.Parent.utility
 -- Variables
 local variables = require(utility.variables)
 local functions = require(utility.functions)
+local locale = require(utility.locale)
 
 -- Pill transparencies per state. Gradient stays constant (theme TabBackground/TabStroke), selection is just transparency.
 local tabStates = {
@@ -140,7 +141,7 @@ function Tab.new(window, properties)
         if self.name then
             self.topbarItemTitle = self.window:Create("TextLabel", {
                 -- Configurables
-                Text = self.name, -- tab name
+                Text = locale.t(self.name), -- tab name
 
                 Size = UDim2.fromOffset(0, 16),
                 BorderSizePixel = 0,
@@ -205,8 +206,12 @@ function Tab.new(window, properties)
         table.insert(
             self.connections,
             self.window:Connect(self.topbarItemInteract.MouseEnter, function()
+                if not self.window:_interactive() then
+                    return -- window still revealing/hiding: dont light up mid-animation
+                end
                 if self.window.selectedTab ~= self then
                     self:_applyVisual("hover", hoverTweenInfo)
+                    self:_spinGradients() -- little gradient sweep, same as the intro flourish
                 end
             end)
         )
@@ -257,6 +262,20 @@ function Tab:_applyVisual(stateName, tweenInfo)
     end
 end
 
+-- Flourish: spin the pill's fill + stroke gradients one full turn back to their resting 90deg.
+-- Used staggered per tab on the first reveal, and again when hovering an unselected tab.
+function Tab:_spinGradients()
+    if self.neglectSelector then
+        return
+    end
+
+    local spinInfo = TweenInfo.new(0.7, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    for _, gradient in { self.topbarItemGradient, self.topbarItemStrokeGradient } do
+        gradient.Rotation = 90 - 360 -- one full turn shy of rest, so the tween lands clockwise on 90
+        variables.tweenService:Create(gradient, spinInfo, { Rotation = 90 }):Play()
+    end
+end
+
 function Tab:Select(noAnimation)
     self.window.selectedTab = self
     self.window:Navigate(self.tabPage)
@@ -303,7 +322,7 @@ function Tab:_register(element)
     assignOrder(element, #self.elements * 10)
 
     if not self.window.hidden then
-        element:_setShown(true)
+        element:_setShown(true, true)
     end
 
     return element
@@ -351,6 +370,11 @@ end
 -- Keybind
 function Tab:CreateKeybind(properties)
     return self:_register(require(script.Parent.keybind).new(self, properties))
+end
+
+-- Color picker
+function Tab:CreateColorPicker(properties)
+    return self:_register(require(script.Parent.colorpicker).new(self, properties))
 end
 
 -- Group (layout container). A row that wraps by default; pass direction="column" for a
