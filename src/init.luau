@@ -10,7 +10,6 @@ export type WindowProps = types.WindowProps
 export type Window = types.Window
 export type Tab = types.Tab
 export type Group = types.Group
-export type Stack = types.Stack -- legacy alias
 export type Button = types.Button
 export type Toggle = types.Toggle
 export type Slider = types.Slider
@@ -19,6 +18,7 @@ export type Input = types.Input
 export type Keybind = types.Keybind
 export type Stat = types.Stat
 export type Section = types.Section
+export type Popup = types.Popup
 
 local function createBanner()
     local ui = Instance.new("ScreenGui")

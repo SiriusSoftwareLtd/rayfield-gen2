@@ -5,7 +5,7 @@ local textService = variables.textService
 
 -- Width (px) a string renders at for a given font+size, cached since GetTextBoundsAsync
 -- yields. Elements use this to report how much room they need before they'd overlap,
--- so a horizontal stack can decide how many fit per row.
+-- so a horizontal group can decide how many fit per row.
 local widthCache = {}
 local widthCacheCount = 0
 local widthCacheCap = 1024 -- dynamic labels (a live stat) would otherwise grow this forever

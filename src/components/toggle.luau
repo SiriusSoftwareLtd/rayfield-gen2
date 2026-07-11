@@ -521,7 +521,7 @@ function Toggle:_setShown(shown, animate)
 end
 
 -- Room the compact toggle needs: side padding + icon (and gap) if shown + title text
--- + the gap to the pill + the pill itself. Lets a horizontal stack wrap sensibly.
+-- + the gap to the pill + the pill itself. Lets a horizontal group wrap sensibly.
 function Toggle:_minWidth()
     local w = 30 + 10 + 50 -- 15+15 padding, 10 gap to pill, 50 pill
     if self.icon then

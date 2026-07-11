@@ -296,6 +296,7 @@ function ColorPicker.new(tab, properties)
 
     -- establish the picker's hidden state once, from the single visibility list
     self:_applyPickerVisibility(false, false)
+    self:_setControlsVisible(false) -- and keep the collapsed controls out of input entirely
 
     -- pick wide/narrow from the real width and keep it in sync as that width changes (the
     -- column resolves a frame after we build, and the window can be resized). Ignore the
@@ -1029,6 +1030,7 @@ function ColorPicker:_open()
         return
     end
     self._isOpen = true
+    self:_setControlsVisible(true) -- back into input before they fade in
 
     if self._outsideClickConn then
         self.window:Disconnect(self._outsideClickConn)
@@ -1087,6 +1089,14 @@ function ColorPicker:_close()
         :Create(self.preview, openInfo, { Position = previewClosedPos, Size = previewClosedSize })
         :Play()
     variables.tweenService:Create(self.main, openInfo, { Size = UDim2.new(1, -20, 0, headerHeight) }):Play()
+
+    -- once the controls have faded, drop them out of input so a transparent field below the
+    -- collapsed header cant grab the cursor
+    task.delay(fadeInfo.Time, function()
+        if not self._isOpen then
+            self:_setControlsVisible(false)
+        end
+    end)
 end
 
 -- One source of truth for the picker controls' shown/hidden transparencies. Used both to hide
@@ -1123,6 +1133,16 @@ function ColorPicker:_applyPickerVisibility(open, animate)
                 instance[prop] = value
             end
         end
+    end
+end
+
+-- The picker controls sit below the header even while collapsed (the card doesnt clip), so a
+-- transparent TextBox or button down there would still catch the cursor and clicks. Toggling the
+-- top control frames off drops the whole cluster out of input when closed. The preview pill is
+-- separate, so it stays.
+function ColorPicker:_setControlsVisible(visible)
+    for _, frame in { self.map, self.hueBar, self.alphaBar, self.hexBox, self.alphaBox } do
+        frame.Visible = visible
     end
 end
 

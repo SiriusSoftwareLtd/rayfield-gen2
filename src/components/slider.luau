@@ -392,7 +392,7 @@ function Slider:_buildLabel()
     self.valueOdo:snap(self:_format(self.value))
 end
 
--- Set the element height, keeping the width alone when a horizontal stack owns it
+-- Set the element height, keeping the width alone when a horizontal group owns it
 -- (_widthManaged): there the stack freezes us to _minWidth and wraps, so we must not
 -- stomp the X it set. Standalone we take the usual full width.
 function Slider:_setMainHeight(height)

@@ -10,6 +10,7 @@ local variables = require(utility.variables)
 local functions = require(utility.functions)
 local locale = require(utility.locale)
 local assignOrder = require(utility.ordering)
+local search = require(script.Parent.search)
 
 -- Walk a tab or group's children (groups nest) and tear each element down: drop its flag from
 -- the window registry and disconnect every connection it owns, so nothing outlives the
@@ -308,6 +309,12 @@ function Tab:_spinGradients()
 end
 
 function Tab:Select(noAnimation)
+    -- selecting a tab (e.g. via the settings action) leaves search: bring the strip back,
+    -- but let the navigation below pick the page.
+    if self.window._searching then
+        search.close(self.window, { showTabs = true, jumpTo = false })
+    end
+
     self.window.selectedTab = self
     self.window:Navigate(self.tabPage)
 
@@ -404,19 +411,6 @@ end
 -- Group (layout container). A row that wraps by default; pass direction="column" for a
 -- column. Nest a row of columns for a grid. Add elements via group:CreateX.
 function Tab:CreateGroup(properties)
-    return self:_register(require(script.Parent.group).new(self, properties))
-end
-
--- direction-named aliases (kept so older code keeps working)
-function Tab:CreateHStack(properties)
-    properties = if typeof(properties) == "table" then table.clone(properties) else {}
-    properties.direction = "row"
-    return self:_register(require(script.Parent.group).new(self, properties))
-end
-
-function Tab:CreateVStack(properties)
-    properties = if typeof(properties) == "table" then table.clone(properties) else {}
-    properties.direction = "column"
     return self:_register(require(script.Parent.group).new(self, properties))
 end
 

@@ -263,7 +263,7 @@ function Button:_setShown(shown, animate)
 end
 
 -- Room the compact button needs before its label would clip: side padding + icon
--- (and its gap) if shown + the title text. A horizontal stack uses this to wrap.
+-- (and its gap) if shown + the title text. A horizontal group uses this to wrap.
 function Button:_minWidth()
     local w = 32 -- interact padding, 16 each side
     if self.icon then

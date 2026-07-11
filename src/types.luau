@@ -52,7 +52,6 @@ export type SectionProps = {
 export type GroupProps = {
     direction: string?, -- "row" | "column" (default row); "horizontal"/"vertical" also work
 }
-export type StackProps = GroupProps -- legacy alias
 
 export type ButtonProps = {
     name: string?,
@@ -167,6 +166,28 @@ export type ToastProps = {
     duration: number?,
 }
 
+export type PopupBox = {
+    title: string?,
+    description: string?,
+    icon: (string | number)?,
+}
+
+export type PopupOption = {
+    text: string?,
+    style: string?, -- "neutral" (default) | "primary" | "danger"
+    callback: (() -> ())?,
+}
+
+export type PopupProps = {
+    title: string?,
+    subtitle: string?,
+    icon: (string | number)?,
+    content: string?, -- a body paragraph
+    boxes: { PopupBox }?, -- a list of cards (the changelog layout)
+    options: { PopupOption }?, -- footer buttons; defaults to a single dismiss button
+    dismissable: boolean?, -- click the dim or press Escape to close (default true)
+}
+
 -- Handles ------------------------------------------------------------------
 -- Every element can be reordered within its tab.
 export type Moveable = {
@@ -219,6 +240,10 @@ export type Stat = Moveable & {
 
 export type Section = Moveable & {}
 
+export type Popup = {
+    Close: (self: Popup) -> (),
+}
+
 -- A group lays elements along one axis and nests, so a row of columns builds a grid.
 -- A row accepts the compact elements (button/toggle/stat) + slider; a column also takes
 -- dropdown and section. Input, keybind and colorpicker stay tab-level for now.
@@ -231,10 +256,7 @@ export type Group = Moveable & {
     CreateDropdown: (self: Group, props: DropdownProps) -> Dropdown,
     CreateSection: (self: Group, props: SectionProps) -> Section,
     CreateGroup: (self: Group, props: GroupProps?) -> Group,
-    CreateHStack: (self: Group, props: GroupProps?) -> Group,
-    CreateVStack: (self: Group, props: GroupProps?) -> Group,
 }
-export type Stack = Group -- legacy alias
 
 export type Tab = {
     CreateButton: (self: Tab, props: ButtonProps) -> Button,
@@ -248,8 +270,6 @@ export type Tab = {
     CreateStat: (self: Tab, props: StatProps) -> Stat,
     CreateSection: (self: Tab, props: SectionProps) -> Section,
     CreateGroup: (self: Tab, props: GroupProps?) -> Group,
-    CreateHStack: (self: Tab, props: GroupProps?) -> Group,
-    CreateVStack: (self: Tab, props: GroupProps?) -> Group,
 }
 
 export type Window = {
@@ -257,6 +277,7 @@ export type Window = {
     CreateTag: (self: Window, props: TagProps) -> any,
     Notify: (self: Window, props: NotifyProps) -> (),
     Toast: (self: Window, props: ToastProps) -> (),
+    Popup: (self: Window, props: PopupProps) -> Popup,
     Show: (self: Window) -> (),
     Hide: (self: Window) -> (),
     ToggleHide: (self: Window) -> (),

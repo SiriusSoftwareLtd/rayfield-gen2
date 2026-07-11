@@ -996,7 +996,7 @@ function Dropdown:Set(value, skipCallback)
     self._updateSelectedLabel()
 
     if not skipCallback then
-        task.spawn(self.callback, if self.multiSelect then self.value else self.value[1])
+        self.window:_runGuarded(self, self.callback, if self.multiSelect then self.value else self.value[1])
     end
 end
 

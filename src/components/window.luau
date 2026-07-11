@@ -9,6 +9,7 @@ local constants = require(utility.constants)
 local locale = require(utility.locale)
 local log = require(utility.log)
 local chrome = require(script.Parent.chrome)
+local search = require(script.Parent.search)
 
 -- Variables
 local variables = require(utility.variables)
@@ -481,15 +482,7 @@ function Window.new(properties)
         end,
     })
 
-    require(script.Parent.action).new(self, {
-        name = "Search",
-        icon = constants.icons.search,
-        order = 4,
-
-        callback = function()
-            -- TODO: search isn't wired up yet
-        end,
-    })
+    search.build(self)
 
     self.unloaded = false
     self.minimised = false
@@ -707,10 +700,24 @@ function Window:Toast(properties)
     return require(script.Parent.toast).new(self, properties)
 end
 
+-- Centred modal over a dimmed backdrop. Takes { title, subtitle?, icon?, content?, boxes?,
+-- options?, dismissable? } - give it options for a choice dialog, or boxes for a changelog.
+-- Returns the popup handle (call :Close() to dismiss it yourself).
+function Window:Popup(properties)
+    return require(script.Parent.popup).new(self, properties)
+end
+
 function Window:Hide()
     if self.animating then
         return
     end
+
+    -- drop out of search first so we grow back into the normal tab view on next show. tabList
+    -- stays hidden here since the collapse hides it anyway; Show re-enables it.
+    if self._searching then
+        search.close(self, { showTabs = false, jumpTo = self.selectedTab and self.selectedTab.tabPage })
+    end
+
     self.animating = true
     self.hidden = true
     variables.rayfieldHidden = true
@@ -824,6 +831,12 @@ function Window:ToggleMinimise()
     if self.animating or self.hidden then
         return
     end
+
+    -- minimising drops out of search back to the tab view first, so it grows back normally
+    if self._searching then
+        search.close(self, { showTabs = true })
+    end
+
     self.animating = true
 
     local sizeInfo = TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)

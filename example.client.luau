@@ -52,11 +52,11 @@ local window = Rayfield:CreateWindow({
     },
 })
 
-window:CreateTag({
-    text = "us-en",
-    icon = 75184136063371,
-    color = Color3.fromRGB(255, 175, 15),
-})
+--window:CreateTag({
+  --  text = "us-en",
+    --icon = 75184136063371,
+    --color = Color3.fromRGB(255, 175, 15),
+--})
 
 task.delay(4, function()
     window:Notify({
@@ -266,6 +266,65 @@ generalTab:CreateButton({
             subtitle = "Signed in as",
             subtitleAbove = true,
             avatar = game.Players.LocalPlayer.UserId,
+        })
+    end,
+})
+
+generalTab:CreateButton({
+    name = "Confirm Popup (2 choices)",
+    icon = 83277910885129,
+    callback = function()
+        window:Popup({
+            title = "Reset everything?",
+            content = "This clears every saved value and puts the menu back to its defaults. You can't undo it.",
+            icon = 83277910885129,
+            options = {
+                { text = "Cancel" },
+                {
+                    text = "Reset",
+                    style = "danger",
+                    callback = function()
+                        window:Toast({ title = "Everything reset" })
+                    end,
+                },
+            },
+        })
+    end,
+})
+
+generalTab:CreateButton({
+    name = "Changelog Popup (boxes)",
+    icon = 125823673784681,
+    callback = function()
+        window:Popup({
+            title = "What's New",
+            subtitle = "Version 2.1",
+            icon = 125823673784681,
+            boxes = {
+                {
+                    title = "Modal popups",
+                    description = "A new centred dialog for choices and changelogs, styled to match the rest of the menu.",
+                    icon = 93364949241311,
+                },
+                {
+                    title = "Faster reveals",
+                    description = "Element intro animations now only stagger what's on screen, so long pages open instantly.",
+                    icon = 84750991656135,
+                },
+                {
+                    title = "Search across pages",
+                    description = "The search action gathers every tab into one filtered view.",
+                    icon = 100604009889706,
+                },
+                {
+                    title = "Live configurations",
+                    description = "Save named setups and switch between them from the settings tab.",
+                    icon = 125823673784681,
+                },
+            },
+            options = {
+                { text = "Got it", style = "primary" },
+            },
         })
     end,
 })

@@ -641,7 +641,7 @@ function Statistic:_setShown(shown, animate)
 end
 
 -- Room the compact card needs: padding + icon (and gap) if shown + title text + the gap
--- to the readout + the readout number itself. Lets a horizontal stack wrap sensibly.
+-- to the readout + the readout number itself. Lets a horizontal group wrap sensibly.
 function Statistic:_minWidth()
     local w = 30 + 10 -- 15+15 card padding, 10 gap between title and readout
     if self.icon then

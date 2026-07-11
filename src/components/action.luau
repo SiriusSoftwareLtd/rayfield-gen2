@@ -59,9 +59,13 @@ function Action.new(window, properties)
     })
 
     -- drop the icon back to its resting brightness, unless this action opens a tab that's
-    -- currently selected (the settings cog stays lit while its page is open)
+    -- currently selected (the settings cog stays lit while its page is open), or it reports
+    -- itself lit some other way (the search action while the field is open)
     local function settleIcon()
         if self.linkedTab and self.window.selectedTab == self.linkedTab then
+            return
+        end
+        if self.isLit and self:isLit() then
             return
         end
         variables.tweenService

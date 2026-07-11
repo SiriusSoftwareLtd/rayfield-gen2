@@ -171,17 +171,6 @@ end
 function Group:CreateGroup(properties)
     return self:_addGroup(properties)
 end
--- direction-named aliases (kept so older code keeps working)
-function Group:CreateHStack(properties)
-    properties = if typeof(properties) == "table" then table.clone(properties) else {}
-    properties.direction = "row"
-    return self:_addGroup(properties)
-end
-function Group:CreateVStack(properties)
-    properties = if typeof(properties) == "table" then table.clone(properties) else {}
-    properties.direction = "column"
-    return self:_addGroup(properties)
-end
 
 -- reorder a child within this group
 function Group:_moveElement(element, targetIndex)

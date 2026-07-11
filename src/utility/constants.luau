@@ -67,6 +67,8 @@ constants.zIndex = {
 constants.displayOrder = {
     window = 99999,
     banner = 100000,
+    -- modal popups sit above everything, dim included
+    popup = 100001,
 }
 
 return constants
