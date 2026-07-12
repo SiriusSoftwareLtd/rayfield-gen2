@@ -22,11 +22,13 @@ local thumbEndpoint =
     "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=%d&size=%dx%d&format=Png&isCircular=false"
 
 -- Built straight from the built-in icon list so it can never drift: every id there gets a
--- cache entry, keyed by id -> download url.
+-- cache entry, keyed by id -> download url. Shared ids (e.g. dot + colorpicker) collapse to one.
 local manifest = {}
-local manifestSize = 0
 for _, id in constants.icons do
     manifest[id] = assetBase .. id .. ".png?raw=true"
+end
+local manifestSize = 0
+for _ in manifest do
     manifestSize += 1
 end
 
