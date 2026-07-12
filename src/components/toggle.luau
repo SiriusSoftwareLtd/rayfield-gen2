@@ -9,7 +9,6 @@ local utility = script.Parent.Parent.utility
 local variables = require(utility.variables)
 local functions = require(utility.functions)
 local moveable = require(utility.moveable)
-local constants = require(utility.constants)
 local locale = require(utility.locale)
 
 function Toggle.new(tab, properties)
@@ -35,8 +34,6 @@ function Toggle.new(tab, properties)
         callback = properties.callback or properties.Callback or function() end,
 
         value = if (properties.value or properties.Value) ~= nil then (properties.value or properties.Value) else false,
-
-        locked = false,
     }, Toggle)
 
     -- register as a saveable control if flagged (works in a row too)
@@ -231,15 +228,9 @@ function Toggle:_buildFull()
     self.functionContainer.Position = UDim2.new(1, -15, 0, 20)
     self.functionContainer.AnchorPoint = Vector2.new(1, 0.5)
 
-    self:_buildLock()
-
     self.window:_wireElementHover(self)
 
     self.window:ConnectFor(self, self.interact.MouseButton1Click, function()
-        if self.locked then
-            return
-        end
-
         variables.tweenService
             :Create(
                 self.stroke,
@@ -369,10 +360,6 @@ function Toggle:_buildCompact()
     self.window:_wireElementHover(self)
 
     self.window:ConnectFor(self, self.interact.MouseButton1Click, function()
-        if self.locked then
-            return
-        end
-
         variables.tweenService
             :Create(
                 self.stroke,
@@ -393,73 +380,6 @@ function Toggle:_buildCompact()
             )
             :Play()
     end)
-end
-
--- full-only lock overlay
-function Toggle:_buildLock()
-    local window = self.window
-
-    self.elementLock = window:Create("Frame", {
-        Name = "ElementLock",
-        Size = UDim2.fromScale(1, 1),
-        BackgroundColor3 = Color3.fromRGB(0, 0, 0),
-        BackgroundTransparency = 0.45,
-        BorderSizePixel = 0,
-        Visible = false,
-        ZIndex = 10,
-
-        Parent = self.main,
-    })
-
-    window:Create("UICorner", {
-        Parent = self.elementLock,
-    }, { CornerRadius = "ElementCornerRadius" })
-
-    local lockContent = window:Create("Frame", {
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.fromScale(0.5, 0.5),
-        Size = UDim2.new(1, -20, 0, 20),
-        BackgroundTransparency = 1,
-        ZIndex = 15,
-
-        Parent = self.elementLock,
-    })
-
-    window:Create("UIListLayout", {
-        Padding = UDim.new(0, 6),
-        FillDirection = Enum.FillDirection.Horizontal,
-        VerticalAlignment = Enum.VerticalAlignment.Center,
-        HorizontalAlignment = Enum.HorizontalAlignment.Center,
-        SortOrder = Enum.SortOrder.LayoutOrder,
-
-        Parent = lockContent,
-    })
-
-    window:Create("ImageLabel", {
-        Image = constants.icons.toggle,
-        Size = UDim2.fromOffset(20, 20),
-        BorderSizePixel = 0,
-        BackgroundTransparency = 1,
-        ImageTransparency = 0.2,
-        ZIndex = 15,
-
-        Parent = lockContent,
-    })
-
-    self.lockLabel = window:Create("TextLabel", {
-        Text = locale.t("This element is locked."),
-        Size = UDim2.fromScale(0, 1),
-        AutomaticSize = Enum.AutomaticSize.X,
-        BackgroundTransparency = 1,
-        TextSize = 15,
-        TextTransparency = 0.2,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        TextWrapped = true,
-        LayoutOrder = 1,
-        ZIndex = 15,
-
-        Parent = lockContent,
-    }, { TextColor3 = "ContentColor", FontFace = "TitleFont" })
 end
 
 function Toggle:_animateIndicator()
@@ -579,31 +499,6 @@ function Toggle:Set(value, skipCallback)
     if not skipCallback then
         self.window:_runGuarded(self, self.callback, self.value)
         self.window:_persist(self) -- skipped on load (Load passes skipCallback)
-    end
-end
-
-function Toggle:Lock(message)
-    self.locked = true
-    if self.lockLabel and message then
-        self.lockLabel.Text = message
-    end
-    if self.elementLock then
-        self.elementLock.Visible = true
-    elseif self.title then
-        -- compact/row toggles have no overlay (no room in the flex row), so swap the
-        -- title to the lock message. clicks are already blocked by self.locked.
-        self._unlockedTitle = self._unlockedTitle or self.title.Text
-        self.title.Text = message or locale.resolve("Locked")
-    end
-end
-
-function Toggle:Unlock()
-    self.locked = false
-    if self.elementLock then
-        self.elementLock.Visible = false
-    elseif self.title and self._unlockedTitle then
-        self.title.Text = self._unlockedTitle
-        self._unlockedTitle = nil
     end
 end
 

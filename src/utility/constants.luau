@@ -20,7 +20,6 @@ constants.icons = {
     chevron = 88479147175134,
     check = 125626312718314,
     dot = 91452555903853, -- unselected dropdown option
-    toggle = 78137979054938,
     colorpicker = 128242943430630,
     banner = 111263549366178,
     config = 125823673784681, -- saved-configurations picker
