@@ -140,13 +140,12 @@ function Toast.new(window, properties)
     })
 
     self.stroke = self.window:Create("UIStroke", {
-        Color = Color3.fromRGB(255, 255, 255),
         Transparency = 1, -- In = 0.9
 
         Parent = self.body,
-    })
+    }, { Color = "SurfaceStroke" })
 
-    self.shadow = self.window:CreateGlow(self.body, Color3.fromRGB(0, 0, 0), 20, 1) -- In = 0.6
+    self.shadow = self.window:CreateGlow(self.body, "ShadowColor", 20, 1) -- In = 0.6
 
     self.window:Create("UIPadding", {
         PaddingLeft = UDim.new(0, self._leftPad),
@@ -166,8 +165,8 @@ function Toast.new(window, properties)
     })
 
     if hasIcon then
-        -- untinted (ImageColor3 stays white) so a white glyph reads as-is and an avatar photo
-        -- isn't recoloured; circular to suit both
+        -- glyph icons follow the theme's content colour; an avatar headshot stays untinted so the
+        -- photo isn't recoloured. circular to suit both
         self.iconLabel = self.window:Create("ImageLabel", {
             Image = self._iconImage,
             Size = UDim2.fromOffset(self._iconSize, self._iconSize),
@@ -180,7 +179,7 @@ function Toast.new(window, properties)
             ImageTransparency = 1, -- In = 0
 
             Parent = self.body,
-        })
+        }, if hasAvatar then nil else { ImageColor3 = "ContentColor" })
 
         self.window:Create("UICorner", {
             CornerRadius = UDim.new(1, 0),

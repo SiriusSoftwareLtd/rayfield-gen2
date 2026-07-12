@@ -127,12 +127,10 @@ function Statistic:_buildFull()
         Name = self.name,
         ZIndex = 5,
 
-        BackgroundColor3 = Color3.fromRGB(25, 25, 25),
-
         BackgroundTransparency = 1,
 
         Parent = self.tab.tabPage,
-    }, { BackgroundTransparency = "ElementTransparency" })
+    }, { BackgroundColor3 = "StatBackground", BackgroundTransparency = "ElementTransparency" })
 
     window:Create("UICorner", {
         Parent = self.main,
@@ -213,8 +211,6 @@ function Statistic:_buildFull()
     if self.icon then
         self.iconLabel = window:Create("ImageLabel", {
             Image = "rbxassetid://" .. tostring(self.icon),
-            ImageColor3 = Color3.fromRGB(255, 255, 255),
-
             Size = UDim2.fromOffset(32, 32),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
@@ -289,14 +285,13 @@ function Statistic:_buildCompact()
         Size = if inRow then UDim2.fromOffset(0, compactHeight) else UDim2.new(1, -20, 0, compactHeight),
         AutomaticSize = if inRow then Enum.AutomaticSize.X else Enum.AutomaticSize.None,
         ClipsDescendants = true,
-        BackgroundColor3 = Color3.fromRGB(25, 25, 25),
         BorderSizePixel = 0,
         ZIndex = 5,
 
         BackgroundTransparency = 1, -- In = ElementTransparency
 
         Parent = self.tab.tabPage,
-    }, { BackgroundTransparency = "ElementTransparency" })
+    }, { BackgroundColor3 = "StatBackground", BackgroundTransparency = "ElementTransparency" })
 
     window:Create("UICorner", {
         Parent = self.main,
@@ -406,7 +401,6 @@ function Statistic:_buildCompact()
     if self.icon then
         self.iconLabel = window:Create("ImageLabel", {
             Image = "rbxassetid://" .. tostring(self.icon),
-            ImageColor3 = Color3.fromRGB(255, 255, 255),
             Size = UDim2.fromOffset(20, 20), -- smaller than the full 32
             BorderSizePixel = 0,
             BackgroundTransparency = 1,

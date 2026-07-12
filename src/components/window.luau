@@ -36,17 +36,81 @@ local maxToastWidth = 320
 -- Standard element row height, shared by the compact button/toggle scaffold.
 local compactRowHeight = 41
 
--- Resolve a theme arg (table or name) to a fresh table. We copy so ChangeTheme never
--- mutates the required theme module, which require() caches and shares between windows.
-local function resolveTheme(value)
-    local source = if typeof(value) == "table"
-        then value
-        elseif typeof(value) == "string" and themes:FindFirstChild(string.lower(value)) then require(
-            themes[string.lower(value)]
-        )
-        else require(themes["default"])
+-- Keys that drive a UIGradient and so want a ColorSequence. A dev may pass a plain Color3 for
+-- any of these and we widen it to a flat sequence, so a theme reads the same either way.
+local gradientKeys = {
+    WindowColor = true,
+    ElementGradient = true,
+    ElementStrokeGradient = true,
+    TabBackground = true,
+    TabStroke = true,
+    SliderProgress = true,
+}
 
-    return table.clone(source)
+local function coerceThemeValue(key, value)
+    if gradientKeys[key] and typeof(value) == "Color3" then
+        return ColorSequence.new(value)
+    end
+    return value
+end
+
+local function firstColor(value)
+    return if typeof(value) == "ColorSequence" then value.Keypoints[1].Value else value
+end
+
+-- A subtle raised edge for a fill: lighten a dark fill, darken a light one.
+local function edgeShade(color, amount)
+    local luminance = 0.299 * color.R + 0.587 * color.G + 0.114 * color.B
+    local target = if luminance > 0.5 then Color3.new(0, 0, 0) else Color3.new(1, 1, 1)
+    return color:Lerp(target, amount)
+end
+
+-- Give a custom theme sensible strokes for free: when it recolours a surface but leaves the
+-- matching stroke unset, derive one from the fill so a colours-only theme still reads coherently.
+local function deriveStrokes(resolved, overrides)
+    if overrides.ElementGradient then
+        local fill = firstColor(resolved.ElementGradient)
+        if overrides.ElementStroke == nil then
+            resolved.ElementStroke = edgeShade(fill, 0.28)
+        end
+        if overrides.ElementStrokeGradient == nil then
+            resolved.ElementStrokeGradient = ColorSequence.new(edgeShade(fill, 0.4))
+        end
+        if overrides.ElementStrokeHover == nil then
+            resolved.ElementStrokeHover = edgeShade(fill, 0.52)
+        end
+    end
+    if overrides.TabBackground and overrides.TabStroke == nil then
+        resolved.TabStroke = ColorSequence.new(edgeShade(firstColor(resolved.TabBackground), 0.4))
+    end
+end
+
+-- Resolve a theme arg to its raw key set: a table is taken as-is (partial is fine), a known
+-- name is required, anything else falls back to default. Read-only - callers never mutate it,
+-- so the require()-cached module stays clean for other windows.
+local function themeOverrides(value)
+    if typeof(value) == "table" then
+        return value
+    elseif typeof(value) == "string" and themes:FindFirstChild(string.lower(value)) then
+        return require(themes[string.lower(value)])
+    else
+        return require(themes["default"])
+    end
+end
+
+-- A complete theme for first paint: default filled in with the given overrides, so a partial
+-- custom theme only needs the keys it wants to change and the rest fall back to default.
+local function resolveTheme(value)
+    local resolved = table.clone(require(themes["default"]))
+    local overrides = themeOverrides(value)
+    for key, override in overrides do
+        resolved[key] = coerceThemeValue(key, override)
+    end
+    -- only a hand-written table gets derived strokes; a named built-in ships its own.
+    if typeof(value) == "table" then
+        deriveStrokes(resolved, overrides)
+    end
+    return resolved
 end
 
 function Window.new(properties)
@@ -160,13 +224,11 @@ function Window.new(properties)
     }, { CornerRadius = "CornerRoundness" })
 
     self.windowStroke = self:Create("UIStroke", {
-        Color = Color3.fromRGB(255, 255, 255),
-
         -- Animations
         Transparency = 1, -- In = 0.95
 
         Parent = self.main,
-    })
+    }, { Color = "SurfaceStroke" })
 
     self.windowGradient = self:Create("UIGradient", {
         Rotation = 270,
@@ -197,7 +259,6 @@ function Window.new(properties)
     self.bottomFadeGradient = self:Create("UIGradient", {
         Rotation = 270,
         Offset = Vector2.new(0, 0.2),
-        Color = ColorSequence.new(Color3.fromRGB(10, 10, 10)),
         Transparency = NumberSequence.new({
             NumberSequenceKeypoint.new(0, 0),
             NumberSequenceKeypoint.new(0.4414, 0),
@@ -206,6 +267,15 @@ function Window.new(properties)
         }),
 
         Parent = self.bottomFade,
+    }, {
+        -- Track the window's colour at its base (keypoint 0 sits at the bottom under Rotation 270)
+        -- so elements dissolve into the window instead of a fixed dark smudge on light themes.
+        Color = {
+            "WindowColor",
+            function(color)
+                return ColorSequence.new(functions.toColorSequence(color).Keypoints[1].Value)
+            end,
+        },
     })
 
     -- Topbar
@@ -262,8 +332,6 @@ function Window.new(properties)
             -- Configurables
             Text = locale.t(self.name), -- window name
 
-            -- Theming
-            TextColor3 = Color3.fromRGB(255, 255, 255),
             FontFace = Font.new(constants.fontAsset, Enum.FontWeight.Medium),
 
             Size = UDim2.fromOffset(50, 20),
@@ -335,27 +403,8 @@ function Window.new(properties)
         Parent = self.tagContainer,
     })
 
-    -- Shadow
-    self.windowShadow = self:Create("UIShadow", {
-        BlurRadius = UDim.new(0, 20),
-
-        -- Animations
-        Transparency = 1, -- In = 0.6
-        ZIndex = -1,
-
-        Parent = self.main,
-    }, {
-        Color = {
-            "ShadowColor",
-            function(color)
-                if typeof(color) == "ColorSequence" then
-                    return color.Keypoints[1].Value
-                else
-                    return color
-                end
-            end,
-        },
-    })
+    -- Shadow (Transparency 1 here, tweened to 0.6 on show)
+    self.windowShadow = self:CreateGlow(self.main, "ShadowColor", 20, 1)
 
     -- Elements Preparation
 
@@ -527,10 +576,11 @@ function Window.new(properties)
 end
 
 function Window:ChangeTheme(theme)
-    theme = resolveTheme(theme)
-
-    for name, value in theme do
-        self.theme[name] = value
+    -- A named theme fully switches: resolve against default so keys it omits reset rather than
+    -- lingering from the previous theme. A partial table just overrides the keys it names.
+    local overrides = if typeof(theme) == "table" then theme else resolveTheme(theme)
+    for name, value in overrides do
+        self.theme[name] = coerceThemeValue(name, value)
     end
 
     for instance, properties in self.themeProperties do
@@ -547,6 +597,20 @@ function Window:ChangeTheme(theme)
                     :Play()
             else
                 instance[property] = targetValue
+            end
+        end
+    end
+
+    -- themeProperties above only carry plain colours; reveal-driven transparencies and state
+    -- colours (the toggle knob, field fills, glows) aren't, so refresh the elements to reach
+    -- them on a live swap. Every tab's elements stay shown (just page-clipped), settings
+    -- included, so refresh them all; groups forward the call to their children.
+    if not self.hidden then
+        for _, tab in self.tabs do
+            for _, element in tab.elements do
+                if element._refreshTheme then
+                    element:_refreshTheme()
+                end
             end
         end
     end
@@ -1520,6 +1584,8 @@ function Window:Create(className, properties, themeProperties)
     assert(typeof(className) == "string", "Invalid argument #1 (string expected)")
     local instance = Instance.new(className)
 
+    -- Themed properties apply first so animation start-states in `properties` (e.g. a hidden
+    -- BackgroundTransparency = 1) still win at build; the theme value is the reveal target.
     if themeProperties and self.theme then
         for property, value in themeProperties do
             instance[property] = (
@@ -1584,15 +1650,30 @@ function Window:RegisterTranslations(tables)
 end
 
 -- Soft glow behind a GuiObject via a native UIShadow (no image). ZIndex -1 keeps it behind.
+-- `color` is a Color3 for a fixed glow, or a theme key (string) for a shadow that tracks the
+-- theme and re-tints on ChangeTheme - a ColorSequence key resolves to its first keypoint.
 function Window:CreateGlow(parent, color, blur, transparency)
-    return self:Create("UIShadow", {
-        Color = color,
+    local properties = {
         BlurRadius = UDim.new(0, blur),
         Transparency = transparency,
         ZIndex = -1,
 
         Parent = parent,
-    })
+    }
+
+    if typeof(color) == "string" then
+        return self:Create("UIShadow", properties, {
+            Color = {
+                color,
+                function(value)
+                    return if typeof(value) == "ColorSequence" then value.Keypoints[1].Value else value
+                end,
+            },
+        })
+    end
+
+    properties.Color = color
+    return self:Create("UIShadow", properties)
 end
 
 -- Flash an element's inset box + glow to signal a set landed: green for a good set, red for a
@@ -1627,13 +1708,13 @@ function Window:_flashResult(element, ok)
         if element._flashToken ~= token then
             return
         end
-        variables.tweenService:Create(box, outInfo, { BackgroundColor3 = white }):Play()
+        variables.tweenService:Create(box, outInfo, { BackgroundColor3 = self.theme.FieldBackground }):Play()
         if stroke then
             variables.tweenService:Create(stroke, outInfo, { Color = white, Transparency = 0.85 }):Play()
         end
         if glow then
             variables.tweenService
-                :Create(glow, outInfo, { Color = white, Transparency = element._glowIdle or 1 })
+                :Create(glow, outInfo, { Color = self.theme.FieldGlow, Transparency = element._glowIdle or 1 })
                 :Play()
         end
     end)

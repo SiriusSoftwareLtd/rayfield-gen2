@@ -194,6 +194,15 @@ function Group:_setShown(shown, animate)
     end
 end
 
+-- same reason: forward a runtime theme refresh down to the children (nested groups recurse).
+function Group:_refreshTheme()
+    for _, el in self.elements do
+        if el._refreshTheme then
+            el:_refreshTheme()
+        end
+    end
+end
+
 -- reorder the group within its host
 moveable(Group)
 

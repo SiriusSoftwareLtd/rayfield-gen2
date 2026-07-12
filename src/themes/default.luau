@@ -49,6 +49,34 @@ return {
 
     DropdownHighlight = Color3.fromRGB(255, 255, 255),
 
+    -- Accent for the active toggle, slider glow and popup primary button.
+    AccentColor = Color3.fromRGB(23, 153, 110),
+    AccentStroke = Color3.fromRGB(32, 201, 144),
+    AccentGlow = 0.4, -- shown transparency of the toggle's accent glow
+
+    StatBackground = Color3.fromRGB(25, 25, 25),
+    SliderHandle = Color3.fromRGB(255, 255, 255),
+    PillCornerRadius = UDim.new(1, 0), -- tab pills + the collapsed icon
+
+    -- Toggle switch: track colour + transparency, and the off-knob's colour + transparency.
+    ToggleTrack = Color3.fromRGB(0, 0, 0),
+    ToggleTrackTransparency = 0.9,
+    ToggleKnobOff = Color3.fromRGB(255, 255, 255),
+    ToggleKnobOffTransparency = 0.8,
+
+    -- Inset fields (input, keybind box): fill, its transparency, and the soft glow behind them.
+    FieldBackground = Color3.fromRGB(255, 255, 255),
+    FieldTransparency = 0.9,
+    FieldGlow = Color3.fromRGB(255, 255, 255),
+
+    PlaceholderColor = Color3.fromRGB(178, 178, 178), -- input/search hint text
+    SurfaceStroke = Color3.fromRGB(255, 255, 255), -- faint rim on window/field/toast/popup surfaces
+
+    -- Popup neutral (secondary) button: rest, hover and edge.
+    NeutralButton = Color3.fromRGB(38, 38, 38),
+    NeutralButtonHover = Color3.fromRGB(54, 54, 54),
+    NeutralButtonStroke = Color3.fromRGB(255, 255, 255),
+
     ErrorColor = Color3.fromRGB(185, 50, 50),
     ErrorStrokeColor = Color3.fromRGB(240, 75, 75),
 }

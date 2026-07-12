@@ -42,7 +42,7 @@ local translations = {
 local window = Rayfield:CreateWindow({
     name = "Example",
     subtitle = "Rayfield Gen2",
-    theme = "default",
+    theme = "cobalt",
     translations = translations,
 
     configuration = {
@@ -154,10 +154,10 @@ generalTab:CreateToggle({
 generalTab:CreateDropdown({
     name = "Theme",
     flag = "InterfaceTheme",
-    options = { "Default", "Pacific", "Midnight" },
-    value = "Default",
+    options = { "Default", "Cobalt", "Ember", "Amethyst", "Frost" },
+    value = "Cobalt",
     callback = function(value)
-        print("Theme:", value)
+        window:ChangeTheme(string.lower(value))
     end,
 })
 

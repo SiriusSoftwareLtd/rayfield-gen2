@@ -26,13 +26,11 @@ function chrome.buildCollapsedFace(window)
         ImageTransparency = 1, -- shown = 0, set by chrome.setCollapsedShown
 
         Parent = window.main,
-    })
+    }, { ImageColor3 = "TitlingColor" })
 
     window:Create("UICorner", {
-        CornerRadius = UDim.new(1, 0),
-
         Parent = window.collapsedIcon,
-    })
+    }, { CornerRadius = "PillCornerRadius" })
 
     local textContainer = window:Create("Frame", {
         Name = "CollapsedText",
@@ -60,7 +58,6 @@ function chrome.buildCollapsedFace(window)
         BackgroundTransparency = 1,
         FontFace = Font.new(constants.fontAsset, Enum.FontWeight.Medium),
         RichText = true,
-        TextColor3 = Color3.fromRGB(240, 240, 240),
         TextSize = 16,
         TextWrapped = true,
         TextXAlignment = Enum.TextXAlignment.Left,
@@ -70,7 +67,7 @@ function chrome.buildCollapsedFace(window)
         TextTransparency = 1, -- shown = 0, set by chrome.setCollapsedShown
 
         Parent = textContainer,
-    })
+    }, { TextColor3 = "TitlingColor" })
 
     window.collapsedSubtitle = window:Create("TextLabel", {
         Name = "Subtitle",
@@ -78,7 +75,6 @@ function chrome.buildCollapsedFace(window)
         Size = UDim2.new(1, 0, 0, 14),
         BackgroundTransparency = 1,
         FontFace = Font.new(constants.fontAsset, Enum.FontWeight.Medium),
-        TextColor3 = Color3.fromRGB(255, 255, 255),
         TextSize = 14,
         TextXAlignment = Enum.TextXAlignment.Left,
         LayoutOrder = 2,
@@ -87,7 +83,7 @@ function chrome.buildCollapsedFace(window)
         TextTransparency = 1, -- shown = 0.5, set by chrome.setCollapsedShown
 
         Parent = textContainer,
-    })
+    }, { TextColor3 = "TitlingColor" })
 
     -- covers the whole window but only takes clicks while collapsed - Window:Hide/Show flip
     -- Visible as the morph starts/settles so it can never eat a click mid-animation or while

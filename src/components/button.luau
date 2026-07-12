@@ -82,12 +82,7 @@ function Button:_buildFull()
 
     if self.icon then
         self.iconLabel = self.window:Create("ImageLabel", {
-            -- Configurables
             Image = "rbxassetid://" .. tostring(self.icon),
-
-            -- Theming
-            ImageColor3 = Color3.fromRGB(255, 255, 255),
-
             Size = UDim2.fromOffset(16, 16),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
@@ -194,7 +189,6 @@ function Button:_buildCompact()
     if self.icon then
         self.iconLabel = window:Create("ImageLabel", {
             Image = "rbxassetid://" .. tostring(self.icon),
-            ImageColor3 = Color3.fromRGB(255, 255, 255),
             Size = UDim2.fromOffset(16, 16),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,

@@ -320,7 +320,6 @@ function search.build(window)
     window.searchInput = window:Create("TextBox", {
         Text = "",
         PlaceholderText = locale.t("Search all pages"),
-        PlaceholderColor3 = Color3.fromRGB(178, 178, 178),
         AnchorPoint = Vector2.new(0, 0.5),
         Position = UDim2.new(0, 40, 0.5, 0),
         Size = UDim2.new(1, -110, 0, 18),
@@ -334,7 +333,7 @@ function search.build(window)
         TextTransparency = 1, -- shown = 0.2
 
         Parent = window.searchPill,
-    }, { TextColor3 = "ContentColor", FontFace = "Font" })
+    }, { TextColor3 = "ContentColor", FontFace = "Font", PlaceholderColor3 = "PlaceholderColor" })
 
     window:Connect(window.searchInput:GetPropertyChangedSignal("Text"), function()
         if window._searching then

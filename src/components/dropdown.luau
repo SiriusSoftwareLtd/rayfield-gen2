@@ -152,12 +152,7 @@ function Dropdown.new(tab, properties)
 
     if self.icon then
         self.iconLabel = self.window:Create("ImageLabel", {
-            -- Configurables
             Image = "rbxassetid://" .. tostring(self.icon),
-
-            -- Theming
-            ImageColor3 = Color3.fromRGB(255, 255, 255),
-
             Size = UDim2.fromOffset(16, 16),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
@@ -642,7 +637,6 @@ function Dropdown:_buildSearch()
     self.searchInput = self.window:Create("TextBox", {
         Text = "",
         PlaceholderText = locale.t("Search..."),
-        PlaceholderColor3 = Color3.fromRGB(150, 150, 150),
         Size = UDim2.new(1, -58, 0, 16),
         Position = UDim2.new(0, 44, 0.5, 0),
         AnchorPoint = Vector2.new(0, 0.5),
@@ -657,7 +651,7 @@ function Dropdown:_buildSearch()
         TextTransparency = 1, -- expanded = 0.3
 
         Parent = self.searchbar,
-    }, { TextColor3 = "ContentColor", FontFace = "Font" })
+    }, { TextColor3 = "ContentColor", FontFace = "Font", PlaceholderColor3 = "PlaceholderColor" })
 
     self.searchIcon = self.window:Create("ImageButton", {
         Image = "rbxassetid://" .. tostring(searchIconAsset),

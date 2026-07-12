@@ -158,14 +158,13 @@ function Popup:_build()
     }, { CornerRadius = "CornerRoundness" })
 
     self.cardStroke = window:Create("UIStroke", {
-        Color = Color3.fromRGB(255, 255, 255),
         Transparency = 1, -- shown = 0.95
 
         Parent = self.card,
-    })
+    }, { Color = "SurfaceStroke" })
     self:_fade(self.cardStroke, "Transparency", 0.95)
 
-    self.cardShadow = window:CreateGlow(self.card, Color3.fromRGB(0, 0, 0), 26, 1) -- shown = 0.55
+    self.cardShadow = window:CreateGlow(self.card, "ShadowColor", 26, 1) -- shown = 0.55
     self:_fade(self.cardShadow, "Transparency", 0.55)
 
     window:Create("UIPadding", {
@@ -558,13 +557,13 @@ function Popup:_buildButton(parent, option, order)
     local restColor, hoverColor, edgeColor, strokeShown
     if style == "primary" then
         restColor, hoverColor, edgeColor, strokeShown =
-            constants.accent.on, constants.accent.onStroke, constants.accent.onStroke, 0.1
+            window.theme.AccentColor, window.theme.AccentStroke, window.theme.AccentStroke, 0.1
     elseif style == "danger" then
         restColor, hoverColor, edgeColor, strokeShown =
             window.theme.ErrorColor, window.theme.ErrorStrokeColor, window.theme.ErrorStrokeColor, 0
     else
         restColor, hoverColor, edgeColor, strokeShown =
-            Color3.fromRGB(38, 38, 38), Color3.fromRGB(54, 54, 54), Color3.fromRGB(255, 255, 255), 0.85
+            window.theme.NeutralButton, window.theme.NeutralButtonHover, window.theme.NeutralButtonStroke, 0.85
     end
 
     local button = window:Create("Frame", {
@@ -600,10 +599,12 @@ function Popup:_buildButton(parent, option, order)
             TextXAlignment = Enum.TextXAlignment.Center,
             TextTruncate = Enum.TextTruncate.AtEnd,
 
+            -- adaptive: black or white by the fill's luminance, so every style stays readable
+            TextColor3 = functions.contrastText(restColor),
             TextTransparency = 1, -- shown = 0
 
             Parent = button,
-        }, { TextColor3 = "ContentColor", FontFace = "Font" }),
+        }, { FontFace = "Font" }),
         "TextTransparency",
         0
     )

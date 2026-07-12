@@ -117,7 +117,6 @@ function Keybind.new(tab, properties)
     if self.icon then
         self.iconLabel = self.window:Create("ImageLabel", {
             Image = "rbxassetid://" .. tostring(self.icon),
-            ImageColor3 = Color3.fromRGB(255, 255, 255),
             Size = UDim2.fromOffset(16, 16),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
@@ -152,13 +151,12 @@ function Keybind.new(tab, properties)
         Size = UDim2.fromOffset(40, 30),
         AutoButtonColor = false,
         Text = "",
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         BorderSizePixel = 0,
 
-        BackgroundTransparency = 1, -- In = 0.9
+        BackgroundTransparency = 1, -- In = FieldTransparency
 
         Parent = self.main,
-    })
+    }, { BackgroundColor3 = "FieldBackground" })
 
     self.window:Create("UICorner", {
         CornerRadius = UDim.new(1, 0),
@@ -166,15 +164,13 @@ function Keybind.new(tab, properties)
     })
 
     self.boxStroke = self.window:Create("UIStroke", {
-        Color = Color3.fromRGB(255, 255, 255),
-
         Transparency = 1, -- In = 0.85
 
         Parent = self.box,
-    })
+    }, { Color = "SurfaceStroke" })
 
     -- soft white glow behind the box: 0.9 idle, 0.7 while recording
-    self.glow = self.window:CreateGlow(self.box, Color3.fromRGB(255, 255, 255), 20, 1)
+    self.glow = self.window:CreateGlow(self.box, "FieldGlow", 20, 1)
     self._glowIdle = 0.9 -- glow Transparency at rest (used by the set-result flash)
 
     self.keyLabel = self.window:Create("TextLabel", {
@@ -429,7 +425,7 @@ function Keybind:_setShown(shown, animate)
     local w = self.window
     if shown then
         w:_revealCommon(self, animate)
-        w:_reveal(self.box, { BackgroundTransparency = 0.9 }, animate)
+        w:_reveal(self.box, { BackgroundTransparency = w.theme.FieldTransparency }, animate)
         w:_reveal(self.boxStroke, { Transparency = 0.85 }, animate)
         w:_reveal(self.keyLabel, { TextTransparency = 0.6 }, animate)
         w:_reveal(self.glow, { Transparency = 0.9 }, animate)
@@ -440,6 +436,18 @@ function Keybind:_setShown(shown, animate)
         w:_reveal(self.keyLabel, { TextTransparency = 1 }, animate)
         w:_reveal(self.glow, { Transparency = 1 }, animate)
     end
+end
+
+-- Re-apply the box's theme-driven fill transparency on a runtime ChangeTheme (its colour rides
+-- a themeProperty). Called on the visible tab only, so the box is shown.
+function Keybind:_refreshTheme()
+    variables.tweenService
+        :Create(
+            self.box,
+            TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+            { BackgroundTransparency = self.window.theme.FieldTransparency }
+        )
+        :Play()
 end
 
 moveable(Keybind)

@@ -62,12 +62,11 @@ function Toggle:_buildSwitch(parent)
     self.functionContainer = window:Create("Frame", {
         BorderSizePixel = 0,
         Size = UDim2.fromOffset(50, 21),
-        BackgroundColor3 = Color3.fromRGB(0, 0, 0),
 
-        BackgroundTransparency = 1, -- In = 0.9
+        BackgroundTransparency = 1, -- In = ToggleTrackTransparency
 
         Parent = parent,
-    })
+    }, { BackgroundColor3 = "ToggleTrack" })
 
     window:Create("UICorner", {
         CornerRadius = UDim.new(0, 15),
@@ -75,17 +74,16 @@ function Toggle:_buildSwitch(parent)
     })
 
     self.containerStroke = window:Create("UIStroke", {
-        Color = Color3.fromRGB(255, 255, 255),
         Transparency = 1, -- In = 0.85
         Parent = self.functionContainer,
-    })
+    }, { Color = "SurfaceStroke" })
 
     self.indicator = window:Create("Frame", {
         BorderSizePixel = 0,
         Size = UDim2.fromOffset(25, 17),
         Position = self.value and UDim2.new(1, -28, 0.5, 0) or UDim2.new(1, -47, 0.5, 0),
         AnchorPoint = Vector2.new(0, 0.5),
-        BackgroundColor3 = self.value and constants.accent.on or Color3.fromRGB(255, 255, 255),
+        BackgroundColor3 = self.value and self.window.theme.AccentColor or self.window.theme.ToggleKnobOff,
 
         BackgroundTransparency = 1, -- In = 0.8
 
@@ -98,14 +96,15 @@ function Toggle:_buildSwitch(parent)
     })
 
     self.indicatorStroke = window:Create("UIStroke", {
-        Color = self.value and constants.accent.onStroke or Color3.fromRGB(255, 255, 255),
+        Color = self.value and self.window.theme.AccentStroke or Color3.fromRGB(255, 255, 255),
         Transparency = 1, -- In = 0.7
         Parent = self.indicator,
     })
 
-    -- Green glow behind the selector; hidden until on (gated by Transparency: 1 hidden, 0.4 shown)
-    self.indicatorGlow = window:CreateGlow(self.indicator, constants.accent.on, 20, 1)
+    -- Accent glow behind the selector; hidden until on (gated by Transparency: 1 hidden, AccentGlow shown)
+    self.indicatorGlow = window:CreateGlow(self.indicator, "AccentColor", 20, 1)
 
+    -- Dark wash over the switch for light themes (hidden on dark themes via DarkToggleOverlay).
     self.overlay = window:Create("Frame", {
         BorderSizePixel = 0,
         Size = UDim2.fromScale(1, 1),
@@ -189,7 +188,6 @@ function Toggle:_buildFull()
     if self.icon then
         self.iconLabel = window:Create("ImageLabel", {
             Image = "rbxassetid://" .. tostring(self.icon),
-            ImageColor3 = Color3.fromRGB(255, 255, 255),
             Size = UDim2.fromOffset(16, 16),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
@@ -331,7 +329,6 @@ function Toggle:_buildCompact()
     if self.icon then
         self.iconLabel = window:Create("ImageLabel", {
             Image = "rbxassetid://" .. tostring(self.icon),
-            ImageColor3 = Color3.fromRGB(255, 255, 255),
             Size = UDim2.fromOffset(16, 16),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
@@ -468,25 +465,27 @@ end
 function Toggle:_animateIndicator()
     local info = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
     if self.indicatorGlow then
-        variables.tweenService:Create(self.indicatorGlow, info, { Transparency = self.value and 0.4 or 1 }):Play()
+        variables.tweenService
+            :Create(self.indicatorGlow, info, { Transparency = self.value and self.window.theme.AccentGlow or 1 })
+            :Play()
     end
     if self.value then
         variables.tweenService
             :Create(self.indicator, info, {
                 Position = UDim2.new(1, -28, 0.5, 0),
-                BackgroundColor3 = constants.accent.on,
+                BackgroundColor3 = self.window.theme.AccentColor,
                 BackgroundTransparency = 0,
             })
             :Play()
         variables.tweenService
-            :Create(self.indicatorStroke, info, { Color = constants.accent.onStroke, Transparency = 0 })
+            :Create(self.indicatorStroke, info, { Color = self.window.theme.AccentStroke, Transparency = 0 })
             :Play()
     else
         variables.tweenService
             :Create(self.indicator, info, {
                 Position = UDim2.new(1, -47, 0.5, 0),
-                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-                BackgroundTransparency = 0.8,
+                BackgroundColor3 = self.window.theme.ToggleKnobOff,
+                BackgroundTransparency = self.window.theme.ToggleKnobOffTransparency,
             })
             :Play()
         variables.tweenService
@@ -503,12 +502,29 @@ function Toggle:_setShown(shown, animate)
     local w = self.window
     if shown then
         w:_revealCommon(self, animate)
-        w:_reveal(self.indicator, { BackgroundTransparency = self.value and 0 or 0.8 }, animate, toggleReveal)
-        w:_reveal(self.indicatorStroke, { Transparency = self.value and 0 or 0.7 }, animate, toggleReveal)
-        w:_reveal(self.indicatorGlow, { Transparency = self.value and 0.4 or 1 }, animate, toggleGlowReveal)
+        -- carry the state colours here too, so revealing on a tab switch also picks up the theme
+        w:_reveal(self.indicator, {
+            BackgroundColor3 = self.value and w.theme.AccentColor or w.theme.ToggleKnobOff,
+            BackgroundTransparency = self.value and 0 or w.theme.ToggleKnobOffTransparency,
+        }, animate, toggleReveal)
+        w:_reveal(self.indicatorStroke, {
+            Color = self.value and w.theme.AccentStroke or Color3.fromRGB(255, 255, 255),
+            Transparency = self.value and 0 or 0.7,
+        }, animate, toggleReveal)
+        w:_reveal(
+            self.indicatorGlow,
+            { Transparency = self.value and w.theme.AccentGlow or 1 },
+            animate,
+            toggleGlowReveal
+        )
         w:_reveal(self.overlay, { BackgroundTransparency = 0 }, animate, toggleReveal)
         w:_reveal(self.containerStroke, { Transparency = 0.85 }, animate, toggleReveal)
-        w:_reveal(self.functionContainer, { BackgroundTransparency = 0.9 }, animate, toggleReveal)
+        w:_reveal(
+            self.functionContainer,
+            { BackgroundTransparency = w.theme.ToggleTrackTransparency },
+            animate,
+            toggleReveal
+        )
     else
         w:_hideCommon(self, animate)
         w:_reveal(self.indicator, { BackgroundTransparency = 1 }, animate, toggleReveal)
@@ -517,6 +533,25 @@ function Toggle:_setShown(shown, animate)
         w:_reveal(self.overlay, { BackgroundTransparency = 1 }, animate, toggleReveal)
         w:_reveal(self.containerStroke, { Transparency = 1 }, animate, toggleReveal)
         w:_reveal(self.functionContainer, { BackgroundTransparency = 1 }, animate, toggleReveal)
+    end
+end
+
+-- Re-apply the visuals that aren't plain themeProperties (the knob's state colour + the reveal
+-- transparencies) so a runtime ChangeTheme reaches the switch. Called on the visible tab only.
+function Toggle:_refreshTheme()
+    local t = self.window.theme
+    local info = TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local ts = variables.tweenService
+    ts:Create(self.functionContainer, info, { BackgroundTransparency = t.ToggleTrackTransparency }):Play()
+    ts:Create(self.indicator, info, {
+        BackgroundColor3 = self.value and t.AccentColor or t.ToggleKnobOff,
+        BackgroundTransparency = self.value and 0 or t.ToggleKnobOffTransparency,
+    }):Play()
+    ts:Create(self.indicatorStroke, info, {
+        Color = self.value and t.AccentStroke or Color3.fromRGB(255, 255, 255),
+    }):Play()
+    if self.indicatorGlow then
+        ts:Create(self.indicatorGlow, info, { Transparency = self.value and t.AccentGlow or 1 }):Play()
     end
 end
 

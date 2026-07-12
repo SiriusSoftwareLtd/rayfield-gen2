@@ -101,10 +101,8 @@ function Tab.new(window, properties)
         })
 
         self.window:Create("UICorner", {
-            CornerRadius = UDim.new(1, 0),
-
             Parent = self.topbarItem,
-        })
+        }, { CornerRadius = "PillCornerRadius" })
 
         self.topbarItemGradient = self.window:Create("UIGradient", {
             Rotation = 90,

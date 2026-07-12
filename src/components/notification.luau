@@ -98,13 +98,12 @@ function Notification.new(window, properties)
     }, { CornerRadius = "CornerRoundness" })
 
     self.stroke = self.window:Create("UIStroke", {
-        Color = Color3.fromRGB(255, 255, 255),
         Transparency = 1, -- In = 0.95
 
         Parent = self.body,
-    })
+    }, { Color = "SurfaceStroke" })
 
-    self.shadow = self.window:CreateGlow(self.body, Color3.fromRGB(0, 0, 0), 20, 1) -- In = 0.6
+    self.shadow = self.window:CreateGlow(self.body, "ShadowColor", 20, 1) -- In = 0.6
 
     -- Horizontal insets; vertical padding comes from centering the row in the grown height
     self.window:Create("UIPadding", {

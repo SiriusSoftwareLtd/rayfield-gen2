@@ -78,7 +78,6 @@ function Input.new(tab, properties)
     if self.icon then
         self.iconLabel = self.window:Create("ImageLabel", {
             Image = "rbxassetid://" .. tostring(self.icon),
-            ImageColor3 = Color3.fromRGB(255, 255, 255),
             Size = UDim2.fromOffset(16, 16),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
@@ -111,13 +110,12 @@ function Input.new(tab, properties)
         AnchorPoint = Vector2.new(1, 0.5),
         Position = UDim2.new(1, -7, 0, 20),
         Size = UDim2.fromOffset(85, 30),
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         BorderSizePixel = 0,
 
-        BackgroundTransparency = 1, -- In = 0.9
+        BackgroundTransparency = 1, -- In = FieldTransparency
 
         Parent = self.main,
-    })
+    }, { BackgroundColor3 = "FieldBackground" })
 
     self.window:Create("UICorner", {
         CornerRadius = UDim.new(1, 0),
@@ -125,21 +123,18 @@ function Input.new(tab, properties)
     })
 
     self.boxStroke = self.window:Create("UIStroke", {
-        Color = Color3.fromRGB(255, 255, 255),
-
         Transparency = 1, -- In = 0.85
 
         Parent = self.box,
-    })
+    }, { Color = "SurfaceStroke" })
 
     -- glow behind the box, invisible until a set flashes it green/red
-    self.glow = self.window:CreateGlow(self.box, Color3.fromRGB(255, 255, 255), 20, 1)
+    self.glow = self.window:CreateGlow(self.box, "FieldGlow", 20, 1)
     self._glowIdle = 1 -- glow hidden at rest (used by the set-result flash)
 
     self.input = self.window:Create("TextBox", {
         Text = self.value,
         PlaceholderText = locale.t(self.placeholder),
-        PlaceholderColor3 = Color3.fromRGB(178, 178, 178),
         Size = UDim2.new(1, -15, 0, 15),
         Position = UDim2.new(0.5, 0, 0.5, 0),
         AnchorPoint = Vector2.new(0.5, 0.5),
@@ -153,7 +148,7 @@ function Input.new(tab, properties)
         TextTransparency = 1, -- In = 0.6
 
         Parent = self.box,
-    }, { TextColor3 = "ContentColor", FontFace = "Font" })
+    }, { TextColor3 = "ContentColor", FontFace = "Font", PlaceholderColor3 = "PlaceholderColor" })
 
     -- resize to hug the text; numeric mode also strips non-number chars as they're typed
     self.window:ConnectFor(self, self.input:GetPropertyChangedSignal("Text"), function()
@@ -235,7 +230,7 @@ function Input:_setShown(shown, animate)
     local w = self.window
     if shown then
         w:_revealCommon(self, animate)
-        w:_reveal(self.box, { BackgroundTransparency = 0.9 }, animate)
+        w:_reveal(self.box, { BackgroundTransparency = w.theme.FieldTransparency }, animate)
         w:_reveal(self.boxStroke, { Transparency = 0.85 }, animate)
         w:_reveal(self.input, { TextTransparency = 0.6 }, animate)
     else
@@ -244,6 +239,18 @@ function Input:_setShown(shown, animate)
         w:_reveal(self.boxStroke, { Transparency = 1 }, animate)
         w:_reveal(self.input, { TextTransparency = 1 }, animate)
     end
+end
+
+-- Re-apply the field's theme-driven fill transparency on a runtime ChangeTheme (its colour
+-- rides a themeProperty). Called on the visible tab only, so the field is shown.
+function Input:_refreshTheme()
+    variables.tweenService
+        :Create(
+            self.box,
+            TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+            { BackgroundTransparency = self.window.theme.FieldTransparency }
+        )
+        :Play()
 end
 
 moveable(Input)

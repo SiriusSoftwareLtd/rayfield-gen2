@@ -339,7 +339,6 @@ function ColorPicker:_buildHeader()
     if self.icon then
         self.iconLabel = self.window:Create("ImageLabel", {
             Image = "rbxassetid://" .. tostring(self.icon),
-            ImageColor3 = Color3.fromRGB(255, 255, 255),
             Size = UDim2.fromOffset(16, 16),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
@@ -725,7 +724,6 @@ function ColorPicker:_buildPicker()
     self.hexInput = self.window:Create("TextBox", {
         Text = "#" .. self.value:ToHex():upper(),
         PlaceholderText = locale.t("Smart Input"),
-        PlaceholderColor3 = Color3.fromRGB(150, 150, 150),
         Size = UDim2.new(1, -14, 1, 0),
         Position = UDim2.fromScale(0.5, 0.5),
         AnchorPoint = Vector2.new(0.5, 0.5),
@@ -739,7 +737,7 @@ function ColorPicker:_buildPicker()
         TextTransparency = 1, -- Open = 0.4
 
         Parent = self.hexBox,
-    }, { TextColor3 = "ContentColor", FontFace = "Font" })
+    }, { TextColor3 = "ContentColor", FontFace = "Font", PlaceholderColor3 = "PlaceholderColor" })
 
     -- Alpha % field, sits right of the hex field. Same styling as hexBox.
     self.alphaBox = self.window:Create("Frame", {
@@ -769,7 +767,6 @@ function ColorPicker:_buildPicker()
     self.alphaInput = self.window:Create("TextBox", {
         Text = tostring(math.round(self.alpha * 100)) .. "%",
         PlaceholderText = "100%",
-        PlaceholderColor3 = Color3.fromRGB(150, 150, 150),
         Size = UDim2.new(1, -10, 1, 0),
         Position = UDim2.fromScale(0.5, 0.5),
         AnchorPoint = Vector2.new(0.5, 0.5),
@@ -783,7 +780,7 @@ function ColorPicker:_buildPicker()
         TextTransparency = 1, -- Open = 0.4
 
         Parent = self.alphaBox,
-    }, { TextColor3 = "ContentColor", FontFace = "Font" })
+    }, { TextColor3 = "ContentColor", FontFace = "Font", PlaceholderColor3 = "PlaceholderColor" })
 
     self.window:ConnectFor(self, self.mapInteract.InputBegan, function(input)
         if

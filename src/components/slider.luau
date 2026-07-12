@@ -10,7 +10,6 @@ local variables = require(utility.variables)
 local functions = require(utility.functions)
 local odometer = require(utility.odometer)
 local moveable = require(utility.moveable)
-local constants = require(utility.constants)
 local locale = require(utility.locale)
 
 -- Decimal places implied by an increment (0.1 -> 1, 0.25 -> 2, 1 -> 0). Used so
@@ -148,20 +147,19 @@ function Slider.new(tab, properties)
     }, { Color = { "SliderProgress", functions.toColorSequence } })
 
     -- Green glow behind the filled progress (revealed on show)
-    self.progressGlow = self.window:CreateGlow(self.progress, constants.accent.on, 20, 1)
+    self.progressGlow = self.window:CreateGlow(self.progress, "AccentColor", 20, 1)
 
     -- Handle blob: solid white at rest, ghosts + grows a stroke while held
     self.handle = self.window:Create("Frame", {
         AnchorPoint = Vector2.new(1, 0.5),
         Position = UDim2.new(1, 20, 0.5, 0),
         Size = UDim2.fromOffset(35, 20),
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         BorderSizePixel = 0,
         ZIndex = 50,
         BackgroundTransparency = 1, -- In = 0
 
         Parent = self.progress,
-    })
+    }, { BackgroundColor3 = "SliderHandle" })
 
     self.window:Create("UICorner", {
         CornerRadius = UDim.new(1, 0),
@@ -542,7 +540,8 @@ function Slider:_setShown(shown, animate)
         if self.valueOdo then
             self.valueOdo:reveal(0.3, animate)
         end
-        w:_reveal(self.progressGlow, { Transparency = 0.55 }, animate, sliderGlowReveal)
+        -- soften the accent bloom on light themes (AccentGlow) but never below the default 0.55
+        w:_reveal(self.progressGlow, { Transparency = math.max(0.55, w.theme.AccentGlow) }, animate, sliderGlowReveal)
         w:_reveal(self.handleGlow, { Transparency = 0.8 }, animate, sliderGlowReveal)
     else
         w:_hideCommon(self, animate)
@@ -555,6 +554,18 @@ function Slider:_setShown(shown, animate)
         w:_reveal(self.progressGlow, { Transparency = 1 }, animate, sliderGlowReveal)
         w:_reveal(self.handleGlow, { Transparency = 1 }, animate, sliderGlowReveal)
     end
+end
+
+-- Re-apply the accent glow strength on a runtime ChangeTheme (fill/handle/track ride
+-- themeProperties). Called on the visible tab only.
+function Slider:_refreshTheme()
+    variables.tweenService
+        :Create(
+            self.progressGlow,
+            TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+            { Transparency = math.max(0.55, self.window.theme.AccentGlow) }
+        )
+        :Play()
 end
 
 -- Room the slider needs in a row: its narrow layout puts title + value on the top row,
