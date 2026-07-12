@@ -1,8 +1,7 @@
 local constants = require(script.Parent.Parent.utility.constants)
 
--- Light theme: cool white surfaces, dark text, cyan accents and squared corners.
+-- Light theme: cool white surfaces, dark text and cyan accents.
 return {
-    CornerRoundness = UDim.new(0, 0),
     WindowColor = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(246, 249, 251)),
         ColorSequenceKeypoint.new(1, Color3.fromRGB(236, 241, 245)),
@@ -20,7 +19,6 @@ return {
     ElementStrokeTransparency = 0.1,
     ElementStrokeHoverTransparency = 0,
     ElementStrokeHover = Color3.fromRGB(0, 176, 208), -- cyan edge on hover
-    ElementCornerRadius = UDim.new(0, 0),
     DarkToggleOverlay = false, -- no dark veil; the track colour carries the switch instead
     DividerColor = Color3.fromRGB(204, 210, 214),
 
@@ -41,7 +39,6 @@ return {
 
     StatBackground = Color3.fromRGB(255, 255, 255),
     SliderHandle = Color3.fromRGB(60, 66, 72), -- dark grip instead of a white blob
-    PillCornerRadius = UDim.new(0, 0), -- squared tabs + collapsed icon
 
     -- Opaque grey track so the switch reads on white without the dark overlay; white off-knob.
     ToggleTrack = Color3.fromRGB(198, 204, 210),
