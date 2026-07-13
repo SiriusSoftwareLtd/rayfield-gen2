@@ -211,7 +211,7 @@ function ColorPicker.new(tab, properties)
         name = properties.name or properties.Name or "Color Picker",
         icon = properties.icon or properties.Icon,
         description = properties.description or properties.Description,
-        forgetState = properties.forgetState or properties.ForgetState,
+        forgetState = properties.forgetState or properties.ForgetState or tab.forgetState,
 
         callback = properties.callback or properties.Callback or function() end,
 
@@ -1193,6 +1193,22 @@ function ColorPicker:SetAlpha(alpha, skipCallback)
         self:_fireCallback()
         self.window:_persist(self)
     end
+end
+
+-- Persistence: RRGGBB plus an alpha byte (AA) so alpha round-trips.
+function ColorPicker:_serialize()
+    return self.value:ToHex() .. string.format("%02x", math.clamp(math.round((self.alpha or 1) * 255), 0, 255))
+end
+
+-- Restore colour + alpha from that hex. Old 6-char configs (no alpha byte) still load. Alpha is
+-- set silently first so the Set fires the callback just once, with the final colour and alpha.
+function ColorPicker:_deserialize(raw)
+    local hex = tostring(raw)
+    if #hex >= 8 then
+        self:SetAlpha((tonumber(hex:sub(7, 8), 16) or 255) / 255, true)
+        hex = hex:sub(1, 6)
+    end
+    self:Set(Color3.fromHex(hex))
 end
 
 function ColorPicker:_setShown(shown, animate)

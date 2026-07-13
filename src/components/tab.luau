@@ -64,6 +64,8 @@ function Tab.new(window, properties)
         icon = properties.icon or properties.Icon,
         neglectSelector = properties.neglectSelector or properties.NeglectSelector or false,
         customOrder = properties.customOrder or properties.CustomOrder or 0,
+        -- when true, controls on this tab default to not persisting to config (the settings tab)
+        forgetState = properties.forgetState or properties.ForgetState or false,
 
         elements = {},
         connections = {}, -- tracked so Remove can drop them without waiting for Unload

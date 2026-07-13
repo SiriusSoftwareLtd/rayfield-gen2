@@ -55,7 +55,7 @@ function Keybind.new(tab, properties)
         name = properties.name or properties.Name or "Keybind",
         icon = properties.icon or properties.Icon,
         description = properties.description or properties.Description,
-        forgetState = properties.forgetState or properties.ForgetState,
+        forgetState = properties.forgetState or properties.ForgetState or tab.forgetState,
 
         -- the settings' menu-toggle keybind. it drives settings.toggleKeybind, so its clash
         -- check runs the other way: reject keys an element keybind already owns.
@@ -421,6 +421,15 @@ function Keybind:Set(value, skipChanged)
         self.window:_runGuarded(self, self.onChanged, self.value)
         self.window:_persist(self)
     end
+end
+
+-- Persistence: store the enum type + value so any bound KeyCode or mouse button round-trips.
+function Keybind:_serialize()
+    return { tostring(self.value.EnumType), self.value.Value }
+end
+
+function Keybind:_deserialize(raw)
+    self:Set(Enum[raw[1]]:FromValue(raw[2]))
 end
 
 function Keybind:_setShown(shown, animate)

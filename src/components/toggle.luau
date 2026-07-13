@@ -21,13 +21,13 @@ function Toggle.new(tab, properties)
         name = properties.name or properties.Name or "Switch",
         icon = properties.icon or properties.Icon,
         description = properties.description or properties.Description,
-        forgetState = properties.forgetState or properties.ForgetState, -- dont save config for this element if true.
+        forgetState = properties.forgetState or properties.ForgetState or tab.forgetState, -- dont save config for this element if true.
         compact = tab.compact or false, -- true when the host is a Row
 
         flag = properties.flag
             or properties.Flag
             or (
-                not (properties.forgetState or properties.ForgetState)
+                not (properties.forgetState or properties.ForgetState or tab.forgetState)
                     and functions.deriveFlagFromName(properties.name or properties.Name or "Switch")
                 or nil
             ),

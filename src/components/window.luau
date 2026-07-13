@@ -525,6 +525,9 @@ function Window.new(properties)
         customOrder = 1000,
 
         neglectSelector = true,
+        -- everything here is ephemeral: these controls persist to rayfield.rfld via SaveSettings,
+        -- never the user's config. children inherit this, so none of them opt out individually.
+        forgetState = true,
     })
 
     require(script.Parent.action).new(self, {
@@ -705,7 +708,9 @@ end
 -- set to autoSave and the control opts into persistence. Every Set/commit path funnels here so
 -- persistence stays uniform across elements.
 function Window:_persist(control)
-    if control.flag and not control.forgetState and self.configuration.autoSave then
+    -- _loading: a config restore fires every control's callback, but must not autosave back over
+    -- the file it's reading (or storm Save once per control)
+    if control.flag and not control.forgetState and self.configuration.autoSave and not self._loading then
         task.spawn(self.Save, self)
     end
 end
@@ -1083,7 +1088,6 @@ function Window:_buildSettingsUI()
         icon = constants.icons.search,
         value = self.settings.toggleKeybind,
         isMenuToggle = true, -- reject keys already owned by an element keybind
-        forgetState = true, -- lives in settings.rfld, not the user's config
         onChanged = function(key)
             self.settings.toggleKeybind = key
             self:SaveSettings()
@@ -1094,7 +1098,6 @@ function Window:_buildSettingsUI()
         name = "Unlock cursor while open",
         description = "Unlocks the cursor while the menu is open so you can configure in FPS games that lock it.",
         value = self.settings.mouseOverride,
-        forgetState = true, -- lives in settings.rfld, not the user's config
         callback = function(state)
             self.settings.mouseOverride = state
             self:SaveSettings()
@@ -1105,7 +1108,6 @@ function Window:_buildSettingsUI()
         name = "Welcome toast",
         description = "Shows a 'Signed in as' toast the first time you open the menu on a new account.",
         value = self.settings.welcomeToast,
-        forgetState = true, -- lives in settings.rfld, not the user's config
         callback = function(state)
             self.settings.welcomeToast = state
             self:SaveSettings()
@@ -1116,7 +1118,6 @@ function Window:_buildSettingsUI()
         name = "Haptics",
         description = "A subtle tap as you interact, on devices that support haptics.",
         value = self.settings.haptics,
-        forgetState = true, -- lives in settings.rfld, not the user's config
         callback = function(state)
             self.settings.haptics = state
             hapticEngine.setEnabled(state)
@@ -1130,7 +1131,6 @@ function Window:_buildSettingsUI()
         name = "Keep window on screen",
         description = "Stops the window being dragged off the edge of the screen and lost.",
         value = self.settings.keepOnScreen,
-        forgetState = true, -- lives in settings.rfld, not the user's config
         callback = function(state)
             self.settings.keepOnScreen = state
             self:SaveSettings()
@@ -1178,7 +1178,6 @@ function Window:_buildSettingsUI()
             options = self:ListConfigs(),
             value = selected,
             placeholder = "No saved configurations",
-            forgetState = true, -- the picker itself isnt part of the user's config
             callback = function(value)
                 selected = value
             end,
@@ -1188,7 +1187,6 @@ function Window:_buildSettingsUI()
             name = "Configuration Name",
             description = "Name a new configuration, or leave blank to overwrite the selected one.",
             placeholder = "e.g. PvP Loadout",
-            forgetState = true,
             clearOnFocus = false,
         })
 

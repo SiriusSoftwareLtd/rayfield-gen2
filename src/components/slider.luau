@@ -44,7 +44,7 @@ function Slider.new(tab, properties)
         name = properties.name or properties.Name or "Slider",
         icon = properties.icon or properties.Icon,
         description = properties.description or properties.Description,
-        forgetState = properties.forgetState or properties.ForgetState,
+        forgetState = properties.forgetState or properties.ForgetState or tab.forgetState,
 
         range = properties.range or properties.Range or { 0, 100 },
         increment = properties.increment or properties.Increment or 1,

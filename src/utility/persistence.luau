@@ -53,16 +53,13 @@ function persistence.save(window, name)
 
     local flags = {}
     for flag, control in window.controls do
-        -- one bad control shouldnt abort the rest
+        -- one bad control shouldnt abort the rest. an element serializes itself only if its value
+        -- isnt a plain JSON type (see _serialize); everything else saves its value as-is.
         local ok, value = pcall(function()
-            local v = control.value
-            if control.__type == "ColorPicker" then
-                -- RRGGBB plus an alpha byte (AA), so alpha round-trips; old 6-char configs still load
-                return v:ToHex() .. string.format("%02x", math.clamp(math.round((control.alpha or 1) * 255), 0, 255))
-            elseif control.__type == "Keybind" then
-                return { tostring(v.EnumType), v.Value }
+            if control._serialize then
+                return control:_serialize()
             end
-            return v
+            return control.value
         end)
         if ok then
             flags[flag] = value
@@ -120,30 +117,29 @@ function persistence.load(window, name)
         return false
     end
 
+    -- Apply the saved values as if the user set each control, so the config actually takes effect
+    -- on load (callbacks fire, not just the visuals). window._loading suppresses the autosave and
+    -- the input flash those Sets would otherwise trigger, so we dont re-save over the file we're
+    -- loading or flash every field at once.
+    window._loading = true
     for flag, control in window.controls do
         local value = parsed[flag]
         if value ~= nil or control._canBeNil then
-            -- one bad control shouldnt abort the rest
+            -- one bad control shouldnt abort the rest. an element restores itself from its saved
+            -- form only if it defined _deserialize; otherwise the raw value applies via Set.
             local ok, err = pcall(function()
-                if control.__type == "ColorPicker" and value ~= nil then
-                    -- split off the optional alpha byte, restore it, then load the RRGGBB colour
-                    local hex = tostring(value)
-                    if #hex >= 8 then
-                        control:SetAlpha((tonumber(hex:sub(7, 8), 16) or 255) / 255, true)
-                        hex = hex:sub(1, 6)
-                    end
-                    value = Color3.fromHex(hex)
+                if control._deserialize then
+                    control:_deserialize(value)
+                else
+                    control:Set(value)
                 end
-                if control.__type == "Keybind" and value ~= nil then
-                    value = Enum[value[1]]:FromValue(value[2])
-                end
-                control:Set(value, true)
             end)
             if not ok then
                 log.warn("Rayfield: Failed to restore flag '" .. tostring(flag) .. "' - " .. tostring(err))
             end
         end
     end
+    window._loading = false
 
     return true
 end

@@ -26,7 +26,7 @@ function Input.new(tab, properties)
         name = properties.name or properties.Name or "Input",
         icon = properties.icon or properties.Icon,
         description = properties.description or properties.Description,
-        forgetState = properties.forgetState or properties.ForgetState,
+        forgetState = properties.forgetState or properties.ForgetState or tab.forgetState,
         placeholder = properties.placeholder or properties.Placeholder or "",
         numeric = properties.numeric or properties.Numeric or false, -- strip anything not a number
         clearOnFocus = properties.clearOnFocus or properties.ClearOnFocus or false,
@@ -216,8 +216,9 @@ function Input:_commit(text, silent)
     if not silent then
         self.window:_runGuarded(self, self.callback, text)
         self.window:_persist(self)
-        -- green flash to confirm the value landed (only when it actually changed)
-        if changed then
+        -- green flash to confirm the value landed (only when it actually changed, and not while a
+        -- config restore is applying every field at once)
+        if changed and not self.window._loading then
             hapticEngine.click()
             self.window:_flashResult(self, true)
         end

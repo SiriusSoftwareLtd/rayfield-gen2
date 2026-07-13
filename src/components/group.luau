@@ -40,6 +40,7 @@ function Group.new(tab, properties)
         window = tab.window,
         direction = direction,
         compact = horizontal, -- row children pack side by side
+        forgetState = tab.forgetState, -- inherit the host's config-persistence stance
         elements = {},
     }, Group)
 
