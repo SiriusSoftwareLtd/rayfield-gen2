@@ -8,6 +8,7 @@ local utility = script.Parent.Parent.utility
 -- Variables
 local variables = require(utility.variables)
 local log = require(utility.log)
+local hapticEngine = require(utility.HapticEngine)
 
 function Action.new(window, properties)
     properties = if typeof(properties) == "table" then properties else {}
@@ -78,6 +79,7 @@ function Action.new(window, properties)
     end
 
     self.window:Connect(self.interact.MouseButton1Click, function()
+        hapticEngine.click()
         task.spawn(function()
             local success, result = pcall(self.callback)
             if not success then

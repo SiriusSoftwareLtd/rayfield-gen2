@@ -13,6 +13,7 @@ local functions = require(utility.functions)
 local constants = require(utility.constants)
 local locale = require(utility.locale)
 local log = require(utility.log)
+local hapticEngine = require(utility.HapticEngine)
 
 -- Timings (Exponential Out, matching the notification/toast feel).
 local enterInfo = TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out) -- card rise-in
@@ -642,6 +643,7 @@ function Popup:_buildButton(parent, option, order)
             if self._closed then
                 return
             end
+            hapticEngine.click()
             -- press feel: ghost the stroke, then run the callback and close
             variables.tweenService:Create(stroke, hoverInfo, { Transparency = 1 }):Play()
             if callback then
@@ -715,6 +717,8 @@ function Popup:_show()
     if not self.screenGui.Parent then
         return
     end
+
+    hapticEngine.notify()
 
     variables.tweenService:Create(self.card, enterInfo, { Position = UDim2.new(0.5, 0, 0.5, 0) }):Play()
 

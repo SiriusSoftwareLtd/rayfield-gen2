@@ -10,6 +10,7 @@ local variables = require(utility.variables)
 local functions = require(utility.functions)
 local moveable = require(utility.moveable)
 local locale = require(utility.locale)
+local hapticEngine = require(utility.HapticEngine)
 
 function Button.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
@@ -127,6 +128,7 @@ function Button:_buildFull()
 
     -- press: ghost the stroke + squeeze the width around the callback
     self.window:ConnectFor(self, self.interact.MouseButton1Click, function()
+        hapticEngine.click()
         variables.tweenService
             :Create(
                 self.stroke,
@@ -226,6 +228,7 @@ function Button:_buildCompact()
 
     -- press: ghost the stroke around the callback
     self.window:ConnectFor(self, self.interact.MouseButton1Click, function()
+        hapticEngine.click()
         variables.tweenService
             :Create(
                 self.stroke,

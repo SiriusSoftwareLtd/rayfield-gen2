@@ -21,7 +21,9 @@ function Drag.new(window, properties)
         BackgroundTransparency = 1,
         Size = UDim2.fromOffset(150, 20),
         AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.new(0.5, 0, 0.5, 265),
+        -- hangs under the window's bottom edge; derived from the real size so it's right on the
+        -- first open too (Show/minimise recompute the same way against self.size)
+        Position = UDim2.new(0.5, 0, 0.5, self.window.size.Y.Offset / 2 + 15),
         ZIndex = constants.zIndex.drag,
 
         -- Animation

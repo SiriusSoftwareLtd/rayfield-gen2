@@ -11,6 +11,7 @@ local functions = require(utility.functions)
 local image = require(utility.image)
 local constants = require(utility.constants)
 local locale = require(utility.locale)
+local hapticEngine = require(utility.HapticEngine)
 
 local chevronIcon = constants.icons.chevron
 local checkIcon = constants.icons.check
@@ -488,6 +489,7 @@ function Dropdown.new(tab, properties)
         end)
 
         self.window:ConnectFor(self, interact.MouseButton1Click, function()
+            hapticEngine.click()
             local sel = isOptionSelected(optionName)
 
             if not self.multiSelect then
@@ -538,6 +540,7 @@ function Dropdown.new(tab, properties)
 
     -- Function
     self.window:ConnectFor(self, self.interact.MouseButton1Click, function()
+        hapticEngine.click()
         if self._isOpen then
             self:_close()
         else

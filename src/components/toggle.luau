@@ -10,6 +10,7 @@ local variables = require(utility.variables)
 local functions = require(utility.functions)
 local moveable = require(utility.moveable)
 local locale = require(utility.locale)
+local hapticEngine = require(utility.HapticEngine)
 
 function Toggle.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
@@ -138,6 +139,7 @@ end
 
 -- flip, animate, run callback (error-flash on fail), autosave. press anim is per-layout
 function Toggle:_performToggle()
+    hapticEngine.click()
     self.value = not self.value
     self:_animateIndicator()
 

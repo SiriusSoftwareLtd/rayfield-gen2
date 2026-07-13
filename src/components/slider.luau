@@ -11,6 +11,7 @@ local functions = require(utility.functions)
 local odometer = require(utility.odometer)
 local moveable = require(utility.moveable)
 local locale = require(utility.locale)
+local hapticEngine = require(utility.HapticEngine)
 
 -- Decimal places implied by an increment (0.1 -> 1, 0.25 -> 2, 1 -> 0). Used so
 -- the readout formats mid-roll floats to the same precision as landed values.
@@ -207,6 +208,7 @@ function Slider.new(tab, properties)
             input.UserInputType == Enum.UserInputType.MouseButton1
             or input.UserInputType == Enum.UserInputType.Touch
         then
+            hapticEngine.click() -- one tick on grab, not per drag frame
             self.dragging = true
             self:_setHeld(true)
             self:_updateFromMouse()

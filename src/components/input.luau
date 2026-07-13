@@ -11,6 +11,7 @@ local functions = require(utility.functions)
 local moveable = require(utility.moveable)
 local locale = require(utility.locale)
 local constants = require(utility.constants)
+local hapticEngine = require(utility.HapticEngine)
 
 local resizeInfo = constants.pillResizeInfo
 -- text is muted at rest, opaque while typing
@@ -217,6 +218,7 @@ function Input:_commit(text, silent)
         self.window:_persist(self)
         -- green flash to confirm the value landed (only when it actually changed)
         if changed then
+            hapticEngine.click()
             self.window:_flashResult(self, true)
         end
     end

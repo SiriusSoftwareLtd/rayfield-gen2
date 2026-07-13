@@ -8,6 +8,7 @@ local persistence = require(utility.persistence)
 local constants = require(utility.constants)
 local locale = require(utility.locale)
 local log = require(utility.log)
+local hapticEngine = require(utility.HapticEngine)
 local chrome = require(script.Parent.chrome)
 local search = require(script.Parent.search)
 
@@ -35,6 +36,26 @@ local maxToastWidth = 320
 
 -- Standard element row height, shared by the compact button/toggle scaffold.
 local compactRowHeight = 41
+
+-- Default window size, and the smallest we'll shrink it to on a tiny screen.
+local defaultWindowSize = Vector2.new(475, 500)
+local minWindowSize = Vector2.new(300, 320)
+local viewportMargin = 60 -- keep the window comfortably inset from the edges of a small screen
+
+-- The default size, shrunk to fit small screens (a phone, or a small PC window) so the window
+-- never overflows the viewport. Big screens keep the full size untouched; small ones clamp to
+-- the usable area minus a margin, floored so it stays usable. Computed once at open - everything
+-- downstream (the reveal target, drag clamp, collapse) reads self.size, so it all inherits this.
+local function fitWindowSize()
+    local camera = variables.workspace.CurrentCamera
+    local viewport = camera and camera.ViewportSize
+    if not viewport or viewport.X <= 0 or viewport.Y <= 0 then
+        return UDim2.fromOffset(defaultWindowSize.X, defaultWindowSize.Y) -- no camera yet: full size
+    end
+    local width = math.max(minWindowSize.X, math.min(defaultWindowSize.X, viewport.X - viewportMargin))
+    local height = math.max(minWindowSize.Y, math.min(defaultWindowSize.Y, viewport.Y - viewportMargin))
+    return UDim2.fromOffset(width, height)
+end
 
 -- Keys that drive a UIGradient and so want a ColorSequence. A dev may pass a plain Color3 for
 -- any of these and we widen it to a flat sequence, so a theme reads the same either way.
@@ -130,7 +151,7 @@ function Window.new(properties)
     local self = setmetatable({
         name = properties.name or properties.Name or "Rayfield Window",
         subheading = properties.subtitle or properties.Subtitle,
-        size = UDim2.fromOffset(475, 500),
+        size = fitWindowSize(),
         instances = {},
         connections = {},
 
@@ -544,9 +565,11 @@ function Window.new(properties)
         mouseOverride = true, -- free the cursor while the menu is open (for FPS games that lock it)
         keepOnScreen = true, -- clamp the drag so the window cant be pulled off screen
         welcomeToast = true, -- the "signed in as" toast on first open for a new/changed account
+        haptics = false, -- off by default; opt in from settings (buzzes on presses/notifications)
     }
 
     self:LoadSettings()
+    hapticEngine.setEnabled(self.settings.haptics) -- honour a saved off before any interaction
     chrome.buildCollapsedFace(self)
     self:_bindKeybind()
     self:_bindMouseOverride()
@@ -1079,6 +1102,18 @@ function Window:_buildSettingsUI()
         forgetState = true, -- lives in settings.rfld, not the user's config
         callback = function(state)
             self.settings.welcomeToast = state
+            self:SaveSettings()
+        end,
+    })
+
+    self.rfSettings:CreateToggle({
+        name = "Haptics",
+        description = "A subtle tap as you interact, on devices that support haptics.",
+        value = self.settings.haptics,
+        forgetState = true, -- lives in settings.rfld, not the user's config
+        callback = function(state)
+            self.settings.haptics = state
+            hapticEngine.setEnabled(state)
             self:SaveSettings()
         end,
     })

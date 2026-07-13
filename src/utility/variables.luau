@@ -21,6 +21,7 @@ variables.secureMode = (function()
 end)()
 
 variables.coreGui = getService("CoreGui")
+variables.workspace = getService("Workspace") -- where HapticEngine parents its effects
 variables.runService = getService("RunService")
 variables.userInputService = getService("UserInputService")
 variables.guiService = getService("GuiService")

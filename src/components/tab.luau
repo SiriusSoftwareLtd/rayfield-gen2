@@ -10,6 +10,7 @@ local variables = require(utility.variables)
 local functions = require(utility.functions)
 local locale = require(utility.locale)
 local assignOrder = require(utility.ordering)
+local hapticEngine = require(utility.HapticEngine)
 local search = require(script.Parent.search)
 
 -- Walk a tab or group's children (groups nest) and tear each element down: drop its flag from
@@ -229,6 +230,7 @@ function Tab.new(window, properties)
         table.insert(
             self.connections,
             self.window:Connect(self.topbarItemInteract.MouseButton1Click, function()
+                hapticEngine.click()
                 self:Select()
             end)
         )

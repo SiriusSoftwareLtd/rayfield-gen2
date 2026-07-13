@@ -11,6 +11,7 @@ local functions = require(utility.functions)
 local moveable = require(utility.moveable)
 local locale = require(utility.locale)
 local constants = require(utility.constants)
+local hapticEngine = require(utility.HapticEngine)
 
 local resizeInfo = constants.pillResizeInfo
 local recordInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
@@ -188,6 +189,7 @@ function Keybind.new(tab, properties)
     }, { TextColor3 = "ContentColor", FontFace = "Font" })
 
     self.window:ConnectFor(self, self.box.MouseButton1Click, function()
+        hapticEngine.click()
         if self.recording then
             self:_stopRecording()
         else

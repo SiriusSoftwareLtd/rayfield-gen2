@@ -6,6 +6,7 @@ local variables = require(utility.variables)
 local filesystem = require(utility.filesystem)
 local constants = require(utility.constants)
 local locale = require(utility.locale)
+local hapticEngine = require(utility.HapticEngine)
 
 local chrome = {}
 
@@ -102,6 +103,7 @@ function chrome.buildCollapsedFace(window)
     })
 
     window:Connect(window.collapsedInteract.MouseButton1Click, function()
+        hapticEngine.click()
         window:ToggleHide()
     end)
 end

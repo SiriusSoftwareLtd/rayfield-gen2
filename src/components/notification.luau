@@ -9,6 +9,7 @@ local utility = script.Parent.Parent.utility
 local variables = require(utility.variables)
 local functions = require(utility.functions)
 local constants = require(utility.constants)
+local hapticEngine = require(utility.HapticEngine)
 
 -- Timings/easings copied from Rayfield Gen1 (all Exponential, Out).
 local growInfo = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
@@ -248,6 +249,8 @@ function Notification:_show()
     if not self.main.Parent then
         return
     end
+
+    hapticEngine.notify()
 
     -- Open the slot and slide the card in from the right (body starts off-right), fading as it comes
     variables.tweenService:Create(self.main, growInfo, { Size = UDim2.new(1, 0, 0, target) }):Play()

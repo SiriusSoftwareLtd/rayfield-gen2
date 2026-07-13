@@ -8,6 +8,7 @@ local variables = require(utility.variables)
 local functions = require(utility.functions)
 local constants = require(utility.constants)
 local image = require(utility.image)
+local hapticEngine = require(utility.HapticEngine)
 
 -- Timings (Exponential Out, matching the notification feel).
 local slideInfo = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out) -- entry travel
@@ -295,6 +296,8 @@ function Toast:_show()
     if not self.main.Parent then
         return
     end
+
+    hapticEngine.notify()
 
     local width, height = self:_measure()
     self.main.Size = UDim2.new(0, width, 0, 0)

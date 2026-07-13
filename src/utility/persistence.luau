@@ -200,6 +200,7 @@ function persistence.saveSettings(window)
         mouseOverride = window.settings.mouseOverride,
         keepOnScreen = window.settings.keepOnScreen,
         welcomeToast = window.settings.welcomeToast,
+        haptics = window.settings.haptics,
     }
 
     local ok, encoded = pcall(variables.httpService.JSONEncode, variables.httpService, data)
@@ -257,6 +258,10 @@ function persistence.loadSettings(window)
 
     if type(parsed.welcomeToast) == "boolean" then
         window.settings.welcomeToast = parsed.welcomeToast
+    end
+
+    if type(parsed.haptics) == "boolean" then
+        window.settings.haptics = parsed.haptics
     end
 
     return true

@@ -11,6 +11,7 @@ local functions = require(utility.functions)
 local moveable = require(utility.moveable)
 local constants = require(utility.constants)
 local locale = require(utility.locale)
+local hapticEngine = require(utility.HapticEngine)
 
 -- Full hue wheel top (red) to bottom (back to red) for the vertical hue bar.
 local hueSequence = ColorSequence.new({
@@ -254,6 +255,7 @@ function ColorPicker.new(tab, properties)
     self:_buildPicker()
 
     self.window:ConnectFor(self, self.interact.MouseButton1Click, function()
+        hapticEngine.click()
         if self._isOpen then
             self:_close()
         else
