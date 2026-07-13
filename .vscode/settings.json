@@ -5,6 +5,7 @@
     ],
     "luau-lsp.plugin.enabled": true,
     "cSpell.words": [
+        "Configurables",
         "makefolder"
     ]
 }
