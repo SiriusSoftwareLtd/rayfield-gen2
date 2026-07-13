@@ -9,7 +9,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 echo "==> stylua (format check)"
-stylua --check src
+stylua --syntax Luau --check src
 
 echo "==> selene (lint)"
 [ -f roblox.yml ] || selene generate-roblox-std
