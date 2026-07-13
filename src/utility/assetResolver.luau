@@ -19,6 +19,7 @@ type assetResolver = {
 
 	new: (useCache: boolean?, assetContentDownloadUrl: AssetDownloadUrl?) -> assetResolver,
 	resolve: (self: assetResolver, value: any) -> (string | number | nil),
+    getAssetContentFromUrl: (self: assetResolver, url: string, cacheKey: number | string?, forced: boolean?) -> (string | nil),
 	getAssetContentFromId: (self: assetResolver, id: number | string, forced: boolean?) -> (string | nil),
 }
 -- example asset ids:
@@ -55,6 +56,36 @@ function assetResolver:resolve(value)
 	return nil
 end
 
+function assetResolver:getAssetContentFromUrl(url: string, cacheKey: number | string?, forced: boolean?): string?
+    if cacheKey ~= nil and self.contentCache then
+        local cachedContent = self.contentCache[cacheKey :: any]
+        if cachedContent then
+            return cachedContent
+        end
+    end
+
+    local requestFn = network.getRequestFn()
+    if not requestFn then
+        warn("No request function available to download asset content.")
+        return nil
+    end
+
+    local success, response = pcall(requestFn, {
+        Url = url,
+        Method = "GET",
+    })
+    local content = nil
+    if success and response and response.Body then
+        content = response.Body
+        if cacheKey ~= nil and self.contentCache then
+            self.contentCache[cacheKey :: any] = content
+        end
+    elseif not forced then
+        warn("Failed to download asset content for url: " .. tostring(url))
+    end
+    return content
+end
+
 function assetResolver:getAssetContentFromId(id, forced): string?
     id = self:resolve(id)
     -- we can only download content for valid asset ids
@@ -63,33 +94,8 @@ function assetResolver:getAssetContentFromId(id, forced): string?
         return nil
     end
 
-	-- check if the content is already cached
-    if self.contentCache and self.contentCache[id] then
-        return self.contentCache[id]
-    end
-
-    -- download the content from the asset id
     local downloadUrl = string.format(self.contentDownloadUrl, id)
-    local requestFn = network.getRequestFn()
-    if not requestFn then
-        warn("No request function available to download asset content.")
-        return nil
-    end
-    local success, response = pcall(requestFn, {
-        Url = downloadUrl,
-        Method = "GET",
-    })
-    local content = nil
-    if success and response and response.Body then
-        content = response.Body
-        -- cache the content if caching is enabled
-        if self.contentCache then
-            self.contentCache[id] = content
-        end
-    elseif not forced then
-        warn("Failed to download asset content for id: " .. tostring(id))
-    end
-    return content
+    return self:getAssetContentFromUrl(downloadUrl, id, forced)
 end
 
 return assetResolver
