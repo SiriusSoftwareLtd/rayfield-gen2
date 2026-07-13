@@ -112,11 +112,17 @@ end
 local function themeOverrides(value)
     if typeof(value) == "table" then
         return value
-    elseif typeof(value) == "string" and themes:FindFirstChild(string.lower(value)) then
-        return require(themes[string.lower(value)])
-    else
-        return require(themes["default"])
+    elseif typeof(value) == "string" then
+        local named = themes:FindFirstChild(string.lower(value))
+        if named then
+            return require(named)
+        end
+        -- a typo'd name shouldnt crash the menu; warn and fall back so the UI still builds
+        log.warn("Rayfield: unknown theme '" .. value .. "', using default")
+    elseif value ~= nil then
+        log.warn("Rayfield: invalid theme (expected a built-in name or a theme table), using default")
     end
+    return require(themes["default"])
 end
 
 -- A complete theme for first paint: default filled in with the given overrides, so a partial
