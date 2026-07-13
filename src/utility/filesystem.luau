@@ -3,11 +3,12 @@
 -- Filesystem Abstraction
 -- Uses native executor functions when available, simulates with instances
 
-local variables = require(script.Parent.variables)
+local services = require(script.Parent.services)
+-- local variables = require(script.Parent.variables)
 
 local filesystem = {}
 
-local isStudio = variables.runService:IsStudio()
+local isStudio = services.getService("RunService"):IsStudio()
 local hasNativeFS = not isStudio and typeof(writefile) == "function"
 
 if hasNativeFS then
@@ -54,7 +55,7 @@ elseif isStudio then
 
     local root = Instance.new("Folder")
     root.Name = "Filesystem"
-    root.Parent = variables.replicatedStorage
+    root.Parent = services.getService("ReplicatedStorage")
 
     local function splitPath(path)
         local parts = {}
@@ -224,6 +225,22 @@ elseif isStudio then
         assert(folder and folder:IsA("Folder"), "Folder not found: " .. path)
 
         folder:Destroy()
+    end
+end
+
+function filesystem.ensureFolder(path)
+	if not filesystem.isfolder(path) then
+		filesystem.makefolder(path)
+	end
+end
+
+function filesystem.ensureDir(dir)
+    local built = ""
+    for part in string.gmatch(dir, "[^/]+") do
+        built = if built == "" then part else built .. "/" .. part
+        if not filesystem.isfolder(built) then
+            filesystem.makefolder(built)
+        end
     end
 end
 

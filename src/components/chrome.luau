@@ -114,7 +114,7 @@ function chrome.isNewUser()
         return true
     end
 
-    local path = "Rayfield/lastuser.txt"
+    local path = variables.fileSystemManager:getPath("lastuser.txt")
     local currentId = tostring(variables.localPlayer.UserId)
     local isNew = true
 
@@ -125,9 +125,6 @@ function chrome.isNewUser()
     end)
 
     pcall(function()
-        if typeof(filesystem.isfolder) == "function" and not filesystem.isfolder("Rayfield") then
-            filesystem.makefolder("Rayfield")
-        end
         filesystem.writefile(path, currentId)
     end)
 

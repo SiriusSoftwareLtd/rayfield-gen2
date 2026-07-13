@@ -15,23 +15,12 @@ local function sanitizeFile(value)
     return (tostring(value):gsub("[/\\]", ""):gsub("%.%.", ""))
 end
 
--- make each folder in a / joined path
-local function ensureDir(dir)
-    local built = ""
-    for part in string.gmatch(dir, "[^/]+") do
-        built = if built == "" then part else built .. "/" .. part
-        if not filesystem.isfolder(built) then
-            filesystem.makefolder(built)
-        end
-    end
-end
-
 -- config -----------------------------------------------------------------
 
 -- name picks a specific config; nil falls back to the window's default file. Both live in
 -- the same folder so a named config sits right next to the auto-saved one.
 function persistence.getPath(window, name)
-    local dir = "Rayfield/Configurations"
+    local dir = variables.fileSystemManager:getPath("Configurations")
     if window.configuration.customFolder then
         dir = dir .. "/" .. sanitizeFolder(window.configuration.customFolder)
     end
@@ -75,7 +64,7 @@ function persistence.save(window, name)
     end
 
     local ok, err = pcall(function()
-        ensureDir(dir)
+        filesystem.ensureDir(dir)
         filesystem.writefile(fullPath, encoded)
     end)
 
@@ -110,7 +99,7 @@ function persistence.load(window, name)
             .. sanitizeFile(name or window.configuration.fileName or window.name)
             .. " (Incorrect Format).rfld"
         pcall(function()
-            ensureDir(dir)
+            filesystem.ensureDir(dir)
             filesystem.writefile(backupPath, config)
             filesystem.delfile(fullPath)
         end)
@@ -184,7 +173,7 @@ end
 -- settings ---------------------------------------------------------------
 
 function persistence.getSettingsPath()
-    local dir = "Rayfield/Settings"
+    local dir = variables.fileSystemManager:getPath("Settings")
     return dir, dir .. "/rayfield.rfld"
 end
 
@@ -205,7 +194,7 @@ function persistence.saveSettings(window)
     end
 
     local writeOk, err = pcall(function()
-        ensureDir(dir)
+        filesystem.ensureDir(dir)
         filesystem.writefile(fullPath, encoded)
     end)
 

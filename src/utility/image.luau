@@ -6,8 +6,8 @@ local constants = require(script.Parent.constants)
 
 local image = {}
 
-local cacheRoot = "Rayfield"
-local cacheFolder = cacheRoot .. "/Assets"
+local cacheRoot = variables.fileSystemManager:getRootFolder()
+local cacheFolder = variables.fileSystemManager:getAssetsFolder()
 
 local assetBase = "https://github.com/SiriusSoftwareLtd/rayfield-gen2/blob/main/assets/"
 
@@ -50,12 +50,6 @@ local function blocked(value)
     return ""
 end
 
-local function ensureFolder(path)
-    if not filesystem.isfolder(path) then
-        filesystem.makefolder(path)
-    end
-end
-
 local function getRequestFn()
     return env.request
         or env.http_request
@@ -85,8 +79,8 @@ local function cacheFile(path, url)
         return nil
     end
     if not filesystem.isfile(path) then
-        pcall(ensureFolder, cacheRoot)
-        pcall(ensureFolder, cacheFolder)
+        pcall(filesystem.ensureFolder, cacheRoot)
+        pcall(filesystem.ensureFolder, cacheFolder)
         local body = httpGet(url)
         if not body or not pcall(filesystem.writefile, path, body) then
             return nil
