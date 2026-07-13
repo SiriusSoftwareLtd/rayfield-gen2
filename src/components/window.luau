@@ -359,7 +359,7 @@ function Window.new(properties)
             -- Configurables
             Text = locale.t(self.name), -- window name
 
-            FontFace = Font.new(constants.fontAsset, Enum.FontWeight.Medium),
+            FontFace = variables.fontManager:loadFont(constants.fontAsset, Enum.FontWeight.Medium),
 
             Size = UDim2.fromOffset(50, 20),
             AutomaticSize = Enum.AutomaticSize.X,

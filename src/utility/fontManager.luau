@@ -47,9 +47,10 @@ faces: { FontFace },
 }
 
 type CachedFont = {
-customId: string,
-manifest: FontManifest,
-loadedFromDisk: boolean,
+	customId: string,
+	manifest: FontManifest,
+	loadedFromDisk: boolean,
+	variants: { [string]: Font },
 }
 
 export type FontResolverOptions = {
@@ -72,6 +73,10 @@ getFontFromId: (self: fontManager, id: number | string) -> Font?,
 --local DEFAULT_FALLBACK_FONT = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium)
 
 local env = getfenv()
+
+local function variantKey(fontWeight: Enum.FontWeight, fontStyle: Enum.FontStyle): string
+	return tostring(fontWeight) .. "|" .. tostring(fontStyle)
+end
 
 local function resolveId(id: number | string): number?
 if type(id) == "number" then
@@ -97,7 +102,18 @@ function fontManager.__index(self, key)
 	end
 
 	if self.fontCache then
-		return self.fontCache[resolvedId].font
+		local cached = self.fontCache[resolvedId]
+		if cached then
+			local regularKey = variantKey(Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+			local regularFont = cached.variants and cached.variants[regularKey]
+			if regularFont then
+				return regularFont
+			end
+
+			for _, font in pairs(cached.variants or {}) do
+				return font
+			end
+		end
 	end
 
 	return nil
@@ -110,18 +126,24 @@ function fontManager.new(rootFolder: string, useDebug: boolean?, useCache: boole
 	self.fontCache = useCache and {} or nil
 	self.assetResolver = assetResolver.new(useCache, assetContentDownloadUrl)
 	self.defaultOptions = defaultOptions or {
-	saveToDisk = true,
-	skipCache = not useCache or false,
+		saveToDisk = true,
+		skipCache = not useCache or false,
+		fallbackFont = Font.fromEnum(Enum.Font.SourceSans),
 	}
 	self._debug = useDebug or runService:IsStudio() or false
 	return self
 end
 
 function fontManager:loadFont(id: (number | string)?, fontWeight: Enum.FontWeight?, fontStyle: Enum.FontStyle?, saveToDisk: boolean?, skipCache: boolean?): Font?
-	saveToDisk = saveToDisk or self.defaultOptions.saveToDisk
-	skipCache = skipCache or self.defaultOptions.skipCache
+	if saveToDisk == nil then
+		saveToDisk = self.defaultOptions.saveToDisk
+	end
+	if skipCache == nil then
+		skipCache = self.defaultOptions.skipCache
+	end
 	fontWeight = fontWeight or Enum.FontWeight.Regular
 	fontStyle = fontStyle or Enum.FontStyle.Normal
+	local cacheKey = variantKey(fontWeight, fontStyle)
 	local rawId = self.assetResolver:resolve(id)
 	local resolvedId = resolveId(rawId)
 	if not resolvedId then
@@ -129,22 +151,32 @@ function fontManager:loadFont(id: (number | string)?, fontWeight: Enum.FontWeigh
 		return self.defaultOptions.fallbackFont
 	end
 	-- if the font is already cached, return it
-	if self.fontCache and self.fontCache[resolvedId] and not skipCache then
+	if self.fontCache and not skipCache then
 		local cachedFont = self.fontCache[resolvedId]
-		local fontManifestId = cachedFont.customId
-		local ok, loadedFont = pcall(Font.new, fontManifestId, fontWeight, fontStyle)
-		if ok and loadedFont then
-			if self._debug then
-				print("Loaded font from cache for id: " .. tostring(resolvedId))
+		if cachedFont then
+			local cachedVariant = cachedFont.variants and cachedFont.variants[cacheKey]
+			if cachedVariant then
+				if self._debug then
+					print("Loaded font from cache for id: " .. tostring(resolvedId))
+				end
+				return cachedVariant
 			end
-			return loadedFont
-		else
-			if self._debug then
-				warn("Failed to load font from cache for id: " .. tostring(resolvedId))
+
+			local ok, loadedFont = pcall(Font.new, cachedFont.customId, fontWeight, fontStyle)
+			if ok and loadedFont then
+				cachedFont.variants = cachedFont.variants or {}
+				cachedFont.variants[cacheKey] = loadedFont
+				if self._debug then
+					print("Loaded font variant from cache for id: " .. tostring(resolvedId))
+				end
+				return loadedFont
+			else
+				if self._debug then
+					warn("Failed to load font from cache for id: " .. tostring(resolvedId))
+				end
+				self.fontCache[resolvedId] = nil
+				return self.defaultOptions.fallbackFont
 			end
-			-- remove the cached font if it failed to load
-			self.fontCache[resolvedId] = nil
-			return self.defaultOptions.fallbackFont
 		end
 	end
 
@@ -244,9 +276,12 @@ function fontManager:loadFont(id: (number | string)?, fontWeight: Enum.FontWeigh
 	-- write the font manifest to the disk
 	if self.fontCache then
 		self.fontCache[resolvedId] = {
-		customId = fontManifestId,
-		manifest = fontManifest,
-		loadedFromDisk = true,
+			customId = fontManifestId,
+			manifest = fontManifest,
+			loadedFromDisk = true,
+			variants = {
+				[cacheKey] = loadedFont,
+			},
 		}
 		if self._debug then
 			print("Cached font for id: " .. tostring(resolvedId))
@@ -267,7 +302,9 @@ function fontManager:resolve(id: number | string): Font?
 			if self._debug then
 				print("Resolved font for id: " .. tostring(resolvedId))
 			end
-			return cached.font
+			for _, font in pairs(cached.variants or {}) do
+				return font
+			end
 		end
 	end
 

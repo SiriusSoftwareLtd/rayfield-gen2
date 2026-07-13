@@ -1,4 +1,5 @@
 local constants = require(script.Parent.Parent.utility.constants)
+local variables = require(script.Parent.Parent.utility.variables)
 
 return {
     CornerRoundness = UDim.new(0, 20),
@@ -32,8 +33,8 @@ return {
     SliderProgress = ColorSequence.new(Color3.fromRGB(0, 170, 127), Color3.fromRGB(0, 134, 98)),
     SliderStroke = Color3.fromRGB(255, 255, 255),
     ActionColor = Color3.fromRGB(255, 255, 255),
-    TitleFont = Font.new(constants.fontAsset, Enum.FontWeight.SemiBold),
-    Font = Font.new(constants.fontAsset, Enum.FontWeight.Medium),
+    TitleFont = variables.fontManager:loadFont(constants.fontAsset, Enum.FontWeight.SemiBold),
+    Font = variables.fontManager:loadFont(constants.fontAsset, Enum.FontWeight.Medium),
     ContentColor = Color3.fromRGB(255, 255, 255),
 
     LiveAnimation = false, -- Subtly changes window gradient and shadow offset to make Rayfield feel more natural.
