@@ -8,8 +8,8 @@ local assetResolver = {
         AssetDownloadUrl = {
             RobloxDownloadUrl = "https://assetdelivery.roblox.com/v1/asset/?id=%d" :: AssetDownloadUrl,
             RoProxyDownloadUrl = "https://assetdelivery.roproxy.com/v1/asset?id=%d" :: AssetDownloadUrl,
-        }
-    }
+        },
+    },
 }
 assetResolver.__index = assetResolver
 assetResolver.__type = "assetResolver"
@@ -17,10 +17,15 @@ type assetResolver = {
     contentCache: { [number]: string }?,
     contentDownloadUrl: AssetDownloadUrl?,
 
-	new: (useCache: boolean?, assetContentDownloadUrl: AssetDownloadUrl?) -> assetResolver,
-	resolve: (self: assetResolver, value: any) -> (string | number | nil),
-    getAssetContentFromUrl: (self: assetResolver, url: string, cacheKey: number | string?, forced: boolean?) -> (string | nil),
-	getAssetContentFromId: (self: assetResolver, id: number | string, forced: boolean?) -> (string | nil),
+    new: (useCache: boolean?, assetContentDownloadUrl: AssetDownloadUrl?) -> assetResolver,
+    resolve: (self: assetResolver, value: any) -> string | number | nil,
+    getAssetContentFromUrl: (
+        self: assetResolver,
+        url: string,
+        cacheKey: number | string?,
+        forced: boolean?
+    ) -> string | nil,
+    getAssetContentFromId: (self: assetResolver, id: number | string, forced: boolean?) -> string | nil,
 }
 -- example asset ids:
 --[[
@@ -29,31 +34,31 @@ rbxassetid://12187293441
 ]]
 
 function assetResolver.new(useCache: boolean?, assetContentDownloadUrl: AssetDownloadUrl?): assetResolver
-	return setmetatable({
-		contentCache = useCache and {} or nil,
-        contentDownloadUrl = assetContentDownloadUrl or assetResolver.Enum.AssetDownloadUrl.RobloxDownloadUrl
-	}, assetResolver)
+    return setmetatable({
+        contentCache = useCache and {} or nil,
+        contentDownloadUrl = assetContentDownloadUrl or assetResolver.Enum.AssetDownloadUrl.RobloxDownloadUrl,
+    }, assetResolver)
 end
 
 function assetResolver:resolve(value)
-	if type(value) == "number" then
-		return value
-	end
+    if type(value) == "number" then
+        return value
+    end
 
-	if type(value) ~= "string" then
-		return nil
-	end
+    if type(value) ~= "string" then
+        return nil
+    end
 
-	if string.sub(value, 1, 11) == "rbxasset://" or string.sub(value, 1, 11) == "rbxthumb://" then
-		return value
-	end
+    if string.sub(value, 1, 11) == "rbxasset://" or string.sub(value, 1, 11) == "rbxthumb://" then
+        return value
+    end
 
-	local id = tonumber(string.match(value, "^rbxassetid://(%d+)$"))
-	if id then
-		return id
-	end
+    local id = tonumber(string.match(value, "^rbxassetid://(%d+)$"))
+    if id then
+        return id
+    end
 
-	return nil
+    return nil
 end
 
 function assetResolver:getAssetContentFromUrl(url: string, cacheKey: number | string?, forced: boolean?): string?

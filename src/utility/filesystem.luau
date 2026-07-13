@@ -229,9 +229,9 @@ elseif isStudio then
 end
 
 function filesystem.ensureFolder(path)
-	if not filesystem.isfolder(path) then
-		filesystem.makefolder(path)
-	end
+    if not filesystem.isfolder(path) then
+        filesystem.makefolder(path)
+    end
 end
 
 function filesystem.ensureDir(dir)

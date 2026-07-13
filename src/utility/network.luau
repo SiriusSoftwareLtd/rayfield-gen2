@@ -1,5 +1,3 @@
-local services = require(script.Parent.services)
-
 local network = {}
 network.__index = network
 
@@ -12,6 +10,5 @@ function network.getRequestFn(env)
         or (env.syn and env.syn.request)
         or (env.fluxus and env.fluxus.request)
 end
-
 
 return network

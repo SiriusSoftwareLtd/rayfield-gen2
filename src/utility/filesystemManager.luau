@@ -6,7 +6,6 @@ local path = require(script.Parent.path)
 -- defaults
 local DEFAULT_ROOT_PATH = "Rayfield"
 
-
 local fileSystemManager = {}
 fileSystemManager.__index = fileSystemManager
 

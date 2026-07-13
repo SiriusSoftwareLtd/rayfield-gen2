@@ -26,7 +26,7 @@ function persistenceSettings.saveSettings(window)
         return false
     end
 
-    local writeOk, err = pcall(function()
+    local writeOk, _err = pcall(function()
         filesystem.ensureDir(dir)
         filesystem.writefile(fullPath, encoded)
     end)

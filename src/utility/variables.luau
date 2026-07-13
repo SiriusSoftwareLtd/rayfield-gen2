@@ -6,11 +6,7 @@ local assetResolver = require(script.Parent.assetResolver)
 local fontManager = require(script.Parent.fontManager)
 
 
-local variables = {}
-
-for key, value in runtime do
-    variables[key] = value
-end
+local variables = table.clone(runtime)
 
 variables.fileSystemManager = fileSystemManager.new()
 variables.assetResolver = assetResolver.new(true, assetResolver.Enum.AssetDownloadUrl.RoProxyDownloadUrl)

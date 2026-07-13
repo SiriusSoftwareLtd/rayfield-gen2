@@ -50,9 +50,11 @@ end
 local function fetchAvatar(userId)
     local cdnUrl
     for _ = 1, 4 do
-        local body = assetResolver:getAssetContentFromUrl(string.format(thumbEndpoint, userId, headshotPx, headshotPx),
+        local body = assetResolver:getAssetContentFromUrl(
+            string.format(thumbEndpoint, userId, headshotPx, headshotPx),
             "avatar:" .. tostring(userId),
-            false)
+            false
+        )
         if body then
             local decodeOk, parsed = pcall(function()
                 return variables.httpService:JSONDecode(body)
