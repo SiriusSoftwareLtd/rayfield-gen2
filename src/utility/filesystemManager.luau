@@ -1,6 +1,7 @@
 --!nocheck
 
 local filesystem = require(script.Parent.filesystem)
+local path = require(script.Parent.path)
 
 -- defaults
 local DEFAULT_ROOT_PATH = "Rayfield"
@@ -8,14 +9,6 @@ local DEFAULT_ROOT_PATH = "Rayfield"
 
 local fileSystemManager = {}
 fileSystemManager.__index = fileSystemManager
-
-local function joinPath(basePath, childPath)
-    if not childPath or childPath == "" then
-        return basePath
-    end
-
-    return basePath .. "/" .. childPath
-end
 
 function fileSystemManager.new(name)
     local self = setmetatable({}, fileSystemManager)
@@ -29,14 +22,14 @@ function fileSystemManager.new(name)
 end
 
 function fileSystemManager:getPath(subpath)
-    return joinPath(self.root, subpath)
+    return path.join(self.root, subpath)
 end
 
 function fileSystemManager:getAssetsFolder(subfolder)
     if subfolder then
-        local path = joinPath(self.assets, subfolder)
-        pcall(filesystem.ensureFolder, path)
-        return path
+        local assetPath = path.join(self.assets, subfolder)
+        pcall(filesystem.ensureFolder, assetPath)
+        return assetPath
     end
     return self.assets
 end

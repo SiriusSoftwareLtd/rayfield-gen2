@@ -3,6 +3,7 @@
 local variables = require(script.Parent.variables)
 local filesystem = require(script.Parent.filesystem)
 local log = require(script.Parent.log)
+local path = require(script.Parent.path)
 local paths = require(script.Parent.persistencePaths)
 
 local persistenceConfig = {}
@@ -65,10 +66,10 @@ function persistenceConfig.load(window, name)
 
     if not decodeOk then
         log.warn("Rayfield: Configuration file has an invalid format, backing up and resetting")
-        local backupPath = dir
-            .. "/"
-            .. tostring(name or window.configuration.fileName or window.name):gsub("[/\\]", ""):gsub("%.%.", "")
-            .. " (Incorrect Format).rfld"
+        local backupPath = path.join(
+            dir,
+            path.sanitizeFile(name or window.configuration.fileName or window.name) .. " (Incorrect Format).rfld"
+        )
         pcall(function()
             filesystem.ensureDir(dir)
             filesystem.writefile(backupPath, config)
@@ -107,9 +108,9 @@ function persistenceConfig.list(window)
         return names
     end
 
-    for _, path in files do
-        local file = tostring(path):match("[^/\\]+$") or tostring(path)
-        local base = file:match("^(.+)%.rfld$")
+    for _, filePath in files do
+        local file = path.basename(filePath)
+        local base = path.stripExtension(file, ".rfld")
         if base and not base:find(" %(Incorrect Format%)$") then
             table.insert(names, base)
         end
