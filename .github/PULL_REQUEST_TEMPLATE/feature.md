@@ -52,7 +52,7 @@ supported executors, deprecations, and rollout concerns.
 
 ## Validation
 
-- [ ] I ran `bash scripts/check.sh`.
+- [ ] I ran `make ci`, including the coverage threshold.
 - [ ] I added or updated automated or Roblox-hosted tests where practical.
 - [ ] I completed applicable manual testing in Roblox Studio or the affected environment.
 - [ ] I tested existing behavior for regressions.
@@ -90,6 +90,7 @@ documentation. Note any code comments, examples, or type definitions updated her
 - [ ] The feature is focused and contains no unrelated changes.
 - [ ] I reviewed my own changes.
 - [ ] Tests cover the new behavior and relevant regressions where practical.
+- [ ] Coverage did not drop below the enforced threshold.
 - [ ] Public documentation is unaffected, or I linked companion work in `SiriusSoftwareLtd/docs`.
 - [ ] Required code comments, examples, and types match the resulting behavior.
 - [ ] Breaking changes and migration steps are clearly documented.

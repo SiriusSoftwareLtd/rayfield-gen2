@@ -1,0 +1,353 @@
+{
+  "scope": "src",
+  "measuredDate": "2026-07-14",
+  "command": "make coverage-baseline",
+  "threshold": 70.00,
+  "lineCoverage": 83.99,
+  "coveredLines": 3516,
+  "coverableLines": 4186,
+  "notes": [
+    "Generated reports are written to coverage/coverage.txt and coverage/coverage-summary.json.",
+    "The enforced Lune coverage scope is discovered dynamically from src by default.",
+    "Coverage line discovery is heuristic; multi-line table literal continuation lines can still be over-counted.",
+    "Run `make coverage-baseline` after intentional coverage changes to refresh this file."
+  ],
+  "files": [
+    {
+      "path": "src/components/action.luau",
+      "lineCoverage": 95.83,
+      "coveredLines": 23,
+      "coverableLines": 24
+    },
+    {
+      "path": "src/components/button.luau",
+      "lineCoverage": 96.43,
+      "coveredLines": 54,
+      "coverableLines": 56
+    },
+    {
+      "path": "src/components/chrome.luau",
+      "lineCoverage": 90.91,
+      "coveredLines": 30,
+      "coverableLines": 33
+    },
+    {
+      "path": "src/components/colorpicker.luau",
+      "lineCoverage": 66.01,
+      "coveredLines": 233,
+      "coverableLines": 353
+    },
+    {
+      "path": "src/components/descriptor.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 13,
+      "coverableLines": 13
+    },
+    {
+      "path": "src/components/drag.luau",
+      "lineCoverage": 65.96,
+      "coveredLines": 31,
+      "coverableLines": 47
+    },
+    {
+      "path": "src/components/dropdown.luau",
+      "lineCoverage": 72.28,
+      "coveredLines": 206,
+      "coverableLines": 285
+    },
+    {
+      "path": "src/components/group.luau",
+      "lineCoverage": 74.12,
+      "coveredLines": 63,
+      "coverableLines": 85
+    },
+    {
+      "path": "src/components/input.luau",
+      "lineCoverage": 82.05,
+      "coveredLines": 64,
+      "coverableLines": 78
+    },
+    {
+      "path": "src/components/keybind.luau",
+      "lineCoverage": 59.30,
+      "coveredLines": 102,
+      "coverableLines": 172
+    },
+    {
+      "path": "src/components/notification.luau",
+      "lineCoverage": 90.10,
+      "coveredLines": 91,
+      "coverableLines": 101
+    },
+    {
+      "path": "src/components/popup.luau",
+      "lineCoverage": 95.94,
+      "coveredLines": 189,
+      "coverableLines": 197
+    },
+    {
+      "path": "src/components/search.luau",
+      "lineCoverage": 86.18,
+      "coveredLines": 106,
+      "coverableLines": 123
+    },
+    {
+      "path": "src/components/section.luau",
+      "lineCoverage": 95.65,
+      "coveredLines": 22,
+      "coverableLines": 23
+    },
+    {
+      "path": "src/components/slider.luau",
+      "lineCoverage": 77.96,
+      "coveredLines": 145,
+      "coverableLines": 186
+    },
+    {
+      "path": "src/components/stat.luau",
+      "lineCoverage": 81.54,
+      "coveredLines": 159,
+      "coverableLines": 195
+    },
+    {
+      "path": "src/components/tab.luau",
+      "lineCoverage": 82.58,
+      "coveredLines": 128,
+      "coverableLines": 155
+    },
+    {
+      "path": "src/components/tag.luau",
+      "lineCoverage": 85.25,
+      "coveredLines": 52,
+      "coverableLines": 61
+    },
+    {
+      "path": "src/components/toast.luau",
+      "lineCoverage": 94.31,
+      "coveredLines": 116,
+      "coverableLines": 123
+    },
+    {
+      "path": "src/components/toggle.luau",
+      "lineCoverage": 86.29,
+      "coveredLines": 107,
+      "coverableLines": 124
+    },
+    {
+      "path": "src/components/window.luau",
+      "lineCoverage": 84.67,
+      "coveredLines": 508,
+      "coverableLines": 600
+    },
+    {
+      "path": "src/init.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 41,
+      "coverableLines": 41
+    },
+    {
+      "path": "src/themes/amethyst.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 1,
+      "coverableLines": 1
+    },
+    {
+      "path": "src/themes/cobalt.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 1,
+      "coverableLines": 1
+    },
+    {
+      "path": "src/themes/default.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 2,
+      "coverableLines": 2
+    },
+    {
+      "path": "src/themes/ember.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 1,
+      "coverableLines": 1
+    },
+    {
+      "path": "src/themes/frost.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 2,
+      "coverableLines": 2
+    },
+    {
+      "path": "src/themes/rose.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 1,
+      "coverableLines": 1
+    },
+    {
+      "path": "src/types.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 1,
+      "coverableLines": 1
+    },
+    {
+      "path": "src/utility/HapticEngine.luau",
+      "lineCoverage": 91.43,
+      "coveredLines": 32,
+      "coverableLines": 35
+    },
+    {
+      "path": "src/utility/assetResolver.luau",
+      "lineCoverage": 97.67,
+      "coveredLines": 42,
+      "coverableLines": 43
+    },
+    {
+      "path": "src/utility/colors.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 10,
+      "coverableLines": 10
+    },
+    {
+      "path": "src/utility/constants.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 9,
+      "coverableLines": 9
+    },
+    {
+      "path": "src/utility/filesystem.luau",
+      "lineCoverage": 86.01,
+      "coveredLines": 123,
+      "coverableLines": 143
+    },
+    {
+      "path": "src/utility/filesystemManager.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 23,
+      "coverableLines": 23
+    },
+    {
+      "path": "src/utility/flagNames.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 4,
+      "coverableLines": 4
+    },
+    {
+      "path": "src/utility/fontManager.luau",
+      "lineCoverage": 79.04,
+      "coveredLines": 132,
+      "coverableLines": 167
+    },
+    {
+      "path": "src/utility/functions.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 11,
+      "coverableLines": 11
+    },
+    {
+      "path": "src/utility/image.luau",
+      "lineCoverage": 95.45,
+      "coveredLines": 63,
+      "coverableLines": 66
+    },
+    {
+      "path": "src/utility/imageCache.luau",
+      "lineCoverage": 95.60,
+      "coveredLines": 87,
+      "coverableLines": 91
+    },
+    {
+      "path": "src/utility/locale.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 50,
+      "coverableLines": 50
+    },
+    {
+      "path": "src/utility/log.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 22,
+      "coverableLines": 22
+    },
+    {
+      "path": "src/utility/moveable.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 17,
+      "coverableLines": 17
+    },
+    {
+      "path": "src/utility/network.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 6,
+      "coverableLines": 6
+    },
+    {
+      "path": "src/utility/odometer.luau",
+      "lineCoverage": 97.32,
+      "coveredLines": 145,
+      "coverableLines": 149
+    },
+    {
+      "path": "src/utility/ordering.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 5,
+      "coverableLines": 5
+    },
+    {
+      "path": "src/utility/path.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 20,
+      "coverableLines": 20
+    },
+    {
+      "path": "src/utility/persistence.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 12,
+      "coverableLines": 12
+    },
+    {
+      "path": "src/utility/persistenceConfig.luau",
+      "lineCoverage": 98.55,
+      "coveredLines": 68,
+      "coverableLines": 69
+    },
+    {
+      "path": "src/utility/persistencePaths.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 18,
+      "coverableLines": 18
+    },
+    {
+      "path": "src/utility/persistenceSettings.luau",
+      "lineCoverage": 94.12,
+      "coveredLines": 48,
+      "coverableLines": 51
+    },
+    {
+      "path": "src/utility/runtime.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 17,
+      "coverableLines": 17
+    },
+    {
+      "path": "src/utility/services.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 5,
+      "coverableLines": 5
+    },
+    {
+      "path": "src/utility/textMetrics.luau",
+      "lineCoverage": 94.44,
+      "coveredLines": 34,
+      "coverableLines": 36
+    },
+    {
+      "path": "src/utility/variables.luau",
+      "lineCoverage": 91.30,
+      "coveredLines": 21,
+      "coverableLines": 23
+    }
+  ],
+  "auditGaps": [
+    "Deterministic Lune component coverage exercises construction and public APIs, but real Roblox rendering/input timing still requires Studio or manual validation when UI behavior changes.",
+    "src/init.luau: executor-specific compatibility and asset/font download behavior are stubbed in deterministic specs and still require integration validation when touched.",
+    "src/utility/odometer.luau: tween completion is simulated by the test shim; visual animation smoothness still requires Roblox runtime validation.",
+    "executor-specific globals and public UI APIs still require manual compatibility validation when touched."
+  ]
+}

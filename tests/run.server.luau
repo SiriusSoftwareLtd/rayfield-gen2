@@ -1,0 +1,33 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local TestEZModule = ReplicatedStorage:FindFirstChild("TestEZ")
+if not TestEZModule then
+    error("ReplicatedStorage.TestEZ is required. Run `make test-place` or use the Avant Plugin to run .spec tests.")
+end
+
+local TestEZ = require(TestEZModule)
+local testsRoot = ReplicatedStorage:WaitForChild("Tests")
+
+_G.__RAYFIELD_TEST_HELPERS = {
+    requireUtility = function(name)
+        return require(ReplicatedStorage.Rayfield.utility[name])
+    end,
+    requireComponent = function(name)
+        return require(ReplicatedStorage.Rayfield.components[name])
+    end,
+    requireTheme = function(name)
+        return require(ReplicatedStorage.Rayfield.themes[name])
+    end,
+    requireRayfield = function()
+        return require(ReplicatedStorage.Rayfield)
+    end,
+}
+_G.__RAYFIELD_TEST_VERBOSE_LOGS = _G.__RAYFIELD_TEST_VERBOSE_LOGS == true
+
+local results = TestEZ.TestBootstrap:run({ testsRoot }, TestEZ.Reporters.TextReporter, {
+    showTimingInfo = true,
+})
+
+if results.failureCount > 0 then
+    error(string.format("%d TestEZ tests failed.", results.failureCount))
+end

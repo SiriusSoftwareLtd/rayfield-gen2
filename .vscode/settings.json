@@ -3,9 +3,35 @@
         "gethui",
         "cloneref"
     ],
-    "luau-lsp.plugin.enabled": true,
     "cSpell.words": [
+        "appendfile",
+        "Avant",
+        "cloneref",
+        "colorpicker",
+        "Compey",
         "Configurables",
-        "makefolder"
-    ]
+        "Corridon",
+        "coverable",
+        "darklua",
+        "delfile",
+        "delfolder",
+        "fromoffset",
+        "fromscale",
+        "getcustomasset",
+        "getgenv",
+        "gethui",
+        "isfile",
+        "Kampfkarren",
+        "keybind",
+        "listfiles",
+        "makefolder",
+        "monkeypatch",
+        "pipefail",
+        "rbxlx",
+        "rokit",
+        "seaofvoices",
+        "stylua"
+    ],
+    "luau-lsp.inlayHints.functionReturnTypes": true,
+    "luau-lsp.studioPlugin.enabled": true
 }

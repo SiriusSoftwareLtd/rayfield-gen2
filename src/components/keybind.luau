@@ -51,6 +51,30 @@ local function coerceKey(value)
     return Enum.KeyCode.Unknown
 end
 
+local function enumItemFromValue(enumType, value)
+    local ok, item = pcall(function()
+        return enumType:FromValue(value)
+    end)
+    if ok and item then
+        return item
+    end
+
+    local itemsOk, items = pcall(function()
+        return enumType:GetEnumItems()
+    end)
+    if not itemsOk then
+        return nil
+    end
+
+    for _, enumItem in items do
+        if enumItem.Value == value then
+            return enumItem
+        end
+    end
+
+    return nil
+end
+
 function Keybind.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
 
@@ -435,14 +459,16 @@ end
 
 function Keybind:_deserialize(raw)
     -- the saved type is tostring(EnumType), e.g. "Enum.KeyCode", so strip the prefix before lookup
-    local enumType = Enum[(tostring(raw[1]):gsub("^Enum%.", ""))]
-    if not enumType then
+    local enumName = tostring(raw[1]):gsub("^Enum%.", "")
+    local enumOk, enumType = pcall(function()
+        return Enum[enumName]
+    end)
+    if not enumOk or not enumType then
         return
     end
-    local ok, item = pcall(function()
-        return enumType:FromValue(raw[2])
-    end)
-    if ok and item then
+
+    local item = enumItemFromValue(enumType, raw[2])
+    if item then
         self:Set(item)
     end
 end

@@ -12,3 +12,5 @@ multiple_statements = "allow"
 # UDim2.new with explicit scale+offset is used deliberately; not always convertible.
 roblox_manual_fromscale_or_fromoffset = "allow"
 mixed_table = "allow"
+# Unit specs intentionally monkeypatch Roblox globals in the Lune shim.
+incorrect_standard_library_use = "allow"

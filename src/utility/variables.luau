@@ -7,11 +7,15 @@
 
 local runtime = require(script.Parent.runtime)
 local constants = require(script.Parent.constants)
+local log = require(script.Parent.log)
 local fileSystemManager = require(script.Parent.filesystemManager)
 local assetResolver = require(script.Parent.assetResolver)
 local fontManager = require(script.Parent.fontManager)
 
 local variables = table.clone(runtime)
+log.setSuppressPredicate(function()
+    return variables.secureMode
+end)
 
 -- built-in stand-in shown in secure mode until the real brand faces download. a dev can override
 -- it per window with the FallbackFont prop (see setFallbackFont); defaults to BuilderSans.
