@@ -3,11 +3,56 @@ local process = require("@lune/process")
 local roblox = require("@lune/roblox")
 
 local root = process.cwd:gsub("\\", "/"):gsub("/$", "")
-local srcRoot = root .. "/src"
 local testsRoot = root .. "/tests/specs"
-local utilityRoot = srcRoot .. "/utility"
+local utilityRoot = root .. "/src/utility"
+local defaultCoverageDirectory = "src/utility"
 local coverageRoot = root .. "/coverage"
 local instrumentedRoot = root .. "/build/coverage/instrumented"
+
+local function normalizePath(path)
+    path = path:gsub("\\", "/"):gsub("/+", "/")
+
+    local prefix = ""
+    if path:match("^%a:/") then
+        prefix = path:sub(1, 2)
+        path = path:sub(3)
+    elseif path:sub(1, 1) == "/" then
+        prefix = "/"
+        path = path:sub(2)
+    end
+
+    local parts = {}
+    for part in path:gmatch("[^/]+") do
+        if part == ".." then
+            if #parts > 0 and parts[#parts] ~= ".." then
+                table.remove(parts)
+            elseif prefix == "" then
+                table.insert(parts, part)
+            end
+        elseif part ~= "." and part ~= "" then
+            table.insert(parts, part)
+        end
+    end
+
+    local normalized = table.concat(parts, "/")
+    if prefix == "/" then
+        return "/" .. normalized
+    elseif prefix ~= "" then
+        return if normalized == "" then prefix .. "/" else prefix .. "/" .. normalized
+    end
+
+    return normalized
+end
+
+local function isAbsolutePath(path)
+    return path:match("^%a:/") ~= nil or path:sub(1, 1) == "/"
+end
+
+local function isInsideRoot(path)
+    local lowerRoot = root:lower()
+    local lowerPath = path:lower()
+    return lowerPath == lowerRoot or lowerPath:sub(1, #lowerRoot + 1) == lowerRoot .. "/"
+end
 
 local function parseNumberArg(name, default)
     local longName = "--" .. name
@@ -25,23 +70,48 @@ local function parseNumberArg(name, default)
     return default
 end
 
-local coverageThreshold = parseNumberArg("coverage-threshold", tonumber(process.env.RAYFIELD_COVERAGE_THRESHOLD) or 70)
+local function parseDirectoryArg(default)
+    local positional = nil
+    local skipNext = false
 
-local coverageScope = "src/utility core modules"
-local trackedCoverageFiles = {
-    "src/utility/assetResolver.luau",
-    "src/utility/colors.luau",
-    "src/utility/filesystemManager.luau",
-    "src/utility/flagNames.luau",
-    "src/utility/image.luau",
-    "src/utility/network.luau",
-    "src/utility/ordering.luau",
-    "src/utility/path.luau",
-    "src/utility/persistence.luau",
-    "src/utility/persistenceConfig.luau",
-    "src/utility/persistencePaths.luau",
-    "src/utility/persistenceSettings.luau",
-}
+    for _, arg in process.args do
+        if skipNext then
+            skipNext = false
+        elseif arg == "--coverage-threshold" then
+            skipNext = true
+        elseif arg:sub(1, 2) == "--" then
+            -- Other options are ignored so future flags do not become paths.
+        elseif positional == nil then
+            positional = arg
+        else
+            warn("Only one coverage directory can be provided.")
+            process.exit(1)
+        end
+    end
+
+    return positional or default
+end
+
+local function resolveCoverageDirectory(path)
+    local normalized = normalizePath(path)
+    local absolutePath = if isAbsolutePath(normalized) then normalized else normalizePath(root .. "/" .. normalized)
+
+    if not isInsideRoot(absolutePath) then
+        warn("Coverage directory must be inside the repository: " .. path)
+        process.exit(1)
+    end
+
+    if not fs.isDir(absolutePath) then
+        warn("Coverage directory does not exist: " .. path)
+        process.exit(1)
+    end
+
+    local relativePath = if absolutePath == root then "." else absolutePath:sub(#root + 2)
+    return absolutePath, relativePath
+end
+
+local coverageThreshold = parseNumberArg("coverage-threshold", tonumber(process.env.RAYFIELD_COVERAGE_THRESHOLD) or 70)
+local coverageDirectory, coverageScope = resolveCoverageDirectory(parseDirectoryArg(defaultCoverageDirectory))
 
 local coverage = {
     files = {},
@@ -153,6 +223,13 @@ local function parentDir(path)
     return path:match("^(.*)/[^/]+$") or "."
 end
 
+local function isTestFile(path)
+    return path:match("%.spec%.lua$") ~= nil
+        or path:match("%.spec%.luau$") ~= nil
+        or path:match("%.test%.lua$") ~= nil
+        or path:match("%.test%.luau$") ~= nil
+end
+
 local function instrumentSource(relativePath, source)
     local fileCoverage = {
         coverable = {},
@@ -202,7 +279,7 @@ local function collectSourceModules(directory, modules)
         local path = directory .. "/" .. entry
         if fs.isDir(path) then
             collectSourceModules(path, modules)
-        elseif entry:match("%.luau$") then
+        elseif entry:match("%.luau$") and not isTestFile(entry) then
             local relativePath = path:sub(#root + 2)
             table.insert(modules, {
                 path = path,
@@ -212,11 +289,38 @@ local function collectSourceModules(directory, modules)
     end
 end
 
+local function addSourceModules(sourceModulesByPath, modules)
+    for _, moduleInfo in modules do
+        sourceModulesByPath[moduleInfo.relativePath] = moduleInfo
+    end
+end
+
 pcall(fs.removeDir, instrumentedRoot)
 fs.writeDir(instrumentedRoot)
 
+local coverageModules = {}
+collectSourceModules(coverageDirectory, coverageModules)
+table.sort(coverageModules, function(a, b)
+    return a.relativePath < b.relativePath
+end)
+
+local trackedCoverageFiles = {}
+for _, moduleInfo in coverageModules do
+    table.insert(trackedCoverageFiles, moduleInfo.relativePath)
+end
+
+local utilitySourceModules = {}
+collectSourceModules(utilityRoot, utilitySourceModules)
+
+local sourceModulesByPath = {}
+addSourceModules(sourceModulesByPath, coverageModules)
+addSourceModules(sourceModulesByPath, utilitySourceModules)
+
 local sourceModules = {}
-collectSourceModules(utilityRoot, sourceModules)
+for _, moduleInfo in sourceModulesByPath do
+    table.insert(sourceModules, moduleInfo)
+end
+
 table.sort(sourceModules, function(a, b)
     return a.relativePath < b.relativePath
 end)
@@ -239,7 +343,35 @@ Color3 = roblox.Color3
 ColorSequence = roblox.ColorSequence
 ColorSequenceKeypoint = roblox.ColorSequenceKeypoint
 Enum = roblox.Enum
-Instance = roblox.Instance
+Instance = table.clone(roblox.Instance)
+
+local robloxInstanceNew = roblox.Instance.new
+Instance.new = function(className, ...)
+    if className == "GetTextBoundsParams" then
+        return {}
+    end
+
+    if className == "HapticEffect" then
+        local effect = {
+            ClassName = className,
+            Parent = nil,
+            Type = nil,
+            Played = false,
+        }
+        function effect:Destroy()
+            self.Parent = nil
+        end
+        function effect:Play()
+            self.Played = true
+        end
+        function effect:IsA(name)
+            return name == className
+        end
+        return effect
+    end
+
+    return robloxInstanceNew(className, ...)
+end
 
 Font = {
     fromEnum = function(font)
@@ -340,6 +472,10 @@ _G.__RAYFIELD_TEST_REQUIRE_UTILITY = function(name)
 
     return result
 end
+
+_G.__RAYFIELD_TEST_HELPERS = {
+    requireUtility = _G.__RAYFIELD_TEST_REQUIRE_UTILITY,
+}
 
 local results = {
     testsRan = 0,
