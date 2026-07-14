@@ -3,9 +3,9 @@
         "gethui",
         "cloneref"
     ],
-    "luau-lsp.plugin.enabled": true,
     "cSpell.words": [
         "appendfile",
+        "Avant",
         "cloneref",
         "Compey",
         "Configurables",
@@ -23,5 +23,7 @@
         "rokit",
         "seaofvoices",
         "stylua"
-    ]
+    ],
+    "luau-lsp.inlayHints.functionReturnTypes": true,
+    "luau-lsp.studioPlugin.enabled": true
 }
