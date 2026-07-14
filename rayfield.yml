@@ -1,6 +1,7 @@
 base: roblox
 name: rayfield
 globals:
+# these are functions that are defined by sUNC, but not roblox, so we need to tell the lsp about them
   writefile:
     args:
     - required: false
@@ -50,6 +51,35 @@ globals:
     - required: false
       type: '...'
   getgenv:
+    args:
+    - required: false
+      type: '...'
+# these are functions that are defined when the testing framework is running, so we need to tell the lsp about them
+  describe:
+    args:
+    - required: false
+      type: '...'
+  it:
+    args:
+    - required: false
+      type: '...'
+  expect:
+    args:
+    - required: false
+      type: '...'
+  beforeEach:
+    args:
+    - required: false
+      type: '...'
+  afterEach:
+    args:
+    - required: false
+      type: '...'
+  beforeAll:
+    args:
+    - required: false
+      type: '...'
+  afterAll:
     args:
     - required: false
       type: '...'

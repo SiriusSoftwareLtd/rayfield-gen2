@@ -4,10 +4,13 @@ local roblox = require("@lune/roblox")
 
 local root = process.cwd:gsub("\\", "/"):gsub("/$", "")
 local testsRoot = root .. "/tests/specs"
+local sourceRoot = root .. "/src"
 local utilityRoot = root .. "/src/utility"
-local defaultCoverageDirectory = "src/utility"
+local defaultCoverageDirectory = "src"
 local coverageRoot = root .. "/coverage"
 local instrumentedRoot = root .. "/build/coverage/instrumented"
+local coverageBaselinePath = root .. "/coverage-baseline.json"
+local coverageEpsilon = 0.005
 
 local function normalizePath(path)
     path = path:gsub("\\", "/"):gsub("/+", "/")
@@ -121,11 +124,62 @@ local function resolveCoverageDirectory(path)
     return absolutePath, relativePath
 end
 
+local function readJsonStringField(contents, name)
+    return contents:match('"' .. name .. '"%s*:%s*"(.-)"')
+end
+
+local function readJsonNumberField(contents, name)
+    local value = contents:match('"' .. name .. '"%s*:%s*([%-%d%.]+)')
+    return if value then tonumber(value) else nil
+end
+
+local function readCoverageBaseline()
+    if not fs.isFile(coverageBaselinePath) then
+        warn("Coverage baseline is missing: coverage-baseline.json")
+        process.exit(1)
+    end
+
+    local contents = fs.readFile(coverageBaselinePath)
+    local baselineScope = readJsonStringField(contents, "scope")
+    local lineCoverage = readJsonNumberField(contents, "lineCoverage")
+
+    if not baselineScope or not lineCoverage then
+        warn("Coverage baseline is missing required fields: scope and lineCoverage")
+        process.exit(1)
+    end
+
+    return {
+        scope = baselineScope,
+        lineCoverage = lineCoverage,
+    }
+end
+
 local coverageThreshold = parseNumberArg("coverage-threshold", tonumber(process.env.RAYFIELD_COVERAGE_THRESHOLD) or 70)
 local updateCoverageBaseline = parseFlagArg("update-coverage-baseline")
 local verboseTestLogsEnv = string.lower(process.env.RAYFIELD_TEST_VERBOSE_LOGS or "")
 local verboseTestLogs = parseFlagArg("verbose-logs") or verboseTestLogsEnv == "true" or verboseTestLogsEnv == "1"
 local coverageDirectory, coverageScope = resolveCoverageDirectory(parseDirectoryArg(defaultCoverageDirectory))
+local coverageBaseline = nil
+
+if not updateCoverageBaseline then
+    coverageBaseline = readCoverageBaseline()
+
+    if coverageBaseline.scope ~= coverageScope then
+        warn(
+            string.format(
+                "Coverage baseline scope mismatch: baseline is %q, current scope is %q. Run `make coverage-baseline` after intentionally changing the coverage scope.",
+                coverageBaseline.scope,
+                coverageScope
+            )
+        )
+        process.exit(1)
+    end
+end
+
+local effectiveCoverageThreshold = coverageThreshold
+if coverageBaseline and coverageBaseline.lineCoverage > effectiveCoverageThreshold then
+    effectiveCoverageThreshold = coverageBaseline.lineCoverage
+end
 
 local coverage = {
     files = {},
@@ -148,40 +202,46 @@ local function splitLines(source)
     return lines
 end
 
-local function removeStringsAndComments(line)
-    local result = {}
-    local index = 1
-    local quote = nil
-
-    while index <= #line do
-        local char = line:sub(index, index)
-        local nextChar = line:sub(index + 1, index + 1)
-
-        if quote then
-            if char == "\\" then
-                index += 2
-            elseif char == quote then
-                quote = nil
-                index += 1
-            else
-                index += 1
-            end
-        elseif char == "-" and nextChar == "-" then
-            break
-        elseif char == '"' or char == "'" or char == "`" then
-            quote = char
-            index += 1
-        else
-            table.insert(result, char)
-            index += 1
-        end
+local function readLongBracketStart(line, index)
+    if line:sub(index, index) ~= "[" then
+        return nil
     end
 
-    return table.concat(result)
+    local cursor = index + 1
+    local equals = 0
+    while line:sub(cursor, cursor) == "=" do
+        equals += 1
+        cursor += 1
+    end
+
+    if line:sub(cursor, cursor) == "[" then
+        return equals, cursor + 1
+    end
+
+    return nil
 end
 
-local function delimiterDelta(line)
-    local code = removeStringsAndComments(line)
+local function readLongBracketEnd(line, index, equals)
+    if line:sub(index, index) ~= "]" then
+        return nil
+    end
+
+    local cursor = index + 1
+    for _ = 1, equals do
+        if line:sub(cursor, cursor) ~= "=" then
+            return nil
+        end
+        cursor += 1
+    end
+
+    if line:sub(cursor, cursor) == "]" then
+        return cursor + 1
+    end
+
+    return nil
+end
+
+local function delimiterDeltaFromCode(code)
     local delta = 0
     for index = 1, #code do
         local char = code:sub(index, index)
@@ -194,12 +254,87 @@ local function delimiterDelta(line)
     return delta
 end
 
+local function delimiterDelta(line, lexerState)
+    local code = {}
+    local index = 1
+    local quote = nil
+
+    while index <= #line do
+        local char = line:sub(index, index)
+        local nextChar = line:sub(index + 1, index + 1)
+
+        if lexerState.longBracket then
+            local afterEnd = readLongBracketEnd(line, index, lexerState.longBracket.equals)
+            if afterEnd then
+                lexerState.longBracket = nil
+                index = afterEnd
+            else
+                index += 1
+            end
+        elseif quote then
+            if char == "\\" then
+                index += 2
+            elseif char == quote then
+                quote = nil
+                index += 1
+            else
+                index += 1
+            end
+        elseif char == "-" and nextChar == "-" then
+            local equals, afterStart = readLongBracketStart(line, index + 2)
+            if equals ~= nil then
+                lexerState.longBracket = {
+                    kind = "comment",
+                    equals = equals,
+                }
+                index = afterStart
+            else
+                break
+            end
+        elseif char == '"' or char == "'" or char == "`" then
+            quote = char
+            index += 1
+        elseif char == "[" then
+            local equals, afterStart = readLongBracketStart(line, index)
+            if equals ~= nil then
+                lexerState.longBracket = {
+                    kind = "string",
+                    equals = equals,
+                }
+                index = afterStart
+            else
+                table.insert(code, char)
+                index += 1
+            end
+        else
+            table.insert(code, char)
+            index += 1
+        end
+    end
+
+    return delimiterDeltaFromCode(table.concat(code))
+end
+
 local function startsContinuation(text)
     return text:match("^or%s") or text:match("^and%s") or text:match("^%.%.") or text:match("^[,:%+%*/%%]")
 end
 
 local function endsContinuation(text)
     return text:match("=%s*$") or text:match("%.%.%s*$") or text:match("[,%+%-%*/%%]%s*$") or text:match("^return%s*$")
+end
+
+local function isContinuationOnly(text)
+    return text == "and"
+        or text == "or"
+        or text == ".."
+        or text == "."
+        or text == ","
+        or text == ":"
+        or text == "+"
+        or text == "-"
+        or text == "*"
+        or text == "/"
+        or text == "%"
 end
 
 local function isCoverableLine(line, depth, inBlockComment, previousContinuation)
@@ -220,10 +355,16 @@ local function isCoverableLine(line, depth, inBlockComment, previousContinuation
     if text:match("^end[%s,%)%}]") or text == "end" then
         return false
     end
-    if startsContinuation(text) then
+    if isContinuationOnly(text) or startsContinuation(text) then
         return false
     end
-    if text:match("^then%s") or text:match("^else") or text:match("^elseif") or text:match("^until") then
+    if
+        text == "then"
+        or text:match("^then%s")
+        or text:match("^else")
+        or text:match("^elseif")
+        or text:match("^until")
+    then
         return false
     end
     if text:match("^[%}%]%)]") then
@@ -252,15 +393,14 @@ local function instrumentSource(relativePath, source)
     coverage.files[relativePath] = fileCoverage
 
     local depth = 0
-    local inBlockComment = false
+    local lexerState = {}
     local previousContinuation = false
     local output = {}
 
     for lineNumber, line in splitLines(source) do
-        local startsBlockComment = line:find("%-%-%[%[", 1) ~= nil
-        local endsBlockComment = line:find("%]%]", 1) ~= nil
+        local startsInLongBracket = lexerState.longBracket ~= nil
         local text = line:match("^%s*(.-)%s*$")
-        local coverable = isCoverableLine(line, depth, inBlockComment, previousContinuation)
+        local coverable = isCoverableLine(line, depth, startsInLongBracket, previousContinuation)
 
         if coverable then
             fileCoverage.coverable[lineNumber] = true
@@ -269,20 +409,24 @@ local function instrumentSource(relativePath, source)
 
         table.insert(output, line)
 
-        if startsBlockComment and not endsBlockComment then
-            inBlockComment = true
-        elseif inBlockComment and endsBlockComment then
-            inBlockComment = false
+        depth += delimiterDelta(line, lexerState)
+        if depth < 0 then
+            depth = 0
         end
 
-        if not inBlockComment then
-            depth += delimiterDelta(line)
-            if depth < 0 then
-                depth = 0
-            end
-        end
+        previousContinuation = not lexerState.longBracket and depth == 0 and endsContinuation(text)
+    end
 
-        previousContinuation = not inBlockComment and depth == 0 and endsContinuation(text)
+    if lexerState.longBracket then
+        error(
+            string.format(
+                "Coverage instrumentation failed for %s: unsupported unterminated long %s with %d equal sign(s)",
+                relativePath,
+                lexerState.longBracket.kind,
+                lexerState.longBracket.equals
+            ),
+            0
+        )
     end
 
     return table.concat(output, "\n")
@@ -487,8 +631,24 @@ _G.__RAYFIELD_TEST_REQUIRE_UTILITY = function(name)
     return result
 end
 
+local function instrumentSourceForTest(relativePath, source)
+    local previousCoverage = coverage.files[relativePath]
+    local ok, instrumented = xpcall(function()
+        return instrumentSource(relativePath, source)
+    end, debug.traceback)
+    local fileCoverage = coverage.files[relativePath]
+    coverage.files[relativePath] = previousCoverage
+
+    if not ok then
+        error(instrumented, 2)
+    end
+
+    return instrumented, fileCoverage
+end
+
 _G.__RAYFIELD_TEST_HELPERS = {
     requireUtility = _G.__RAYFIELD_TEST_REQUIRE_UTILITY,
+    instrumentSource = instrumentSourceForTest,
 }
 _G.__RAYFIELD_TEST_VERBOSE_LOGS = verboseTestLogs
 
@@ -499,44 +659,12 @@ local results = {
     errors = {},
 }
 
-local suiteNames = {}
-local contexts = {
-    {
-        beforeEach = {},
-        afterEach = {},
-        afterAll = {},
-    },
-}
-
-local function fullName(testName)
-    local parts = table.clone(suiteNames)
-    table.insert(parts, testName)
-    return table.concat(parts, " > ")
-end
-
 local function recordFailure(testName, message)
     results.failureCount += 1
     table.insert(results.errors, {
         test = testName,
         message = tostring(message),
     })
-end
-
-local function runBeforeEach()
-    for _, context in contexts do
-        for _, hook in context.beforeEach do
-            hook()
-        end
-    end
-end
-
-local function runAfterEach()
-    for i = #contexts, 1, -1 do
-        local hooks = contexts[i].afterEach
-        for j = #hooks, 1, -1 do
-            hooks[j]()
-        end
-    end
 end
 
 local function fail(message, level)
@@ -591,58 +719,160 @@ function expect(actual)
     }
 end
 
+local currentSuite = nil
+
+local function createSuite(name, parent)
+    return {
+        name = name,
+        parent = parent,
+        beforeEach = {},
+        afterEach = {},
+        beforeAll = {},
+        afterAll = {},
+        tests = {},
+        children = {},
+        registrationErrors = {},
+    }
+end
+
+local function getCurrentSuite(apiName)
+    if not currentSuite then
+        error(apiName .. " can only be called while registering a spec", 3)
+    end
+
+    return currentSuite
+end
+
+local function suitePath(suite)
+    local parts = {}
+    local cursor = suite
+
+    while cursor do
+        if cursor.name then
+            table.insert(parts, 1, cursor.name)
+        end
+        cursor = cursor.parent
+    end
+
+    return table.concat(parts, " > ")
+end
+
+local function hookName(suite, hook)
+    local path = suitePath(suite)
+    return if path == "" then hook else path .. " > " .. hook
+end
+
+local function testName(suite, name)
+    local path = suitePath(suite)
+    return if path == "" then name else path .. " > " .. name
+end
+
+local function suiteAncestry(suite)
+    local ancestry = {}
+    local cursor = suite
+
+    while cursor do
+        table.insert(ancestry, 1, cursor)
+        cursor = cursor.parent
+    end
+
+    return ancestry
+end
+
 function beforeEach(callback)
-    table.insert(contexts[#contexts].beforeEach, callback)
+    table.insert(getCurrentSuite("beforeEach").beforeEach, callback)
 end
 
 function afterEach(callback)
-    table.insert(contexts[#contexts].afterEach, callback)
+    table.insert(getCurrentSuite("afterEach").afterEach, callback)
 end
 
 function beforeAll(callback)
-    callback()
+    table.insert(getCurrentSuite("beforeAll").beforeAll, callback)
 end
 
 function afterAll(callback)
-    table.insert(contexts[#contexts].afterAll, callback)
+    table.insert(getCurrentSuite("afterAll").afterAll, callback)
 end
 
 function describe(name, callback)
-    table.insert(suiteNames, name)
-    table.insert(contexts, {
-        beforeEach = {},
-        afterEach = {},
-        afterAll = {},
-    })
+    local parent = getCurrentSuite("describe")
+    local suite = createSuite(name, parent)
+    table.insert(parent.children, suite)
 
+    local previousSuite = currentSuite
+    currentSuite = suite
     local ok, err = xpcall(callback, debug.traceback)
-    local context = table.remove(contexts)
-
-    for _, hook in context.afterAll do
-        local hookOk, hookErr = xpcall(hook, debug.traceback)
-        if not hookOk then
-            ok = false
-            err = hookErr
-        end
-    end
+    currentSuite = previousSuite
 
     if not ok then
-        recordFailure(table.concat(suiteNames, " > "), err)
+        table.insert(suite.registrationErrors, err)
     end
-
-    table.remove(suiteNames)
 end
 
 function it(name, callback)
-    local nameWithSuites = fullName(name)
+    table.insert(getCurrentSuite("it").tests, {
+        name = name,
+        callback = callback,
+    })
+end
+
+local function runBeforeEach(suite)
+    for _, context in suiteAncestry(suite) do
+        for _, hook in context.beforeEach do
+            hook()
+        end
+    end
+end
+
+local function runAfterEach(suite)
+    local ancestry = suiteAncestry(suite)
+    for i = #ancestry, 1, -1 do
+        local hooks = ancestry[i].afterEach
+        for j = #hooks, 1, -1 do
+            hooks[j]()
+        end
+    end
+end
+
+local function runHookList(suite, hooks, label)
+    local ok = true
+
+    for _, hook in hooks do
+        local hookOk, hookErr = xpcall(hook, debug.traceback)
+        if not hookOk then
+            local name = hookName(suite, label)
+            ok = false
+            recordFailure(name, hookErr)
+            warn("[FAIL] " .. name)
+            warn(hookErr)
+        end
+    end
+
+    return ok
+end
+
+local function recordRegistrationErrors(suite)
+    for _, err in suite.registrationErrors do
+        local name = hookName(suite, "registration")
+        recordFailure(name, err)
+        warn("[FAIL] " .. name)
+        warn(err)
+    end
+end
+
+local function runTest(suite, test)
+    local nameWithSuites = testName(suite, test.name)
     results.testsRan += 1
 
     local ok, err = xpcall(function()
-        runBeforeEach()
-        callback()
+        runBeforeEach(suite)
+        test.callback()
     end, debug.traceback)
 
-    local afterOk, afterErr = xpcall(runAfterEach, debug.traceback)
+    local afterOk, afterErr = xpcall(function()
+        runAfterEach(suite)
+    end, debug.traceback)
     if not afterOk then
         ok = false
         err = afterErr
@@ -656,6 +886,23 @@ function it(name, callback)
         warn("[FAIL] " .. nameWithSuites)
         warn(err)
     end
+end
+
+local function runSuite(suite)
+    recordRegistrationErrors(suite)
+
+    local beforeAllOk = runHookList(suite, suite.beforeAll, "beforeAll")
+    if beforeAllOk then
+        for _, test in suite.tests do
+            runTest(suite, test)
+        end
+
+        for _, child in suite.children do
+            runSuite(child)
+        end
+    end
+
+    runHookList(suite, suite.afterAll, "afterAll")
 end
 
 local function collectSpecs(directory, specs)
@@ -681,7 +928,17 @@ end
 for _, specPath in specs do
     local spec = require(specPath)
     assert(type(spec) == "function", specPath .. " must return a function")
-    spec()
+
+    local rootSuite = createSuite(nil, nil)
+    currentSuite = rootSuite
+    local ok, err = xpcall(spec, debug.traceback)
+    currentSuite = nil
+
+    if not ok then
+        table.insert(rootSuite.registrationErrors, err)
+    end
+
+    runSuite(rootSuite)
 end
 
 local function jsonEscape(value)
@@ -731,13 +988,18 @@ local function writeCoverageReports()
     local totalPercent = if totalCoverable == 0 then 100 else (totalCovered / totalCoverable) * 100
     fs.writeDir(coverageRoot)
 
+    local baselineText = if coverageBaseline then string.format("%.2f%%", coverageBaseline.lineCoverage) else "n/a"
+    local updateModeText = if updateCoverageBaseline then " (baseline update mode)" else ""
     local textLines = {
         string.format(
-            "Line coverage: %.2f%% (%d/%d), threshold %.2f%%",
+            "Line coverage: %.2f%% (%d/%d), threshold %.2f%%, baseline %s, required %.2f%%%s",
             totalPercent,
             totalCovered,
             totalCoverable,
-            coverageThreshold
+            coverageThreshold,
+            baselineText,
+            effectiveCoverageThreshold,
+            updateModeText
         ),
         "Scope: " .. coverageScope,
         "",
@@ -748,11 +1010,17 @@ local function writeCoverageReports()
         "{",
         string.format('  "scope": "%s",', jsonEscape(coverageScope)),
         string.format('  "threshold": %.2f,', coverageThreshold),
-        string.format('  "lineCoverage": %.2f,', totalPercent),
-        string.format('  "coveredLines": %d,', totalCovered),
-        string.format('  "coverableLines": %d,', totalCoverable),
-        '  "files": [',
     }
+
+    if coverageBaseline then
+        table.insert(jsonLines, string.format('  "baselineLineCoverage": %.2f,', coverageBaseline.lineCoverage))
+    end
+
+    table.insert(jsonLines, string.format('  "effectiveThreshold": %.2f,', effectiveCoverageThreshold))
+    table.insert(jsonLines, string.format('  "lineCoverage": %.2f,', totalPercent))
+    table.insert(jsonLines, string.format('  "coveredLines": %d,', totalCovered))
+    table.insert(jsonLines, string.format('  "coverableLines": %d,', totalCoverable))
+    table.insert(jsonLines, '  "files": [')
 
     for index, row in rows do
         table.insert(
@@ -785,11 +1053,12 @@ local function writeCoverageReports()
 
     print(
         string.format(
-            "coverage: %.2f%% lines (%d/%d), threshold %.2f%%",
+            "coverage: %.2f%% lines (%d/%d), required %.2f%%%s",
             totalPercent,
             totalCovered,
             totalCoverable,
-            coverageThreshold
+            effectiveCoverageThreshold,
+            updateModeText
         )
     )
     print("coverage reports: coverage/coverage.txt, coverage/coverage-summary.json")
@@ -813,14 +1082,15 @@ end
 local function writeCoverageBaseline(summary)
     local baselineNotes = {
         "Generated reports are written to coverage/coverage.txt and coverage/coverage-summary.json.",
-        "The enforced Lune coverage scope is discovered dynamically from src/utility by default.",
+        "The enforced Lune coverage scope is discovered dynamically from src by default.",
+        "Coverage line discovery is heuristic; multi-line table literal continuation lines can still be over-counted.",
         "Run `make coverage-baseline` after intentional coverage changes to refresh this file.",
     }
 
     local baselineAuditGaps = {
-        "src/components/*.luau: UI behavior is still primarily Roblox-hosted and should gain Studio/interaction tests as that harness matures.",
-        "src/themes/*.luau: theme data is not part of the current Lune coverage gate.",
-        "src/utility/odometer.luau: animated UI behavior remains outside the deterministic Lune unit coverage.",
+        "src/components/*.luau: UI behavior is included in the all-src gate, but still primarily needs Roblox Studio/interaction tests as that harness matures.",
+        "src/init.luau: public UI construction and executor compatibility still need integration coverage beyond deterministic Lune specs.",
+        "src/utility/odometer.luau: animated UI behavior remains mostly outside deterministic Lune unit coverage.",
         "executor-specific globals and public UI APIs still require manual compatibility validation when touched.",
     }
 
@@ -866,19 +1136,25 @@ if results.failureCount > 0 then
     process.exit(1)
 end
 
-if coverageSummary.lineCoverage + 0.0001 < coverageThreshold then
+if updateCoverageBaseline then
+    writeCoverageBaseline(coverageSummary)
+    process.exit(0)
+end
+
+if coverageSummary.lineCoverage + coverageEpsilon < effectiveCoverageThreshold then
+    local baselineText = if coverageBaseline
+        then string.format(", baseline %.2f%%", coverageBaseline.lineCoverage)
+        else ""
     warn(
         string.format(
-            "Coverage %.2f%% is below the required %.2f%% threshold.",
+            "Coverage %.2f%% is below the required %.2f%% threshold (configured %.2f%%%s).",
             coverageSummary.lineCoverage,
-            coverageThreshold
+            effectiveCoverageThreshold,
+            coverageThreshold,
+            baselineText
         )
     )
     process.exit(1)
-end
-
-if updateCoverageBaseline then
-    writeCoverageBaseline(coverageSummary)
 end
 
 process.exit(0)

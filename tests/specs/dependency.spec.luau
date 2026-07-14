@@ -1,3 +1,5 @@
+--!nolint BuiltinGlobalWrite
+
 local helpers = (_G :: any).__RAYFIELD_TEST_HELPERS
 local requireUtility = helpers.requireUtility
 

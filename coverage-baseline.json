@@ -1,17 +1,192 @@
 {
-  "scope": "src/utility",
+  "scope": "src",
   "measuredDate": "2026-07-14",
   "command": "make coverage-baseline",
   "threshold": 70.00,
-  "lineCoverage": 79.26,
+  "lineCoverage": 20.72,
   "coveredLines": 875,
-  "coverableLines": 1104,
+  "coverableLines": 4222,
   "notes": [
     "Generated reports are written to coverage/coverage.txt and coverage/coverage-summary.json.",
-    "The enforced Lune coverage scope is discovered dynamically from src/utility by default.",
+    "The enforced Lune coverage scope is discovered dynamically from src by default.",
+    "Coverage line discovery is heuristic; multi-line table literal continuation lines can still be over-counted.",
     "Run `make coverage-baseline` after intentional coverage changes to refresh this file."
   ],
   "files": [
+    {
+      "path": "src/components/action.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 24
+    },
+    {
+      "path": "src/components/button.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 56
+    },
+    {
+      "path": "src/components/chrome.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 33
+    },
+    {
+      "path": "src/components/colorpicker.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 362
+    },
+    {
+      "path": "src/components/descriptor.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 13
+    },
+    {
+      "path": "src/components/drag.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 47
+    },
+    {
+      "path": "src/components/dropdown.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 293
+    },
+    {
+      "path": "src/components/group.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 86
+    },
+    {
+      "path": "src/components/input.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 78
+    },
+    {
+      "path": "src/components/keybind.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 156
+    },
+    {
+      "path": "src/components/notification.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 101
+    },
+    {
+      "path": "src/components/popup.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 202
+    },
+    {
+      "path": "src/components/search.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 127
+    },
+    {
+      "path": "src/components/section.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 24
+    },
+    {
+      "path": "src/components/slider.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 188
+    },
+    {
+      "path": "src/components/stat.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 206
+    },
+    {
+      "path": "src/components/tab.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 155
+    },
+    {
+      "path": "src/components/tag.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 63
+    },
+    {
+      "path": "src/components/toast.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 128
+    },
+    {
+      "path": "src/components/toggle.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 124
+    },
+    {
+      "path": "src/components/window.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 602
+    },
+    {
+      "path": "src/init.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 41
+    },
+    {
+      "path": "src/themes/amethyst.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 1
+    },
+    {
+      "path": "src/themes/cobalt.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 1
+    },
+    {
+      "path": "src/themes/default.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 2
+    },
+    {
+      "path": "src/themes/ember.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 1
+    },
+    {
+      "path": "src/themes/frost.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 2
+    },
+    {
+      "path": "src/themes/rose.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 1
+    },
+    {
+      "path": "src/types.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 1
+    },
     {
       "path": "src/utility/HapticEngine.luau",
       "lineCoverage": 91.43,
@@ -170,9 +345,9 @@
     }
   ],
   "auditGaps": [
-    "src/components/*.luau: UI behavior is still primarily Roblox-hosted and should gain Studio/interaction tests as that harness matures.",
-    "src/themes/*.luau: theme data is not part of the current Lune coverage gate.",
-    "src/utility/odometer.luau: animated UI behavior remains outside the deterministic Lune unit coverage.",
+    "src/components/*.luau: UI behavior is included in the all-src gate, but still primarily needs Roblox Studio/interaction tests as that harness matures.",
+    "src/init.luau: public UI construction and executor compatibility still need integration coverage beyond deterministic Lune specs.",
+    "src/utility/odometer.luau: animated UI behavior remains mostly outside deterministic Lune unit coverage.",
     "executor-specific globals and public UI APIs still require manual compatibility validation when touched."
   ]
 }

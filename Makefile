@@ -16,6 +16,7 @@ MKDIR ?= mkdir -p
 
 SRC_DIR ?= src
 TESTS_DIR ?= tests
+TEST_SPECS_DIR ?= tests/specs
 SCRIPTS_DIR ?= scripts
 PROJECT_FILE ?= default.project.json
 TEST_PROJECT_FILE ?= test.project.json
@@ -98,12 +99,12 @@ format-check:
 
 lint:
 	$(SELENE) generate-roblox-std
-	$(SELENE) $(SRC_DIR)
+	$(SELENE) $(SRC_DIR) $(TESTS_DIR)
 
 typecheck:
 	$(ROJO) sourcemap $(PROJECT_FILE) -o $(SOURCEMAP)
 	$(CURL) -fsSL -o $(GLOBAL_TYPES) $(GLOBAL_TYPES_URL)
-	$(LUAU_LSP) analyze --sourcemap=$(SOURCEMAP) --defs=$(GLOBAL_TYPES) --no-strict-dm-types $(SRC_DIR)
+	$(LUAU_LSP) analyze --sourcemap=$(SOURCEMAP) --defs=$(GLOBAL_TYPES) --no-strict-dm-types $(SRC_DIR) $(TEST_SPECS_DIR)
 
 build:
 	$(ROJO) build $(PROJECT_FILE) -o "$(PLACE_FILE)"
