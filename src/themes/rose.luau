@@ -1,3 +1,8 @@
+-- Copyright (c) 2026 Corridon Capital
+-- This Source Code Form is subject to the terms of the Mozilla Public
+-- License, v. 2.0. If a copy of the MPL was not distributed with this
+-- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 -- Dark theme with a rose accent. Partial: overrides the warm-plum tones + pink accent, inherits
 -- corners, fonts and toggle/field behaviour from default.
 return {

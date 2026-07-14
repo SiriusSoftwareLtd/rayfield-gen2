@@ -1,3 +1,8 @@
+-- Copyright (c) 2026 Corridon Capital
+-- This Source Code Form is subject to the terms of the Mozilla Public
+-- License, v. 2.0. If a copy of the MPL was not distributed with this
+-- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 -- Odometer readout: a number as a row of per-digit reels. Each digit is a clipped
 -- cell holding a strip of glyphs; changing it tweens the strip so the new digit
 -- rolls up from the bottom and the old one leaves the top. Non-digit characters

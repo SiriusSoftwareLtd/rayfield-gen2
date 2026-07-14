@@ -7,3 +7,9 @@ Get Started
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, required checks, and pull-request guidance.
+
+## License
+
+Mozilla Public License 2.0. See [LICENSE](LICENSE).
+
+Copyright (c) 2026 Corridon Capital. The Rayfield name and Sirius branding are not covered by the license.

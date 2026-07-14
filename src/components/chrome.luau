@@ -1,3 +1,8 @@
+-- Copyright (c) 2026 Corridon Capital
+-- This Source Code Form is subject to the terms of the Mozilla Public
+-- License, v. 2.0. If a copy of the MPL was not distributed with this
+-- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 -- Window furniture: the collapsed "Show" face main wears while hidden (window.collapsed*
 -- fields), plus the first-open new-user check. The welcome greeting itself is just a toast now.
 

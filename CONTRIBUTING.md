@@ -167,6 +167,8 @@ Every behavior change must include tests where practical and documentation when 
 
 ## Licensing and attribution
 
+Rayfield Gen2 is licensed under the Mozilla Public License 2.0. By contributing, you agree your contributions are licensed under the same terms.
+
 The repository does not currently define a Contributor License Agreement or Developer Certificate of Origin sign-off requirement. No additional contributor sign-off is required at this time.
 
 Only submit work that you have the right to contribute. Do not copy code, assets, fonts, or other material with incompatible terms. Identify third-party material and its license or required attribution in the pull request, and preserve existing copyright and attribution notices. Maintainers may request licensing clarification before accepting a contribution.

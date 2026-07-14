@@ -1,5 +1,10 @@
 --!nocheck
 
+-- Copyright (c) 2026 Corridon Capital
+-- This Source Code Form is subject to the terms of the Mozilla Public
+-- License, v. 2.0. If a copy of the MPL was not distributed with this
+-- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 -- Rayfield's localization core. Two kinds of copy pass through here: the library's own chrome
 -- (search placeholder, "Signed in as", the settings page, and so on) and whatever names a dev
 -- gives its elements. Both resolve the same way - the dev translator first, then the built-in
