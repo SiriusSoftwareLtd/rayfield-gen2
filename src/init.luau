@@ -26,6 +26,7 @@ export type Keybind = types.Keybind
 export type Stat = types.Stat
 export type Section = types.Section
 export type Popup = types.Popup
+export type Rayfield = types.Rayfield
 
 local function createBanner()
     local ui = Instance.new("ScreenGui")
@@ -109,4 +110,4 @@ function rayfield:CreateWindow(properties: types.WindowProps): types.Window
     return window :: any
 end
 
-return (rayfield :: any) :: types.Rayfield
+return (rayfield :: any) :: Rayfield
