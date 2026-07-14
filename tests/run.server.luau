@@ -12,6 +12,15 @@ _G.__RAYFIELD_TEST_HELPERS = {
     requireUtility = function(name)
         return require(ReplicatedStorage.Rayfield.utility[name])
     end,
+    requireComponent = function(name)
+        return require(ReplicatedStorage.Rayfield.components[name])
+    end,
+    requireTheme = function(name)
+        return require(ReplicatedStorage.Rayfield.themes[name])
+    end,
+    requireRayfield = function()
+        return require(ReplicatedStorage.Rayfield)
+    end,
 }
 _G.__RAYFIELD_TEST_VERBOSE_LOGS = _G.__RAYFIELD_TEST_VERBOSE_LOGS == true
 

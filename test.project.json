@@ -8,7 +8,7 @@
         "$path": "src"
       },
       "Tests": {
-        "$path": "tests/specs"
+        "$path": "tests"
       },
       "TestEZ": {
         "$path": "build/TestEZ.rbxm"

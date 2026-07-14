@@ -3,7 +3,7 @@ local process = require("@lune/process")
 local roblox = require("@lune/roblox")
 
 local root = process.cwd:gsub("\\", "/"):gsub("/$", "")
-local testsRoot = root .. "/tests/specs"
+local testsRoot = root .. "/tests"
 local sourceRoot = root .. "/src"
 local utilityRoot = root .. "/src/utility"
 local defaultCoverageDirectory = "src"
@@ -320,7 +320,13 @@ local function startsContinuation(text)
 end
 
 local function endsContinuation(text)
-    return text:match("=%s*$") or text:match("%.%.%s*$") or text:match("[,%+%-%*/%%]%s*$") or text:match("^return%s*$")
+    return text:match("=%s*$")
+        or text:match("%.%.%s*$")
+        or text:match("[,%+%-%*/%%]%s*$")
+        or text:match("[<>=~]=%s*$")
+        or text:match("^return%s*$")
+        or text == "elseif"
+        or text:match("=%s*if%s")
 end
 
 local function isContinuationOnly(text)
@@ -395,7 +401,7 @@ local function instrumentSource(relativePath, source)
     local depth = 0
     local lexerState = {}
     local previousContinuation = false
-    local output = {}
+    local output = { "local script = _G.__RAYFIELD_CURRENT_SCRIPT" }
 
     for lineNumber, line in splitLines(source) do
         local startsInLongBracket = lexerState.longBracket ~= nil
@@ -483,54 +489,134 @@ table.sort(sourceModules, function(a, b)
     return a.relativePath < b.relativePath
 end)
 
-local utilityModules = {}
+local sourceModulePaths = {}
 for _, moduleInfo in sourceModules do
     local source = fs.readFile(moduleInfo.path)
     local instrumented = instrumentSource(moduleInfo.relativePath, source)
     local outputPath = instrumentedRoot .. "/" .. moduleInfo.relativePath
     fs.writeDir(parentDir(outputPath))
     fs.writeFile(outputPath, instrumented)
+    sourceModulePaths[moduleInfo.relativePath] = outputPath
+end
 
-    local name = moduleInfo.relativePath:match("^src/utility/(.-)%.luau$")
-    if name then
-        utilityModules[name] = outputPath
+local function makeSourceNode(name, parent, path)
+    local node = {
+        Name = name,
+        Parent = parent,
+        __path = path,
+        __children = {},
+    }
+
+    function node:FindFirstChild(childName)
+        return self[childName]
     end
+
+    function node:WaitForChild(childName)
+        return self[childName]
+    end
+
+    function node:GetChildren()
+        return table.clone(self.__children)
+    end
+
+    function node:IsA(className)
+        return (self.__path and className == "ModuleScript") or (not self.__path and className == "Folder")
+    end
+
+    return node
+end
+
+local sourceRootNode = makeSourceNode("Rayfield", nil, sourceModulePaths["src/init.luau"])
+local sourceNodesByPath = {}
+sourceNodesByPath[sourceRootNode.__path] = sourceRootNode
+
+local function splitPathParts(path)
+    local parts = {}
+    for part in path:gmatch("[^/]+") do
+        table.insert(parts, part)
+    end
+    return parts
+end
+
+local function addChild(parent, child)
+    parent[child.Name] = child
+    table.insert(parent.__children, child)
+end
+
+local function ensureSourceFolder(parent, name)
+    local child = parent[name]
+    if child then
+        return child
+    end
+
+    child = makeSourceNode(name, parent, nil)
+    addChild(parent, child)
+    return child
+end
+
+for _, moduleInfo in sourceModules do
+    if moduleInfo.relativePath ~= "src/init.luau" then
+        local withoutRoot = moduleInfo.relativePath:gsub("^src/", ""):gsub("%.luau$", "")
+        local parts = splitPathParts(withoutRoot)
+        local parent = sourceRootNode
+
+        for index = 1, #parts - 1 do
+            parent = ensureSourceFolder(parent, parts[index])
+        end
+
+        local node = makeSourceNode(parts[#parts], parent, sourceModulePaths[moduleInfo.relativePath])
+        addChild(parent, node)
+        sourceNodesByPath[node.__path] = node
+    end
+end
+
+local nativeRequire = require
+local sourceRequireCache = {}
+
+function require(module)
+    local path = nil
+    local moduleScript = nil
+
+    if type(module) == "table" and module.__path then
+        path = module.__path
+        moduleScript = module
+    elseif type(module) == "string" then
+        path = module
+        moduleScript = sourceNodesByPath[path]
+    end
+
+    if not moduleScript then
+        return nativeRequire(module)
+    end
+
+    if sourceRequireCache[path] ~= nil then
+        return sourceRequireCache[path]
+    end
+
+    local previousScript = script
+    local previousCurrentScript = _G.__RAYFIELD_CURRENT_SCRIPT
+    script = moduleScript
+    _G.__RAYFIELD_CURRENT_SCRIPT = moduleScript
+    local ok, result = xpcall(function()
+        return nativeRequire(path)
+    end, function(err)
+        return tostring(err) .. "\n" .. debug.traceback(nil, 2)
+    end)
+    script = previousScript
+    _G.__RAYFIELD_CURRENT_SCRIPT = previousCurrentScript
+
+    if not ok then
+        error(result, 2)
+    end
+
+    sourceRequireCache[path] = result
+    return result
 end
 
 Color3 = roblox.Color3
 ColorSequence = roblox.ColorSequence
 ColorSequenceKeypoint = roblox.ColorSequenceKeypoint
 Enum = roblox.Enum
-Instance = table.clone(roblox.Instance)
-
-local robloxInstanceNew = roblox.Instance.new
-Instance.new = function(className, ...)
-    if className == "GetTextBoundsParams" then
-        return {}
-    end
-
-    if className == "HapticEffect" then
-        local effect = {
-            ClassName = className,
-            Parent = nil,
-            Type = nil,
-            Played = false,
-        }
-        function effect:Destroy()
-            self.Parent = nil
-        end
-        function effect:Play()
-            self.Played = true
-        end
-        function effect:IsA(name)
-            return name == className
-        end
-        return effect
-    end
-
-    return robloxInstanceNew(className, ...)
-end
-
 Font = {
     fromEnum = function(font)
         return {
@@ -547,6 +633,12 @@ Font = {
         }
     end,
 }
+NumberSequence = roblox.NumberSequence
+NumberSequenceKeypoint = roblox.NumberSequenceKeypoint
+UDim = roblox.UDim
+UDim2 = roblox.UDim2
+Vector2 = roblox.Vector2
+Vector3 = roblox.Vector3
 
 TweenInfo = {
     new = function(...)
@@ -554,18 +646,296 @@ TweenInfo = {
     end,
 }
 
-task = task
-    or {
-        wait = function() end,
-        spawn = function(callback)
-            local thread = coroutine.create(callback)
-            local ok, err = coroutine.resume(thread)
-            if not ok then
-                error(err, 0)
-            end
-            return thread
-        end,
+local function makeSignal()
+    local signal = {
+        _connections = {},
+        _lastArgs = nil,
     }
+
+    function signal:Connect(callback)
+        local connection = {
+            Connected = true,
+            _callback = callback,
+        }
+
+        function connection:Disconnect()
+            self.Connected = false
+        end
+
+        table.insert(self._connections, connection)
+        return connection
+    end
+
+    function signal:Fire(...)
+        self._lastArgs = table.pack(...)
+        local connections = table.clone(self._connections)
+        for _, connection in connections do
+            if connection.Connected then
+                connection._callback(...)
+            end
+        end
+    end
+
+    function signal:Wait()
+        if self._lastArgs then
+            return table.unpack(self._lastArgs, 1, self._lastArgs.n)
+        end
+        return nil
+    end
+
+    return signal
+end
+
+task = {
+    wait = function()
+        return 1
+    end,
+    delay = function(_, callback, ...)
+        local args = table.pack(...)
+        local thread = coroutine.create(function()
+            callback(table.unpack(args, 1, args.n))
+        end)
+        local ok, err = coroutine.resume(thread)
+        if not ok then
+            error(err, 0)
+        end
+        return thread
+    end,
+    spawn = function(callback, ...)
+        local args = table.pack(...)
+        local thread = coroutine.create(function()
+            callback(table.unpack(args, 1, args.n))
+        end)
+        local ok, err = coroutine.resume(thread)
+        if not ok then
+            error(err, 0)
+        end
+        return thread
+    end,
+}
+task.defer = task.spawn
+
+local instanceMethods = {}
+local removeFromParent
+
+function instanceMethods:GetChildren()
+    return table.clone(self._children)
+end
+
+function instanceMethods:GetDescendants()
+    local descendants = {}
+
+    local function visit(parent)
+        for _, child in parent._children do
+            table.insert(descendants, child)
+            visit(child)
+        end
+    end
+
+    visit(self)
+    return descendants
+end
+
+function instanceMethods:FindFirstChild(name)
+    for _, child in self._children do
+        if child.Name == name then
+            return child
+        end
+    end
+    return nil
+end
+
+function instanceMethods:WaitForChild(name)
+    return self:FindFirstChild(name)
+end
+
+function instanceMethods:IsA(className)
+    return self.ClassName == className
+end
+
+function instanceMethods:GetPropertyChangedSignal(property)
+    local signal = self._propertySignals[property]
+    if not signal then
+        signal = makeSignal()
+        self._propertySignals[property] = signal
+    end
+    return signal
+end
+
+function instanceMethods:Destroy()
+    local children = table.clone(self._children)
+    for _, child in children do
+        child:Destroy()
+    end
+    self.Destroying:Fire()
+    removeFromParent(self, self.Parent)
+    rawset(self, "Parent", nil)
+    self._destroyed = true
+end
+
+function instanceMethods:CaptureFocus()
+    self._focused = true
+    self.Focused:Fire()
+end
+
+function instanceMethods:ReleaseFocus()
+    local wasFocused = self._focused
+    self._focused = false
+    if wasFocused then
+        self.FocusLost:Fire(false)
+    end
+end
+
+function instanceMethods:IsFocused()
+    return self._focused == true
+end
+
+function instanceMethods:JumpTo(page)
+    self.CurrentPage = page
+end
+
+local signalProperties = {
+    Changed = true,
+    Destroying = true,
+    Focused = true,
+    FocusLost = true,
+    InputBegan = true,
+    InputChanged = true,
+    InputEnded = true,
+    MouseButton1Click = true,
+    MouseButton2Click = true,
+    MouseEnter = true,
+    MouseLeave = true,
+}
+
+local instanceMetatable = {}
+
+function instanceMetatable.__index(self, key)
+    local method = instanceMethods[key]
+    if method then
+        return method
+    end
+
+    for _, child in rawget(self, "_children") do
+        if child.Name == key then
+            return child
+        end
+    end
+
+    if signalProperties[key] then
+        local signal = makeSignal()
+        rawset(self, key, signal)
+        return signal
+    end
+
+    return nil
+end
+
+function removeFromParent(instance, parent)
+    if not parent or not parent._children then
+        return
+    end
+
+    local index = table.find(parent._children, instance)
+    if index then
+        table.remove(parent._children, index)
+    end
+end
+
+function instanceMetatable.__newindex(self, key, value)
+    if key == "Parent" then
+        local oldParent = rawget(self, "Parent")
+        if oldParent == value then
+            rawset(self, key, value)
+            return
+        end
+
+        removeFromParent(self, oldParent)
+        rawset(self, key, value)
+
+        if value and value._children and not table.find(value._children, self) then
+            table.insert(value._children, self)
+        end
+    else
+        rawset(self, key, value)
+    end
+
+    local propertySignals = rawget(self, "_propertySignals")
+    local signal = propertySignals and propertySignals[key]
+    if signal then
+        signal:Fire()
+    end
+
+    local changed = rawget(self, "Changed")
+    if changed then
+        changed:Fire(key)
+    end
+end
+
+local function makeInstance(className)
+    if className == "GetTextBoundsParams" then
+        return {}
+    end
+
+    local instance = {
+        ClassName = className,
+        Name = className,
+        Parent = nil,
+        _children = {},
+        _propertySignals = {},
+        _focused = false,
+        AbsolutePosition = Vector2.new(0, 0),
+        AbsoluteSize = Vector2.new(420, 120),
+        AbsoluteWindowSize = Vector2.new(420, 120),
+        AnchorPoint = Vector2.new(0, 0),
+        Position = UDim2.new(),
+        Size = UDim2.new(),
+        Visible = true,
+        ZIndex = 1,
+        Destroying = makeSignal(),
+    }
+
+    if className == "ScreenGui" then
+        instance.AbsoluteSize = Vector2.new(1024, 768)
+    elseif className == "TextBox" or className == "TextButton" or className == "ImageButton" then
+        instance.Active = true
+    elseif className == "HapticEffect" then
+        instance.Played = false
+
+        function instance:Play()
+            self.Played = true
+        end
+    end
+
+    return setmetatable(instance, instanceMetatable)
+end
+
+Instance = {
+    new = makeInstance,
+}
+
+local function makeTween(instance, targetProperties)
+    local tween = {
+        Completed = makeSignal(),
+        _instance = instance,
+        _targetProperties = targetProperties,
+        _cancelled = false,
+    }
+
+    function tween:Play()
+        for property, value in self._targetProperties do
+            self._instance[property] = value
+        end
+        self.Completed:Fire(Enum.PlaybackState.Completed)
+    end
+
+    function tween:Cancel()
+        self._cancelled = true
+        self.Completed:Fire(Enum.PlaybackState.Cancelled)
+    end
+
+    return tween
+end
 
 local function makeFolder(name)
     local folder = Instance.new("Folder")
@@ -573,26 +943,70 @@ local function makeFolder(name)
     return folder
 end
 
+local function propertySignalForService(service, property)
+    service._propertySignals = service._propertySignals or {}
+    local signal = service._propertySignals[property]
+    if not signal then
+        signal = makeSignal()
+        service._propertySignals[property] = signal
+    end
+    return signal
+end
+
 local services = {
     CoreGui = makeFolder("CoreGui"),
     Workspace = makeFolder("Workspace"),
-    UserInputService = {},
-    GuiService = {},
-    TweenService = {},
-    TextService = {},
+    UserInputService = {
+        InputBegan = makeSignal(),
+        InputEnded = makeSignal(),
+        InputChanged = makeSignal(),
+        MouseBehavior = Enum.MouseBehavior.Default,
+        MouseIconEnabled = true,
+        GetMouseLocation = function()
+            return Vector2.new(120, 80)
+        end,
+        IsMouseButtonPressed = function()
+            return false
+        end,
+        GetPropertyChangedSignal = propertySignalForService,
+    },
+    GuiService = {
+        GetGuiInset = function()
+            return Vector2.new(0, 0)
+        end,
+    },
+    TweenService = {
+        Create = function(_, instance, _info, targetProperties)
+            return makeTween(instance, targetProperties)
+        end,
+    },
+    TextService = {
+        GetTextBoundsAsync = function(_, params)
+            local size = params.Size or 16
+            return Vector2.new(math.ceil(#tostring(params.Text or "") * size * 0.6), size)
+        end,
+    },
     LocalizationService = {},
     ReplicatedStorage = makeFolder("ReplicatedStorage"),
     RunService = {
+        RenderStepped = makeSignal(),
+        Heartbeat = makeSignal(),
         IsStudio = function()
             return true
         end,
     },
     Players = {
         LocalPlayer = {
+            DisplayName = "Spec User",
+            Name = "SpecUser",
+            UserId = 12345,
             PlayerGui = makeFolder("PlayerGui"),
         },
     },
     HttpService = {
+        GenerateGUID = function()
+            return "00000000-0000-4000-8000-000000000000"
+        end,
         JSONDecode = function()
             error("HttpService:JSONDecode is not available in the unit test shim")
         end,
@@ -613,22 +1027,25 @@ game = {
 workspace = services.Workspace
 
 _G.__RAYFIELD_TEST_REQUIRE_UTILITY = function(name)
-    local modulePath = utilityModules[name]
-    assert(modulePath, string.format("Unknown utility module: %s", tostring(name)))
+    local moduleScript = sourceRootNode.utility[name]
+    assert(moduleScript, string.format("Unknown utility module: %s", tostring(name)))
+    return require(moduleScript)
+end
 
-    local previousScript = script
-    script = {
-        Parent = utilityModules,
-    }
+local function requireComponent(name)
+    local moduleScript = sourceRootNode.components[name]
+    assert(moduleScript, string.format("Unknown component module: %s", tostring(name)))
+    return require(moduleScript)
+end
 
-    local ok, result = pcall(require, modulePath)
-    script = previousScript
+local function requireTheme(name)
+    local moduleScript = sourceRootNode.themes[name]
+    assert(moduleScript, string.format("Unknown theme module: %s", tostring(name)))
+    return require(moduleScript)
+end
 
-    if not ok then
-        error(result, 2)
-    end
-
-    return result
+local function requireRayfield()
+    return require(sourceRootNode)
 end
 
 local function instrumentSourceForTest(relativePath, source)
@@ -648,6 +1065,11 @@ end
 
 _G.__RAYFIELD_TEST_HELPERS = {
     requireUtility = _G.__RAYFIELD_TEST_REQUIRE_UTILITY,
+    requireComponent = requireComponent,
+    requireTheme = requireTheme,
+    requireRayfield = requireRayfield,
+    services = services,
+    makeSignal = makeSignal,
     instrumentSource = instrumentSourceForTest,
 }
 _G.__RAYFIELD_TEST_VERBOSE_LOGS = verboseTestLogs
@@ -1088,9 +1510,9 @@ local function writeCoverageBaseline(summary)
     }
 
     local baselineAuditGaps = {
-        "src/components/*.luau: UI behavior is included in the all-src gate, but still primarily needs Roblox Studio/interaction tests as that harness matures.",
-        "src/init.luau: public UI construction and executor compatibility still need integration coverage beyond deterministic Lune specs.",
-        "src/utility/odometer.luau: animated UI behavior remains mostly outside deterministic Lune unit coverage.",
+        "Deterministic Lune component coverage exercises construction and public APIs, but real Roblox rendering/input timing still requires Studio or manual validation when UI behavior changes.",
+        "src/init.luau: executor-specific compatibility and asset/font download behavior are stubbed in deterministic specs and still require integration validation when touched.",
+        "src/utility/odometer.luau: tween completion is simulated by the test shim; visual animation smoothness still requires Roblox runtime validation.",
         "executor-specific globals and public UI APIs still require manual compatibility validation when touched.",
     }
 

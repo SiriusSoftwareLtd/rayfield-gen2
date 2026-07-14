@@ -16,7 +16,7 @@ MKDIR ?= mkdir -p
 
 SRC_DIR ?= src
 TESTS_DIR ?= tests
-TEST_SPECS_DIR ?= tests/specs
+TEST_SPECS_DIR ?= tests/components tests/integration tests/runner tests/utility
 SCRIPTS_DIR ?= scripts
 PROJECT_FILE ?= default.project.json
 TEST_PROJECT_FILE ?= test.project.json
