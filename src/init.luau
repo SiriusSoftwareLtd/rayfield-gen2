@@ -1,6 +1,7 @@
 local rayfield = {}
 local variables = require(script.utility.variables)
 local image = require(script.utility.image)
+local locale = require(script.utility.locale)
 local constants = require(script.utility.constants)
 local types = require(script.types)
 
@@ -50,23 +51,40 @@ end
 function rayfield:CreateWindow(properties: types.WindowProps): types.Window
     local banner = createBanner()
 
+    local window -- forward declared so the settle callback below can reach it
+
     if variables.secureMode then
         -- cache icons locally so secureMode doesnt leak asset ids. non-blocking: whats already on
-        -- disk applies now, the rest download in the background and pop in once ready
-        image.preload()
+        -- disk applies now, the rest download in the background and rebind once ready. if any never
+        -- cache, tell the dev once - on screen only, secure mode stays off the console
+        image.preload(function(failed)
+            if failed > 0 and window and not window.unloaded then
+                window:Notify({
+                    title = locale.resolve("Secure mode"),
+                    content = if failed == 1
+                        then locale.resolve("An asset couldn't be cached and won't appear.")
+                        else locale.resolve("Some assets couldn't be cached and won't appear."),
+                })
+            end
+        end)
     end
 
-    local window = require(script.components.window).new(properties)
+    window = require(script.components.window).new(properties)
 
     if variables.secureMode then
-        -- secure mode renders BuilderSans up front (variables.brandFont), then downloads the real
+        -- secure mode renders the fallback up front (variables.brandFont), then downloads the real
         -- brand faces off the main thread and swaps them in once ready, so startup never blocks
         task.spawn(function()
             local body = variables.fontManager:loadFont(constants.fontAsset, Enum.FontWeight.Medium)
             local title = variables.fontManager:loadFont(constants.fontAsset, Enum.FontWeight.SemiBold)
-            local fallback = variables.fontManager.defaultOptions.fallbackFont
             -- the download can outlast the window; dont swap into one thats been unloaded
-            if not window.unloaded and body and title and body ~= fallback and title ~= fallback then
+            if
+                not window.unloaded
+                and body
+                and title
+                and body ~= variables.fallbackFont
+                and title ~= variables.fallbackFont
+            then
                 window:ChangeTheme({ Font = body, TitleFont = title })
             end
         end)

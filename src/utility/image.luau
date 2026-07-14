@@ -8,11 +8,24 @@ local image = {}
 image.rewrites = imageCache.rewrites
 image.onBlock = nil
 
+-- images that resolve blank in secure mode (their icon isnt cached yet) register here, so the real
+-- texture can be dropped in once the background download lands instead of leaving a blank
+image.pending = {}
+
 local imageProperties = {
     Image = true,
     HoverImage = true,
     PressedImage = true,
 }
+
+local function idOf(value)
+    if type(value) == "number" then
+        return value
+    elseif type(value) == "string" then
+        return tonumber(string.match(value, "^rbxassetid://(%d+)$"))
+    end
+    return nil
+end
 
 local function blocked(value)
     if image.onBlock then
@@ -21,8 +34,8 @@ local function blocked(value)
     return ""
 end
 
-function image.preload()
-    return imageCache.preload()
+function image.preload(onSettled)
+    return imageCache.preload(onSettled)
 end
 
 function image.avatar(userId, onReady)
@@ -34,11 +47,39 @@ function image.avatar(userId, onReady)
 end
 
 function image.assign(instance, property, value)
-    if imageProperties[property] then
-        instance[property] = image.resolve(value)
-    else
+    if not imageProperties[property] then
         instance[property] = value
+        return
     end
+    instance[property] = image.resolve(value)
+    -- in secure mode an un-cached icon resolves blank; remember it so it appears once cached
+    if variables.secureMode then
+        local id = idOf(value)
+        if id and not image.rewrites[id] then
+            local list = image.pending[id]
+            if not list then
+                list = {}
+                image.pending[id] = list
+            end
+            table.insert(list, { instance = instance, property = property })
+        end
+    end
+end
+
+-- imageCache calls this when a background icon download lands: drop the real texture into every
+-- instance that resolved blank waiting for it
+imageCache.onCached = function(id)
+    local list = image.pending[id]
+    if not list then
+        return
+    end
+    local uri = image.rewrites[id]
+    for _, entry in list do
+        if uri and entry.instance and entry.instance.Parent then
+            entry.instance[entry.property] = uri
+        end
+    end
+    image.pending[id] = nil
 end
 
 function image.resolve(value)
