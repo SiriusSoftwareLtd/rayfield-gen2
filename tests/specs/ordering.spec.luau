@@ -1,18 +1,11 @@
-local function requireUtility(name)
-    local loader = _G.__RAYFIELD_TEST_REQUIRE_UTILITY
-    if loader then
-        return loader(name)
-    end
-
-    return require(game:GetService("ReplicatedStorage").Rayfield.utility[name])
-end
+local requireUtility = (_G :: any).__RAYFIELD_TEST_HELPERS.requireUtility
 
 return function()
     local assignOrder = requireUtility("ordering")
 
     describe("utility.ordering", function()
         it("assigns the requested order to the main element", function()
-            local element = {
+            local element: any = {
                 main = {},
             }
 
@@ -22,7 +15,7 @@ return function()
         end)
 
         it("places descriptors immediately after their element", function()
-            local element = {
+            local element: any = {
                 main = {},
                 descriptor = {
                     main = {},

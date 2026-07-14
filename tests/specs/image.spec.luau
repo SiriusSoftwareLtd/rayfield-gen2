@@ -1,11 +1,4 @@
-local function requireUtility(name)
-    local loader = _G.__RAYFIELD_TEST_REQUIRE_UTILITY
-    if loader then
-        return loader(name)
-    end
-
-    return require(game:GetService("ReplicatedStorage").Rayfield.utility[name])
-end
+local requireUtility = (_G :: any).__RAYFIELD_TEST_HELPERS.requireUtility
 
 return function()
     local image = requireUtility("image")
@@ -78,7 +71,7 @@ return function()
         end)
 
         it("assigns non-image properties without resolving them", function()
-            local instance = {}
+            local instance: any = {}
 
             image.assign(instance, "Text", 123)
 
@@ -87,7 +80,7 @@ return function()
 
         it("tracks secure-mode image assignments until the asset is cached", function()
             variables.secureMode = true
-            local instance = {
+            local instance: any = {
                 Parent = {},
             }
 

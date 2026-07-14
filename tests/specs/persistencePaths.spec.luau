@@ -1,11 +1,4 @@
-local function requireUtility(name)
-    local loader = _G.__RAYFIELD_TEST_REQUIRE_UTILITY
-    if loader then
-        return loader(name)
-    end
-
-    return require(game:GetService("ReplicatedStorage").Rayfield.utility[name])
-end
+local requireUtility = (_G :: any).__RAYFIELD_TEST_HELPERS.requireUtility
 
 return function()
     local paths = requireUtility("persistencePaths")
