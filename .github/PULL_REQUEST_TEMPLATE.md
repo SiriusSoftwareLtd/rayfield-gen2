@@ -1,9 +1,13 @@
 <!--
 Thank you for contributing to Rayfield Gen 2.
 
-Target normal pull requests at `dev`. Complete every applicable section and remove
-placeholder text. Do not include vulnerability details in a public pull request;
-use https://github.com/SiriusSoftwareLtd/rayfield-gen2/security/advisories/new.
+Target code pull requests at `dev`. Submit standalone documentation changes to
+https://github.com/SiriusSoftwareLtd/docs and link companion documentation work
+below when this code change affects public documentation.
+
+Complete every applicable section and remove placeholder text. Do not include
+vulnerability details in a public pull request; use
+https://github.com/SiriusSoftwareLtd/rayfield-gen2/security/advisories/new.
 -->
 
 ## Summary
@@ -20,7 +24,6 @@ Closes #
 
 - [ ] Bug fix
 - [ ] Feature
-- [ ] Documentation
 - [ ] Refactor or maintenance
 - [ ] Build, tooling, or CI
 - [ ] Breaking change
@@ -55,9 +58,17 @@ and supported executors. Write "None" when there is no compatibility impact.
 
 -
 
-## Documentation
+## Documentation coordination
 
-<!-- List updates to public documentation, examples, comments, or type definitions. Write "Not applicable" with a reason when none are needed. -->
+<!--
+Standalone public documentation changes belong in https://github.com/SiriusSoftwareLtd/docs.
+Link the companion docs issue or pull request when this code change affects public
+documentation. Note any code comments, examples, or type definitions updated here.
+-->
+
+- Public documentation impact: <!-- None or describe the required update -->
+- Companion docs issue or pull request: <!-- Link or "Not applicable" -->
+- In-repository comments, examples, or types updated:
 
 ## UI evidence
 
@@ -73,6 +84,8 @@ and supported executors. Write "None" when there is no compatibility impact.
 - [ ] The change is focused and contains no unrelated work.
 - [ ] I reviewed my own changes.
 - [ ] Tests cover the change where practical.
-- [ ] Documentation and examples match the resulting behavior.
+- [ ] Public documentation is unaffected, or I linked companion work in `SiriusSoftwareLtd/docs`.
+- [ ] Required code comments, examples, and types match the resulting behavior.
+- [ ] I did not commit standalone documentation changes that belong in the docs repository.
 - [ ] I did not commit generated files such as `roblox.yml`, `sourcemap.json`, `globalTypes.d.luau`, or `build/`.
 - [ ] This pull request contains no publicly disclosed vulnerability details.
