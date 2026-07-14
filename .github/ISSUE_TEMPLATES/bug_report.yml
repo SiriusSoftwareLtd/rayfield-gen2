@@ -87,9 +87,9 @@ body:
   - type: textarea
     id: evidence
     attributes:
-      label: Logs and media
+      label: Logs, screenshots, or recordings
       description: Paste relevant logs or attach screenshots or recordings. Redact sensitive information first.
-      placeholder: Drag files here or paste sanitized logs.
+      placeholder: Drag screenshots or recordings here, or paste sanitized logs.
   - type: textarea
     id: context
     attributes:
