@@ -173,6 +173,22 @@ return function()
                 KeyCode = Enum.KeyCode.J,
             }, false)
             expect(keyPressed).to.equal(Enum.KeyCode.J)
+            expect(keybind:_serialize()[1]).to.equal("Enum.KeyCode")
+            keybind:_deserialize({ "Enum.KeyCode", Enum.KeyCode.K.Value })
+            expect(keybind.value).to.equal(Enum.KeyCode.K)
+            expect(keyChanged).to.equal(Enum.KeyCode.K)
+
+            local invalidEnumOk = pcall(function()
+                keybind:_deserialize({ "Enum.NotARealEnum", Enum.KeyCode.L.Value })
+            end)
+            expect(invalidEnumOk).to.equal(true)
+            expect(keybind.value).to.equal(Enum.KeyCode.K)
+
+            local invalidValueOk = pcall(function()
+                keybind:_deserialize({ "Enum.KeyCode", -1 })
+            end)
+            expect(invalidValueOk).to.equal(true)
+            expect(keybind.value).to.equal(Enum.KeyCode.K)
 
             local colorPicker = first:CreateColorPicker({
                 name = "Accent",
