@@ -31,7 +31,7 @@ jobs:
           rokit install
 
       - name: Format, lint and typecheck
-        run: bash scripts/check.sh
+        run: make ci
 
   build_and_bundle:
     name: Bundle and Publish Rayfield Gen2 Release
