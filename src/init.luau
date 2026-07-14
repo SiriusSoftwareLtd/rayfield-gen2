@@ -60,6 +60,19 @@ function rayfield:CreateWindow(properties: types.WindowProps): types.Window
 
     local window = require(script.components.window).new(properties)
 
+    if variables.secureMode then
+        -- secure mode renders BuilderSans up front (variables.brandFont), then downloads the real
+        -- brand faces off the main thread and swaps them in once ready, so startup never blocks
+        task.spawn(function()
+            local body = variables.fontManager:loadFont(constants.fontAsset, Enum.FontWeight.Medium)
+            local title = variables.fontManager:loadFont(constants.fontAsset, Enum.FontWeight.SemiBold)
+            local fallback = variables.fontManager.defaultOptions.fallbackFont
+            if body and title and body ~= fallback and title ~= fallback then
+                window:ChangeTheme({ Font = body, TitleFont = title })
+            end
+        end)
+    end
+
     task.spawn(function()
         task.wait(0.5)
 
