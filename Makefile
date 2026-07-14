@@ -30,7 +30,7 @@ GLOBAL_TYPES ?= globalTypes.d.luau
 GLOBAL_TYPES_URL ?= https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/main/scripts/globalTypes.d.luau
 COVERAGE_THRESHOLD ?= 70
 
-.PHONY: help install ci check test coverage coverage-baseline testez-model test-place format format-check lint typecheck build bundle serve sourcemap-watch dev clean
+.PHONY: help install ci check test test-verbose coverage coverage-baseline testez-model test-place format format-check lint typecheck build bundle serve sourcemap-watch dev clean
 
 help:
 	@echo Rayfield Gen2 Make targets:
@@ -38,6 +38,7 @@ help:
 	@echo   ci         Run the required format, lint, typecheck, test, and coverage gate
 	@echo   check      Alias for the required CI gate
 	@echo   test       Run unit tests and enforce coverage for CI/local validation
+	@echo   test-verbose  Run unit tests with Rayfield logs enabled
 	@echo   coverage   Run tests and write coverage reports
 	@echo   coverage-baseline Refresh coverage-baseline.json from current coverage
 	@echo   testez-model Download the TestEZ model used by Studio tests
@@ -69,6 +70,9 @@ check: format-check lint typecheck test
 
 test:
 	$(LUNE) run scripts/run-tests.luau -- --coverage-threshold=$(COVERAGE_THRESHOLD)
+
+test-verbose:
+	$(LUNE) run scripts/run-tests.luau -- --coverage-threshold=$(COVERAGE_THRESHOLD) --verbose-logs
 
 coverage: test
 	@echo coverage reports written to coverage/coverage.txt and coverage/coverage-summary.json

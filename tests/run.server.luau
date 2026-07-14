@@ -13,6 +13,7 @@ _G.__RAYFIELD_TEST_HELPERS = {
         return require(ReplicatedStorage.Rayfield.utility[name])
     end,
 }
+_G.__RAYFIELD_TEST_VERBOSE_LOGS = _G.__RAYFIELD_TEST_VERBOSE_LOGS == true
 
 local results = TestEZ.TestBootstrap:run({ testsRoot }, TestEZ.Reporters.TextReporter, {
     showTimingInfo = true,

@@ -7,19 +7,40 @@
 -- itself through warn/print, both of which anti-cheats hook. The game's and the dev's own
 -- output are left alone; this only gags Rayfield.
 
-local variables = require(script.Parent.variables)
+local runtime = require(script.Parent.runtime)
 
 local log = {}
 
+local suppressPredicate = function()
+    return runtime.secureMode
+end
+
+local function shouldSuppress()
+    local testHelpers = _G.__RAYFIELD_TEST_HELPERS
+    local isTestEnvironment = type(testHelpers) == "table" and type(testHelpers.requireUtility) == "function"
+    if isTestEnvironment and _G.__RAYFIELD_TEST_VERBOSE_LOGS ~= true then
+        return true
+    end
+    return suppressPredicate()
+end
+
+function log.setSuppressPredicate(predicate)
+    suppressPredicate = if type(predicate) == "function"
+        then predicate
+        else function()
+            return runtime.secureMode
+        end
+end
+
 function log.warn(...)
-    if variables.secureMode then
+    if shouldSuppress() then
         return
     end
     warn(...)
 end
 
 function log.print(...)
-    if variables.secureMode then
+    if shouldSuppress() then
         return
     end
     print(...)

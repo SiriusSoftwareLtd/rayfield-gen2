@@ -123,6 +123,8 @@ end
 
 local coverageThreshold = parseNumberArg("coverage-threshold", tonumber(process.env.RAYFIELD_COVERAGE_THRESHOLD) or 70)
 local updateCoverageBaseline = parseFlagArg("update-coverage-baseline")
+local verboseTestLogsEnv = string.lower(process.env.RAYFIELD_TEST_VERBOSE_LOGS or "")
+local verboseTestLogs = parseFlagArg("verbose-logs") or verboseTestLogsEnv == "true" or verboseTestLogsEnv == "1"
 local coverageDirectory, coverageScope = resolveCoverageDirectory(parseDirectoryArg(defaultCoverageDirectory))
 
 local coverage = {
@@ -488,6 +490,7 @@ end
 _G.__RAYFIELD_TEST_HELPERS = {
     requireUtility = _G.__RAYFIELD_TEST_REQUIRE_UTILITY,
 }
+_G.__RAYFIELD_TEST_VERBOSE_LOGS = verboseTestLogs
 
 local results = {
     testsRan = 0,

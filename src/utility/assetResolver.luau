@@ -6,6 +6,7 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 local network = require(script.Parent.network)
+local log = require(script.Parent.log)
 
 export type AssetDownloadUrl = string
 local assetResolver = {
@@ -76,7 +77,7 @@ function assetResolver:getAssetContentFromUrl(url: string, cacheKey: number | st
 
     local requestFn = network.getRequestFn()
     if not requestFn then
-        warn("No request function available to download asset content.")
+        log.warn("No request function available to download asset content.")
         return nil
     end
 
@@ -91,7 +92,7 @@ function assetResolver:getAssetContentFromUrl(url: string, cacheKey: number | st
             self.contentCache[cacheKey :: any] = content
         end
     elseif not forced then
-        warn("Failed to download asset content for url: " .. tostring(url))
+        log.warn("Failed to download asset content for url: " .. tostring(url))
     end
     return content
 end
@@ -100,7 +101,7 @@ function assetResolver:getAssetContentFromId(id, forced): string?
     id = self:resolve(id)
     -- we can only download content for valid asset ids
     if not id or type(id) ~= "number" then
-        warn("Invalid asset id: " .. tostring(id))
+        log.warn("Invalid asset id: " .. tostring(id))
         return nil
     end
 
