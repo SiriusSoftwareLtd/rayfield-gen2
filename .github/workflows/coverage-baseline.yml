@@ -1,0 +1,49 @@
+name: Coverage Baseline
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+
+concurrency:
+  group: coverage-baseline-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  update:
+    name: Update Coverage Baseline
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Setup RoKit
+        # CompeyDev/setup-rokit@v0.1.2
+        uses: CompeyDev/setup-rokit@v0.1.2
+
+      - name: Install RoKit packages
+        run: make install
+
+      - name: Refresh coverage baseline
+        run: make coverage-baseline
+
+      - name: Commit coverage baseline
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet -- coverage-baseline.json; then
+            echo "coverage-baseline.json is already current"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add coverage-baseline.json
+          git commit -m "chore(test): update coverage baseline" -m "[skip ci]"
+          git push origin "HEAD:${{ github.ref_name }}"
