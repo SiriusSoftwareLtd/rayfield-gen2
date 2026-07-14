@@ -1,3 +1,5 @@
+--!strict
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local TestEZModule = ReplicatedStorage:FindFirstChild("TestEZ")

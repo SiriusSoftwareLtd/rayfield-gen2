@@ -1,4 +1,4 @@
---!nonstrict
+--!strict
 
 -- Copyright (c) 2026 Corridon Capital
 -- This Source Code Form is subject to the terms of the Mozilla Public
@@ -42,7 +42,8 @@ local thumbEndpoint =
 
 local manifest: { [number]: string } = {}
 for _, id in constants.icons do
-    manifest[id] = assetBase .. id .. ".png?raw=true"
+    local iconId = id :: number
+    manifest[iconId] = assetBase .. tostring(iconId) .. ".png?raw=true"
 end
 local manifestSize = 0
 for _ in manifest do
@@ -99,7 +100,7 @@ local function decodeThumbnailUrl(body: string): string?
 end
 
 local function fetchAvatar(userId: number): string?
-    local cdnUrl
+    local cdnUrl: string? = nil
     for _ = 1, 4 do
         local body = assetResolver:getAssetContentFromUrl(
             string.format(thumbEndpoint, userId, headshotPx, headshotPx),
@@ -152,11 +153,11 @@ function imageCache.preload(onSettled: PreloadCallback?): (boolean, number)
     local pending, missing = 0, 0
     local spawning = true -- keep a synchronously-finishing download from settling mid-loop
     for id, url in manifest do
-        local filePath = path.join(cacheFolder, id .. ".png")
-        local uri
+        local filePath = path.join(cacheFolder, tostring(id) .. ".png")
+        local uri: string? = nil
         if filesystem.isfile(filePath) then
             local ok, res = pcall(env.getcustomasset, filePath)
-            uri = ok and res or nil
+            uri = if ok and type(res) == "string" then res else nil
         end
         if uri then
             -- already on disk from a past session: use it right away
@@ -197,7 +198,7 @@ function imageCache.avatar(userId: unknown, onReady: AvatarCallback?): string
     local filePath = avatarPath(userId)
     if filesystem.isfile(filePath) then
         local ok, uri = pcall(getfenv().getcustomasset, filePath)
-        if ok and uri then
+        if ok and type(uri) == "string" then
             return uri
         end
     end

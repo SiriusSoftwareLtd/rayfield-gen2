@@ -1,3 +1,5 @@
+--!strict
+
 local requireUtility = (_G :: any).__RAYFIELD_TEST_HELPERS.requireUtility
 
 return function()
@@ -9,12 +11,12 @@ return function()
         local originalFileSystemManager
         local originalHttpService
         local originalFilesystem
-        local files
-        local encodedData
-        local decodedData
-        local ensuredDir
+        local files: any
+        local encodedData: any
+        local decodedData: any
+        local ensuredDir: any
 
-        local function makeWindow()
+        local function makeWindow(): any
             return {
                 settings = {
                     toggleKeybind = Enum.KeyCode.RightShift,
@@ -115,7 +117,7 @@ return function()
             local window = makeWindow()
             files["Root/Settings/rayfield.rfld"] = "settings-json"
             decodedData = {
-                toggleKeybind = { tostring(Enum.KeyCode), Enum.KeyCode.RightControl.Value },
+                toggleKeybind = { tostring(Enum.KeyCode), Enum.KeyCode.RightControl.Value } :: { any },
                 mouseOverride = true,
                 keepOnScreen = false,
                 welcomeToast = true,

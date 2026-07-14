@@ -1,3 +1,5 @@
+--!strict
+
 local requireUtility = (_G :: any).__RAYFIELD_TEST_HELPERS.requireUtility
 
 return function()
@@ -59,7 +61,7 @@ return function()
 
         it("ignores missing or non-string response bodies without caching them", function()
             local calls = 0
-            local responses = {
+            local responses: { any } = {
                 {},
                 { Body = 123 },
                 { Body = "asset-body" },

@@ -1,9 +1,11 @@
+--!strict
+
 local helpers = (_G :: any).__RAYFIELD_TEST_HELPERS
 
 return function()
     local odometer = helpers.requireUtility("odometer")
 
-    local function makeWindow()
+    local function makeWindow(): any
         local window = {
             created = {},
             theme = {
@@ -15,7 +17,8 @@ return function()
         function window:Create(className, properties)
             local instance = Instance.new(className)
             for property, value in properties or {} do
-                instance[property] = value
+                local target = instance :: any
+                target[property] = value
             end
             table.insert(self.created, instance)
             return instance
@@ -23,14 +26,15 @@ return function()
 
         function window:_reveal(instance, properties)
             for property, value in properties do
-                instance[property] = value
+                local target = instance :: any
+                target[property] = value
             end
         end
 
         return window
     end
 
-    local function makeOdometer(options)
+    local function makeOdometer(options: any?)
         local window = makeWindow()
         local container = Instance.new("Frame")
         container.ZIndex = 2

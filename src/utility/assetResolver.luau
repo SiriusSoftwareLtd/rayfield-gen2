@@ -1,4 +1,4 @@
---!nonstrict
+--!strict
 
 -- Copyright (c) 2026 Corridon Capital
 -- This Source Code Form is subject to the terms of the Mozilla Public
@@ -33,7 +33,11 @@ type AssetResolverState = {
     contentCache: { [CacheKey]: string }?,
     contentDownloadUrl: AssetDownloadUrl,
 }
-export type AssetResolver = typeof(setmetatable({} :: AssetResolverState, assetResolver))
+export type AssetResolver = AssetResolverState & {
+    resolve: (self: AssetResolver, value: unknown) -> ResolvedAsset?,
+    getAssetContentFromUrl: (self: AssetResolver, url: string, cacheKey: CacheKey?, forced: boolean?) -> string?,
+    getAssetContentFromId: (self: AssetResolver, id: AssetId, forced: boolean?) -> string?,
+}
 -- example asset ids:
 --[[
 rbxassetid://12187277209,
@@ -41,17 +45,18 @@ rbxassetid://12187293441
 ]]
 
 function assetResolver.new(useCache: boolean?, assetContentDownloadUrl: AssetDownloadUrl?): AssetResolver
+    local contentCache: { [CacheKey]: string }? = if useCache then {} else nil
     local self = setmetatable(
         {
-            contentCache = useCache and {} or nil,
+            contentCache = contentCache,
             contentDownloadUrl = assetContentDownloadUrl or assetResolver.Enum.AssetDownloadUrl.RobloxDownloadUrl,
         } :: AssetResolverState,
         assetResolver
-    )
+    ) :: any
     return self
 end
 
-function assetResolver:resolve(value: unknown): ResolvedAsset?
+function assetResolver.resolve(_self: AssetResolver, value: unknown): ResolvedAsset?
     if type(value) == "number" then
         return value
     end
@@ -72,9 +77,15 @@ function assetResolver:resolve(value: unknown): ResolvedAsset?
     return nil
 end
 
-function assetResolver:getAssetContentFromUrl(url: string, cacheKey: CacheKey?, forced: boolean?): string?
-    if cacheKey ~= nil and self.contentCache then
-        local cachedContent = self.contentCache[cacheKey]
+function assetResolver.getAssetContentFromUrl(
+    self: AssetResolver,
+    url: string,
+    cacheKey: CacheKey?,
+    forced: boolean?
+): string?
+    local contentCache = self.contentCache
+    if cacheKey ~= nil and contentCache then
+        local cachedContent = contentCache[cacheKey]
         if cachedContent then
             return cachedContent
         end
@@ -103,8 +114,8 @@ function assetResolver:getAssetContentFromUrl(url: string, cacheKey: CacheKey?, 
     end
 
     if content ~= nil then
-        if cacheKey ~= nil and self.contentCache then
-            self.contentCache[cacheKey] = content
+        if cacheKey ~= nil and contentCache then
+            contentCache[cacheKey] = content
         end
     elseif not forced then
         log.warn("Failed to download asset content for url: " .. tostring(url))
@@ -112,7 +123,7 @@ function assetResolver:getAssetContentFromUrl(url: string, cacheKey: CacheKey?, 
     return content
 end
 
-function assetResolver:getAssetContentFromId(id: AssetId, forced: boolean?): string?
+function assetResolver.getAssetContentFromId(self: AssetResolver, id: AssetId, forced: boolean?): string?
     local resolvedId = self:resolve(id)
     -- we can only download content for valid asset ids
     if not resolvedId or type(resolvedId) ~= "number" then

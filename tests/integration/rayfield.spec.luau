@@ -1,3 +1,5 @@
+--!strict
+
 local helpers = (_G :: any).__RAYFIELD_TEST_HELPERS
 
 return function()
@@ -9,7 +11,7 @@ return function()
         local originalSecureMode
         local originalPreload
         local originalLoadFont
-        local window
+        local window: any
 
         beforeEach(function()
             originalSecureMode = variables.secureMode

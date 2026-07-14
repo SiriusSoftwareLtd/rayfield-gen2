@@ -1,3 +1,5 @@
+--!strict
+
 -- Copyright (c) 2026 Corridon Capital
 -- This Source Code Form is subject to the terms of the Mozilla Public
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,13 +13,15 @@ local runtime = require(script.Parent.runtime)
 
 local log = {}
 
-local function defaultSuppressPredicate()
+type SuppressPredicate = () -> boolean
+
+local function defaultSuppressPredicate(): boolean
     return runtime.secureMode
 end
 
-local suppressPredicate = defaultSuppressPredicate
+local suppressPredicate: SuppressPredicate = defaultSuppressPredicate
 
-local function shouldSuppress()
+local function shouldSuppress(): boolean
     local testHelpers = _G.__RAYFIELD_TEST_HELPERS
     local isTestEnvironment = type(testHelpers) == "table" and type(testHelpers.requireUtility) == "function"
     if isTestEnvironment and _G.__RAYFIELD_TEST_VERBOSE_LOGS ~= true then
@@ -26,7 +30,7 @@ local function shouldSuppress()
     return suppressPredicate()
 end
 
-function log.setSuppressPredicate(predicate)
+function log.setSuppressPredicate(predicate: SuppressPredicate?)
     suppressPredicate = if type(predicate) == "function" then predicate else defaultSuppressPredicate
 end
 

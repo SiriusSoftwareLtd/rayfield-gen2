@@ -1,12 +1,14 @@
+--!strict
+
 local helpers = (_G :: any).__RAYFIELD_TEST_HELPERS
 
 return function()
     local Window = helpers.requireComponent("window")
 
     describe("component window workflows", function()
-        local window
+        local window: any
 
-        local function makeWindow(properties)
+        local function makeWindow(properties: any?): any
             window = Window.new(properties or {
                 name = "Spec Window",
                 subtitle = "Harness",
@@ -174,18 +176,18 @@ return function()
             }, false)
             expect(keyPressed).to.equal(Enum.KeyCode.J)
             expect(keybind:_serialize()[1]).to.equal("Enum.KeyCode")
-            keybind:_deserialize({ "Enum.KeyCode", Enum.KeyCode.K.Value })
+            keybind:_deserialize({ "Enum.KeyCode", Enum.KeyCode.K.Value :: any })
             expect(keybind.value).to.equal(Enum.KeyCode.K)
             expect(keyChanged).to.equal(Enum.KeyCode.K)
 
             local invalidEnumOk = pcall(function()
-                keybind:_deserialize({ "Enum.NotARealEnum", Enum.KeyCode.L.Value })
+                keybind:_deserialize({ "Enum.NotARealEnum", Enum.KeyCode.L.Value :: any })
             end)
             expect(invalidEnumOk).to.equal(true)
             expect(keybind.value).to.equal(Enum.KeyCode.K)
 
             local invalidValueOk = pcall(function()
-                keybind:_deserialize({ "Enum.KeyCode", -1 })
+                keybind:_deserialize({ "Enum.KeyCode", -1 :: any })
             end)
             expect(invalidValueOk).to.equal(true)
             expect(keybind.value).to.equal(Enum.KeyCode.K)
@@ -242,7 +244,7 @@ return function()
             })
             w:SetLocale("zz-test")
             expect(w.title.Text).to.equal("Translated Window")
-            w:SetTranslator(function(source)
+            w:SetTranslator(function(source): string?
                 if source == "Run" then
                     return "Hooked Run"
                 end
@@ -308,7 +310,7 @@ return function()
                 icon = 123,
                 boxes = {
                     { title = "Box", description = "Details", icon = 456 },
-                    "Plain Box",
+                    "Plain Box" :: any,
                 },
                 options = {
                     {
@@ -321,7 +323,7 @@ return function()
                     {
                         text = "Delete",
                         style = "danger",
-                    },
+                    } :: any,
                 },
             })
             expect(popup._closed).to.equal(false)

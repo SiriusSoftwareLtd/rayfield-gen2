@@ -1,3 +1,5 @@
+--!strict
+
 local requireUtility = (_G :: any).__RAYFIELD_TEST_HELPERS.requireUtility
 
 return function()

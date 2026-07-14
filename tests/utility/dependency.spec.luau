@@ -1,4 +1,5 @@
 --!nolint BuiltinGlobalWrite
+--!strict
 
 local helpers = (_G :: any).__RAYFIELD_TEST_HELPERS
 local requireUtility = helpers.requireUtility
@@ -9,8 +10,8 @@ return function()
         local variables
         local runtime
         local originalHelpers
-        local originalWarn
-        local originalPrint
+        local originalWarn: any
+        local originalPrint: any
         local originalVariablesSecureMode
         local originalRuntimeSecureMode
         local originalVerboseLogs
@@ -21,11 +22,12 @@ return function()
             warnings = {}
             prints = {}
 
-            warn = function(...)
+            local env = getfenv() :: any
+            env.warn = function(...)
                 table.insert(warnings, { ... })
             end
 
-            print = function(...)
+            env.print = function(...)
                 table.insert(prints, { ... })
             end
         end
@@ -54,12 +56,13 @@ return function()
                     return variables.secureMode
                 end)
             elseif log then
-                log.setSuppressPredicate(nil)
+                log.setSuppressPredicate(nil :: any)
             end
             _G.__RAYFIELD_TEST_HELPERS = originalHelpers
             _G.__RAYFIELD_TEST_VERBOSE_LOGS = originalVerboseLogs
-            warn = originalWarn
-            print = originalPrint
+            local env = getfenv() :: any
+            env.warn = originalWarn
+            env.print = originalPrint
         end)
 
         it("loads log and fontManager before variables", function()
@@ -75,7 +78,7 @@ return function()
 
         it("uses runtime secure mode by default", function()
             log = log or requireUtility("log")
-            log.setSuppressPredicate(nil)
+            log.setSuppressPredicate(nil :: any)
             captureConsole()
             _G.__RAYFIELD_TEST_HELPERS = nil
             _G.__RAYFIELD_TEST_VERBOSE_LOGS = nil
@@ -133,7 +136,7 @@ return function()
 
         it("ignores verbose test logs outside the test environment", function()
             log = log or requireUtility("log")
-            log.setSuppressPredicate(nil)
+            log.setSuppressPredicate(nil :: any)
             captureConsole()
             _G.__RAYFIELD_TEST_HELPERS = nil
 

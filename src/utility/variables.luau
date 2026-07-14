@@ -1,4 +1,4 @@
---!nonstrict
+--!strict
 
 -- Copyright (c) 2026 Corridon Capital
 -- This Source Code Form is subject to the terms of the Mozilla Public
@@ -12,10 +12,21 @@ local fileSystemManager = require(script.Parent.filesystemManager)
 local assetResolver = require(script.Parent.assetResolver)
 local fontManager = require(script.Parent.fontManager)
 
+type RuntimeState = runtime.RuntimeState
+type FileSystemManager = fileSystemManager.FileSystemManager
 type AssetResolver = assetResolver.AssetResolver
 type FontManager = fontManager.FontManager
 
-local variables = table.clone(runtime)
+export type VariablesState = RuntimeState & {
+    fallbackFont: Font,
+    fileSystemManager: FileSystemManager,
+    assetResolver: AssetResolver,
+    fontManager: FontManager,
+    setFallbackFont: (font: Enum.Font | Font) -> (),
+    brandFont: (weight: Enum.FontWeight?) -> Font,
+}
+
+local variables = table.clone(runtime) :: VariablesState
 log.setSuppressPredicate(function()
     return variables.secureMode
 end)
@@ -53,7 +64,7 @@ end
 
 -- brand font at a weight, non-blocking. normal mode streams the family id direct; secure mode
 -- shows the fallback until the real faces download and swap in (see init).
-function variables.brandFont(weight)
+function variables.brandFont(weight: Enum.FontWeight?): Font
     if variables.secureMode then
         return Font.new(variables.fallbackFont.Family, weight)
     end

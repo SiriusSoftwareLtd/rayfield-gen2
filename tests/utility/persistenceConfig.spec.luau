@@ -1,3 +1,5 @@
+--!strict
+
 local requireUtility = (_G :: any).__RAYFIELD_TEST_HELPERS.requireUtility
 
 return function()
@@ -9,13 +11,13 @@ return function()
         local originalFileSystemManager
         local originalHttpService
         local originalFilesystem
-        local files
-        local listedFiles
-        local ensuredDir
-        local encodedData
-        local decodedData
+        local files: any
+        local listedFiles: any
+        local ensuredDir: any
+        local encodedData: any
+        local decodedData: any
 
-        local function makeWindow()
+        local function makeWindow(): any
             return {
                 name = "Main Window",
                 configuration = {

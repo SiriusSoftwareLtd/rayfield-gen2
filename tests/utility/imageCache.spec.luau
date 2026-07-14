@@ -1,3 +1,5 @@
+--!strict
+
 local requireUtility = (_G :: any).__RAYFIELD_TEST_HELPERS.requireUtility
 
 return function()
@@ -13,7 +15,7 @@ return function()
         local originalJsonDecode
         local originalWait
         local originalOnCached
-        local files
+        local files: any
 
         beforeEach(function()
             files = {}
@@ -55,7 +57,9 @@ return function()
                     },
                 }
             end
-            task.wait = function() end
+            task.wait = function(): number
+                return 0
+            end
         end)
 
         afterEach(function()
@@ -152,7 +156,7 @@ return function()
                 return "asset://" .. path
             end
             local decodeCalls = 0
-            variables.httpService.JSONDecode = function()
+            variables.httpService.JSONDecode = function(): any
                 decodeCalls += 1
                 if decodeCalls == 1 then
                     error("malformed json")

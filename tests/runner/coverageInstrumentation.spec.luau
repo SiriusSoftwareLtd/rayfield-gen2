@@ -1,3 +1,5 @@
+--!strict
+
 local helpers = (_G :: any).__RAYFIELD_TEST_HELPERS
 
 return function()

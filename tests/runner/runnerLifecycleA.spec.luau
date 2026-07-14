@@ -1,3 +1,5 @@
+--!strict
+
 return function()
     local globals = _G :: any
     globals.__RAYFIELD_RUNNER_LEAK_COUNT = 0
