@@ -97,4 +97,4 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
-        run: gh release upload "$RELEASE_TAG" build/bundled.luau build/bundled.txt
+        run: gh release upload "$RELEASE_TAG" build/bundled.luau build/bundled.luau.sha256 build/bundled.txt
