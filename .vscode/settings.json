@@ -20,6 +20,7 @@
         "fromoffset",
         "fromscale",
         "getcustomasset",
+        "getfenv",
         "getgenv",
         "gethui",
         "isfile",

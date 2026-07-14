@@ -66,6 +66,7 @@ export type FontResolverOptions = {
     saveToDisk: boolean?,
     skipCache: boolean?,
 }
+
 export type FontManager = {
     _debug: boolean,
     rootFolder: string,
@@ -90,9 +91,8 @@ export type FontManager = {
     ) -> Font?,
     getFontFromId: (self: FontManager, id: number | string) -> Font?,
 }
-export type fontManager = FontManager
 
---local DEFAULT_FALLBACK_FONT = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium)
+export type fontManager = FontManager
 
 local env = getfenv()
 
