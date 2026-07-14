@@ -58,9 +58,6 @@ jobs:
       - name: Bundle
         run: make bundle
 
-      - name: Create raw text bundle
-        run: cp build/bundled.luau build/bundled.luau.txt
-
       - name: Generate bundle checksum
         run: sha256sum build/bundled.luau > build/bundled.luau.sha256
 
@@ -71,7 +68,6 @@ jobs:
           path: |
             build/bundled.luau
             build/bundled.luau.sha256
-            build/bundled.luau.txt
           if-no-files-found: error
           retention-days: 1
 
@@ -93,9 +89,12 @@ jobs:
       - name: Verify bundle checksum
         run: sha256sum --check build/bundled.luau.sha256
 
+      - name: Create raw text file of bundle
+        run: cp build/bundled.luau build/bundled.txt
+
       - name: Upload bundle to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
-        run: gh release upload "$RELEASE_TAG" build/bundled.luau build/bundled.luau.sha256 build/bundled.luau.txt --repo "$GH_REPO" --clobber
+        run: gh release upload "$RELEASE_TAG" build/bundled.luau build/bundled.txt
