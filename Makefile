@@ -29,7 +29,7 @@ SOURCEMAP ?= sourcemap.json
 GLOBAL_TYPES ?= globalTypes.d.luau
 GLOBAL_TYPES_URL ?= https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/main/scripts/globalTypes.d.luau
 
-.PHONY: help install ci check test testez-model test-place format format-check lint typecheck build bundle serve sourcemap-watch dev clean
+.PHONY: help install ci-format check test testez-model test-place format format-check lint typecheck build bundle serve sourcemap-watch dev clean
 
 help:
 	@echo Rayfield Gen2 Make targets:
@@ -46,7 +46,7 @@ help:
 	@echo   bundle     Build the release Luau bundle
 	@echo   serve      Start the Rojo development server
 	@echo   clean      Remove generated local outputs
-	@echo   ci         Run the CI format, lint, typecheck, and test gate
+	@echo   ci-format  Run the CI format, lint, typecheck
 	@echo   dev        Start Rojo serve and watch sourcemap generation
 
 install:
@@ -59,7 +59,7 @@ install:
 	$(ROKIT) trust Roblox/testez
 	$(ROKIT) install
 
-ci: check
+ci-format: format-check lint typecheck
 
 check: format-check lint typecheck test
 	@echo all checks passed

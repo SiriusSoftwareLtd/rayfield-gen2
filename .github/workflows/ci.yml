@@ -20,5 +20,8 @@ jobs:
       - name: Install RoKit packages
         run: make install
 
-      - name: Format, lint, typecheck and test
-        run: make ci
+      - name: Format, lint and typecheck
+        run: make ci-format
+
+      - name: Test
+        run: make test
