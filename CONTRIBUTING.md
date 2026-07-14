@@ -170,7 +170,16 @@ Report suspected vulnerabilities privately through [GitHub's private vulnerabili
 ## Commits and pull requests
 
 1. Branch from an up-to-date `dev` branch and keep the branch limited to one issue or coherent change.
-2. Write concise, imperative commit subjects, such as `Fix dropdown focus handling`. Split unrelated changes into separate commits or pull requests.
+2. Write every commit message using [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/): `<type>[optional scope][!]: <description>`. Keep descriptions concise and imperative. Use `feat` for features, `fix` for bug fixes, and other clear types such as `docs`, `test`, `refactor`, `perf`, `build`, `ci`, `style`, or `chore` when they describe the change. Split unrelated changes into separate commits or pull requests.
+
+   Examples:
+
+   - `fix: correct dropdown focus handling`
+   - `feat(theme): add high contrast palette`
+   - `docs: update contributor guide`
+   - `refactor(window)!: remove legacy resize behavior`
+
+   Mark breaking changes with `!` before the colon, as shown above, or with a `BREAKING CHANGE:` footer after the body.
 3. Rebase or merge the latest `dev` branch when needed to resolve conflicts, without rewriting other contributors' work.
 4. Run `make ci` and all applicable tests and manual checks.
 5. Open the pull request against `dev`. Complete the description with the change, motivation, user impact, validation, screenshots for UI changes, and any follow-up work.
