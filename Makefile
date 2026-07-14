@@ -21,7 +21,7 @@ SOURCEMAP ?= sourcemap.json
 GLOBAL_TYPES ?= globalTypes.d.luau
 GLOBAL_TYPES_URL ?= https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/main/scripts/globalTypes.d.luau
 
-.PHONY: help install ci check format format-check lint typecheck build bundle serve clean
+.PHONY: help install ci check format format-check lint typecheck build bundle serve sourcemap-watch dev clean
 
 help:
 	@echo Rayfield Gen2 Make targets:
@@ -36,6 +36,7 @@ help:
 	@echo   serve      Start the Rojo development server
 	@echo   clean      Remove generated local outputs
 	@echo   ci         Run the CI format, lint, and typecheck gate
+	@echo   dev        Start Rojo serve and watch sourcemap generation
 
 install:
 	$(ROKIT) trust rojo-rbx/rojo
@@ -74,6 +75,12 @@ bundle:
 
 serve:
 	$(ROJO) serve $(PROJECT_FILE)
+
+sourcemap-watch:
+	$(ROJO) sourcemap $(PROJECT_FILE) -o $(SOURCEMAP) --watch
+
+dev:
+	$(MAKE) -j2 sourcemap-watch serve
 
 clean:
 	$(GIT) clean -fdX -- build $(SOURCEMAP) roblox.yml $(GLOBAL_TYPES) "$(PLACE_FILE)"
