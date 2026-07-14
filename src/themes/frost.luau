@@ -1,4 +1,4 @@
-local constants = require(script.Parent.Parent.utility.constants)
+local variables = require(script.Parent.Parent.utility.variables)
 
 -- Light theme: cool white surfaces, dark text and cyan accents.
 return {
@@ -60,8 +60,8 @@ return {
 
     ActionColor = Color3.fromRGB(68, 74, 80), -- top-bar icons
     TitlingColor = Color3.fromRGB(26, 30, 34),
-    TitleFont = Font.new(constants.fontAsset, Enum.FontWeight.SemiBold),
-    Font = Font.new(constants.fontAsset, Enum.FontWeight.Medium),
+    TitleFont = variables.brandFont(Enum.FontWeight.SemiBold),
+    Font = variables.brandFont(Enum.FontWeight.Medium),
     ContentColor = Color3.fromRGB(42, 46, 52),
     ElementTextHoverColor = Color3.fromRGB(18, 22, 26),
 

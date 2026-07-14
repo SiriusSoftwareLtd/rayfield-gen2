@@ -1,39 +1,50 @@
 --!nocheck
 
-local function getService(name)
-    local service = game:GetService(name)
-    return if cloneref then cloneref(service) else service
+local runtime = require(script.Parent.runtime)
+local constants = require(script.Parent.constants)
+local fileSystemManager = require(script.Parent.filesystemManager)
+local assetResolver = require(script.Parent.assetResolver)
+local fontManager = require(script.Parent.fontManager)
+
+local variables = table.clone(runtime)
+
+-- built-in stand-in shown in secure mode until the real brand faces download. a dev can override
+-- it per window with the FallbackFont prop (see setFallbackFont); defaults to BuilderSans.
+variables.fallbackFont = Font.fromEnum(Enum.Font.BuilderSans)
+
+variables.fileSystemManager = fileSystemManager.new()
+variables.assetResolver = assetResolver.new(true, assetResolver.Enum.AssetDownloadUrl.RoProxyDownloadUrl)
+variables.fontManager = fontManager.new(
+    variables.fileSystemManager:getAssetsFolder("fonts"),
+    false,
+    true,
+    assetResolver.Enum.AssetDownloadUrl.RoProxyDownloadUrl,
+    {
+        saveToDisk = true,
+        skipCache = false,
+        fallbackFont = variables.fallbackFont,
+    }
+)
+
+-- let a dev pick the stand-in font, as an Enum.Font or a ready Font. keeps the font managers
+-- own fallback in step so the swap check in init still lines up.
+function variables.setFallbackFont(font)
+    if typeof(font) == "EnumItem" then
+        font = Font.fromEnum(font)
+    end
+    if typeof(font) == "Font" then
+        variables.fallbackFont = font
+        variables.fontManager.defaultOptions.fallbackFont = font
+    end
 end
 
-local variables = {}
-
-variables.rayfieldHidden = false -- flipped while the menu is hidden
-
-variables.secureMode = (function()
-    local _getgenv = rawget(_G, "getgenv")
-    if not _getgenv then
-        return false
+-- brand font at a weight, non-blocking. normal mode streams the family id direct; secure mode
+-- shows the fallback until the real faces download and swap in (see init).
+function variables.brandFont(weight)
+    if variables.secureMode then
+        return Font.new(variables.fallbackFont.Family, weight)
     end
-    local ok, val = pcall(function()
-        return _getgenv().RAYFIELD_SECURE
-    end)
-    return ok and val == true
-end)()
-
-variables.coreGui = getService("CoreGui")
-variables.workspace = getService("Workspace") -- where HapticEngine parents its effects
-variables.runService = getService("RunService")
-variables.userInputService = getService("UserInputService")
-variables.guiService = getService("GuiService")
-variables.localPlayer = getService("Players").LocalPlayer
-variables.tweenService = getService("TweenService")
-variables.httpService = getService("HttpService")
-variables.textService = getService("TextService")
-variables.replicatedStorage = getService("ReplicatedStorage")
-variables.localizationService = getService("LocalizationService")
-variables.guiContainer = if variables.runService:IsStudio()
-    then variables.localPlayer.PlayerGui
-    elseif gethui then gethui()
-    else variables.coreGui
+    return Font.new(constants.fontAsset, weight)
+end
 
 return variables

@@ -3,5 +3,9 @@
         "gethui",
         "cloneref"
     ],
-    "luau-lsp.plugin.enabled": true
+    "luau-lsp.plugin.enabled": true,
+    "cSpell.words": [
+        "Configurables",
+        "makefolder"
+    ]
 }

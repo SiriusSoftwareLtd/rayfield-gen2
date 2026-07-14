@@ -57,7 +57,7 @@ function chrome.buildCollapsedFace(window)
         Text = window.showName,
         Size = UDim2.new(1, 0, 0, 16),
         BackgroundTransparency = 1,
-        FontFace = Font.new(constants.fontAsset, Enum.FontWeight.Medium),
+        FontFace = variables.brandFont(Enum.FontWeight.Medium),
         RichText = true,
         TextSize = 16,
         TextWrapped = true,
@@ -75,7 +75,7 @@ function chrome.buildCollapsedFace(window)
         Text = locale.t("Tap to show"),
         Size = UDim2.new(1, 0, 0, 14),
         BackgroundTransparency = 1,
-        FontFace = Font.new(constants.fontAsset, Enum.FontWeight.Medium),
+        FontFace = variables.brandFont(Enum.FontWeight.Medium),
         TextSize = 14,
         TextXAlignment = Enum.TextXAlignment.Left,
         LayoutOrder = 2,
@@ -114,7 +114,7 @@ function chrome.isNewUser()
         return true
     end
 
-    local path = "Rayfield/lastuser.txt"
+    local path = variables.fileSystemManager:getPath("lastuser.txt")
     local currentId = tostring(variables.localPlayer.UserId)
     local isNew = true
 
@@ -125,9 +125,6 @@ function chrome.isNewUser()
     end)
 
     pcall(function()
-        if typeof(filesystem.isfolder) == "function" and not filesystem.isfolder("Rayfield") then
-            filesystem.makefolder("Rayfield")
-        end
         filesystem.writefile(path, currentId)
     end)
 

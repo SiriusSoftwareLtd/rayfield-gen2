@@ -19,7 +19,7 @@ local shrinkInfo = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingD
 
 -- title weight is fixed (semibold) rather than themed, and the measure below uses the same
 -- font so the hug-width always matches what actually renders
-local titleFont = Font.new(constants.fontAsset, Enum.FontWeight.SemiBold)
+local titleFont = variables.brandFont(Enum.FontWeight.SemiBold)
 
 local iconSize = 24 -- a glyph icon
 local avatarSize = 32 -- a user headshot (matches the old "signed in as" card)

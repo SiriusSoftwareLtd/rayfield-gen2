@@ -251,7 +251,7 @@ function search.build(window)
     window.searchEmpty = window:Create("TextLabel", {
         Name = "NoResults",
         Text = locale.t("No results"),
-        FontFace = Font.new(constants.fontAsset, Enum.FontWeight.Medium),
+        FontFace = variables.brandFont(Enum.FontWeight.Medium),
         TextSize = 15,
         TextTransparency = 0.6,
         BackgroundTransparency = 1,
