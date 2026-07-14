@@ -32,6 +32,15 @@ Trust the tool sources declared by the repository, then install them:
 make install
 ```
 
+Enable the repository's Git hooks:
+
+```bash
+make hooks
+```
+
+The pre-commit hook runs `make check` and then refreshes `coverage-baseline.json` with `make coverage-baseline`.
+If the baseline changes, stage the refreshed file and commit again.
+
 Create a focused branch from the updated `dev` branch:
 
 ```bash

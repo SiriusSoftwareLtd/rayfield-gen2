@@ -13,6 +13,7 @@ TESTEZ ?= testez
 CURL ?= curl
 GIT ?= git
 MKDIR ?= mkdir -p
+HOOKS_DIR ?= .githooks
 
 SRC_DIR ?= src
 TESTS_DIR ?= tests
@@ -31,11 +32,12 @@ GLOBAL_TYPES ?= globalTypes.d.luau
 GLOBAL_TYPES_URL ?= https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/main/scripts/globalTypes.d.luau
 COVERAGE_THRESHOLD ?= 70
 
-.PHONY: help install ci check test test-verbose coverage coverage-baseline testez-model test-place format format-check lint typecheck build bundle serve sourcemap-watch dev clean
+.PHONY: help install hooks ci check test test-verbose coverage coverage-baseline testez-model test-place format format-check lint typecheck build bundle serve sourcemap-watch dev clean
 
 help:
 	@echo Rayfield Gen2 Make targets:
 	@echo   install    Trust and install Rokit tools
+	@echo   hooks      Configure Git to use repository hooks
 	@echo   ci         Run the required format, lint, typecheck, test, and coverage gate
 	@echo   check      Alias for the required CI gate
 	@echo   test       Run unit tests and enforce coverage for CI/local validation
@@ -63,6 +65,9 @@ install:
 	$(ROKIT) trust JohnnyMorganz/luau-lsp
 	$(ROKIT) trust Roblox/testez
 	$(ROKIT) install
+
+hooks:
+	$(GIT) config --local core.hooksPath $(HOOKS_DIR)
 
 ci: check
 
