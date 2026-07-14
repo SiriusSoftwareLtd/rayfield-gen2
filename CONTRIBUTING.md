@@ -15,7 +15,7 @@ You need:
 - GNU Make and `curl`.
 - [Roblox Studio](https://create.roblox.com/docs/studio/setup) for changes that require runtime or visual validation.
 
-Do not install separate versions of Rojo, Lune, Darklua, StyLua, Selene, or luau-lsp for this project. Rokit pins compatible versions.
+Do not install separate versions of Rojo, Lune, Darklua, StyLua, Selene, luau-lsp, or TestEZ for this project. Rokit pins compatible versions.
 
 ## Set up a clean checkout
 
@@ -57,7 +57,9 @@ Then open Roblox Studio, connect the Rojo plugin to the server, and use Play mod
 | `src/themes/` | Built-in theme definitions. |
 | `src/utility/` | Shared runtime, filesystem, asset, persistence, and other helpers. |
 | `src/types.luau` | Shared Luau type definitions. |
-| `tests/spec.luau` | Roblox-hosted tests for pure utilities. |
+| `tests/specs/` | TestEZ specs for pure utilities. |
+| `tests/run.server.luau` | Roblox Studio TestEZ runner for the test project. |
+| `scripts/run-tests.luau` | CI/local runner for the TestEZ-style spec files. |
 | `example.client.luau` | Example client and manual validation surface. |
 | `Makefile` | Local development and CI command entry points. |
 | `default.project.json` | Rojo project used for Studio development. |
@@ -78,12 +80,13 @@ make ci
 This command is required. It performs:
 
 ```bash
-stylua --syntax Luau --check src
+stylua --syntax Luau --check src tests scripts
 selene generate-roblox-std
 selene src
 rojo sourcemap default.project.json -o sourcemap.json
 curl -fsSL -o globalTypes.d.luau https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/main/scripts/globalTypes.d.luau
 luau-lsp analyze --sourcemap=sourcemap.json --defs=globalTypes.d.luau --no-strict-dm-types src
+lune run scripts/run-tests.luau
 ```
 
 The Makefile target generates Selene's Roblox standard library, the Rojo source map, and the luau-lsp Roblox definitions.
@@ -96,13 +99,27 @@ make format
 
 ### Tests
 
-`tests/spec.luau` contains tests that depend on Roblox globals. They run in a Roblox host, not in the current static CI gate. For changes to covered utilities, update these tests and run them in Studio or the Roblox test runner used for the change. The module documents its invocation:
+Tests live in `tests/specs/` as TestEZ-style `.spec.luau` ModuleScripts. Each spec returns a function and uses TestEZ's `describe`, `it`, `expect`, and lifecycle hooks. Keep spec names ending in `.spec` after Rojo maps them into Studio; the Avant Plugin discovers tests by that suffix.
 
-```luau
-local passed, failed, report = require(path.to.spec)(game.ReplicatedStorage.Rayfield)
-assert(failed == 0, report)
-print(`{passed} tests passed`)
+Run the CI/local unit test path with:
+
+```bash
+make test
 ```
+
+This uses Lune to execute the same spec modules with a small Roblox datatype/service shim, so it can run in CI without opening Roblox Studio.
+
+To run tests in Roblox Studio without Avant, build the test place:
+
+```bash
+make test-place
+```
+
+Open `Rayfield Gen2 Tests.rbxlx` in Roblox Studio. The `ServerScriptService.RunTests` script requires `ReplicatedStorage.TestEZ`, runs `ReplicatedStorage.Tests`, and errors if any TestEZ test fails.
+
+To run tests with the Avant Plugin, either open the place from `make test-place` or run `make testez-model` before serving `test.project.json` with Rojo. In Studio, use Avant's `Unit Tests` window. Avant currently supports TestEZ and lists every `ModuleScript` whose name ends with `.spec`.
+
+The Studio test project downloads `build/TestEZ.rbxm` from the pinned TestEZ release when `make test-place` is run. The model is generated local output and must not be committed.
 
 For component, theme, interaction, or executor-specific changes, test the affected path in Roblox Studio and describe the scenarios and results in the pull request. Tests and relevant manual validation are required for behavior changes; explain in the pull request when an automated test is not practical.
 
