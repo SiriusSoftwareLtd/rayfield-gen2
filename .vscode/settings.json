@@ -26,6 +26,7 @@
         "listfiles",
         "makefolder",
         "monkeypatch",
+        "pipefail",
         "rbxlx",
         "rokit",
         "seaofvoices",
