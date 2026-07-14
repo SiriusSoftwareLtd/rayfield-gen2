@@ -26,6 +26,7 @@ for _ in manifest do
 end
 
 imageCache.rewrites = {}
+imageCache.onCached = nil -- image sets this to rebind blank instances when a background download lands
 
 local function cacheFile(filePath, url)
     if type(getfenv().getcustomasset) ~= "function" then
@@ -74,36 +75,71 @@ local function fetchAvatar(userId)
     return cacheFile(avatarPath(userId), cdnUrl)
 end
 
-function imageCache.preload()
+-- onSettled(failed) fires once every background download has finished, with the count that never
+-- cached (a genuine failure), so callers can surface it without spamming per-icon.
+function imageCache.preload(onSettled)
     local env = getfenv()
     if type(env.getcustomasset) ~= "function" then
+        if onSettled then
+            onSettled(manifestSize)
+        end
         return false, manifestSize
     end
 
     local rewrites = imageCache.rewrites
-    for key in rewrites do
-        rewrites[key] = nil
+    table.clear(rewrites) -- drop stale entries before remapping (no-op on the fixed built-in manifest)
+
+    local function settle()
+        if not onSettled then
+            return
+        end
+        local failed = 0
+        for id in manifest do
+            if not rewrites[id] then
+                failed += 1
+            end
+        end
+        onSettled(failed)
     end
 
-    local pending = 0
+    local pending, missing = 0, 0
+    local spawning = true -- keep a synchronously-finishing download from settling mid-loop
     for id, url in manifest do
-        pending += 1
-        task.spawn(function()
-            rewrites[id] = cacheFile(path.join(cacheFolder, id .. ".png"), url)
-            pending -= 1
-        end)
+        local filePath = path.join(cacheFolder, id .. ".png")
+        local uri
+        if filesystem.isfile(filePath) then
+            local ok, res = pcall(env.getcustomasset, filePath)
+            uri = ok and res or nil
+        end
+        if uri then
+            -- already on disk from a past session: use it right away
+            rewrites[id] = uri
+        else
+            -- not cached yet: fetch it in the background and swap it in once it lands
+            missing += 1
+            pending += 1
+            task.spawn(function()
+                local cached = cacheFile(filePath, url)
+                if cached then
+                    rewrites[id] = cached
+                    if imageCache.onCached then
+                        imageCache.onCached(id)
+                    end
+                end
+                pending -= 1
+                if pending == 0 and not spawning then
+                    settle()
+                end
+            end)
+        end
     end
 
-    local deadline = os.clock() + 10
-    while pending > 0 and os.clock() < deadline do
-        task.wait(0.05)
+    spawning = false
+    if pending == 0 then
+        settle()
     end
 
-    local cached = 0
-    for _ in rewrites do
-        cached += 1
-    end
-    return cached == manifestSize, manifestSize - cached
+    return missing == 0, missing
 end
 
 function imageCache.avatar(userId, onReady)

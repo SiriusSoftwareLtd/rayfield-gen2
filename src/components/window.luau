@@ -154,6 +154,13 @@ function Window.new(properties)
     end
     locale.setActive(properties.locale or properties.Locale or locale.detect())
 
+    -- a dev can pick the stand-in font shown while the brand font downloads in secure mode; set it
+    -- before resolveTheme below so the theme's brandFont picks it up
+    local fallbackFont = properties.fallbackFont or properties.FallbackFont
+    if fallbackFont then
+        variables.setFallbackFont(fallbackFont)
+    end
+
     local self = setmetatable({
         name = properties.name or properties.Name or "Rayfield Window",
         subheading = properties.subtitle or properties.Subtitle,
@@ -359,7 +366,7 @@ function Window.new(properties)
             -- Configurables
             Text = locale.t(self.name), -- window name
 
-            FontFace = variables.fontManager:loadFont(constants.fontAsset, Enum.FontWeight.Medium),
+            FontFace = variables.brandFont(Enum.FontWeight.Medium),
 
             Size = UDim2.fromOffset(50, 20),
             AutomaticSize = Enum.AutomaticSize.X,

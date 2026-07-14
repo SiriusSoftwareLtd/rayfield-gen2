@@ -51,14 +51,44 @@ end
 function rayfield:CreateWindow(properties: types.WindowProps): types.Window
     local banner = createBanner()
 
-    local cacheFailures = 0
+    local window -- forward declared so the settle callback below can reach it
+
     if variables.secureMode then
-        -- cache assets locally so secureMode doesnt leak asset ids
-        local _, failed = image.preload()
-        cacheFailures = failed or 0
+        -- cache icons locally so secureMode doesnt leak asset ids. non-blocking: whats already on
+        -- disk applies now, the rest download in the background and rebind once ready. if any never
+        -- cache, tell the dev once - on screen only, secure mode stays off the console
+        image.preload(function(failed)
+            if failed > 0 and window and not window.unloaded then
+                window:Notify({
+                    title = locale.resolve("Secure mode"),
+                    content = if failed == 1
+                        then locale.resolve("An asset couldn't be cached and won't appear.")
+                        else locale.resolve("Some assets couldn't be cached and won't appear."),
+                })
+            end
+        end)
     end
 
-    local window = require(script.components.window).new(properties)
+    window = require(script.components.window).new(properties)
+
+    if variables.secureMode then
+        -- secure mode renders the fallback up front (variables.brandFont), then downloads the real
+        -- brand faces off the main thread and swaps them in once ready, so startup never blocks
+        task.spawn(function()
+            local body = variables.fontManager:loadFont(constants.fontAsset, Enum.FontWeight.Medium)
+            local title = variables.fontManager:loadFont(constants.fontAsset, Enum.FontWeight.SemiBold)
+            -- the download can outlast the window; dont swap into one thats been unloaded
+            if
+                not window.unloaded
+                and body
+                and title
+                and body ~= variables.fallbackFont
+                and title ~= variables.fallbackFont
+            then
+                window:ChangeTheme({ Font = body, TitleFont = title })
+            end
+        end)
+    end
 
     task.spawn(function()
         task.wait(0.5)
@@ -67,18 +97,6 @@ function rayfield:CreateWindow(properties: types.WindowProps): types.Window
 
         task.wait(0.5)
         window:Show()
-
-        -- uncached assets resolve blank in secureMode, so tell the dev instead of leaving
-        -- them to wonder why icons are missing. on-screen only: secureMode exists to stay
-        -- quiet, so we never touch the console here
-        if cacheFailures > 0 then
-            window:Notify({
-                title = locale.resolve("Secure mode"),
-                content = if cacheFailures == 1
-                    then locale.resolve("An asset couldn't be cached and won't appear.")
-                    else locale.resolve("Some assets couldn't be cached and won't appear."),
-            })
-        end
     end)
 
     return window :: any

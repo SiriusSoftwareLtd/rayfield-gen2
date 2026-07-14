@@ -214,13 +214,20 @@ function fontManager:loadFont(
     end
 
     -- if the font is not cached, we need to load it from the asset resolver
+    local manifestPath = self.rootFolder .. "/" .. resolvedId .. ".json"
     local possibleFontManifest: string? = nil
     if runService:IsStudio() and self._debug then
         warn("Font manifest loading is not supported in Studio. Using default font manifest for testing.")
         possibleFontManifest =
             '{"name":"Inter","faces":[{"name":"Thin","weight":100,"style":"normal","assetId":"rbxassetid://12187277209"},{"name":"Extra Light","weight":200,"style":"normal","assetId":"rbxassetid://12187293441"},{"name":"Light","weight":300,"style":"normal","assetId":"rbxassetid://12187268450"},{"name":"Regular","weight":400,"style":"normal","assetId":"rbxassetid://12187266066"},{"name":"Medium","weight":500,"style":"normal","assetId":"rbxassetid://12187336822"},{"name":"Semi Bold","weight":600,"style":"normal","assetId":"rbxassetid://12187254443"},{"name":"Bold","weight":700,"style":"normal","assetId":"rbxassetid://12187275575"},{"name":"Extra Bold","weight":800,"style":"normal","assetId":"rbxassetid://12187267750"},{"name":"Black","weight":900,"style":"normal","assetId":"rbxassetid://12187359223"}]}'
+    elseif fileSystem.isfile(manifestPath) then
+        local ok, contents = pcall(fileSystem.readfile, manifestPath)
+        possibleFontManifest = ok and contents or nil
     else
         possibleFontManifest = self.assetResolver:getAssetContentFromId(resolvedId, false)
+        if possibleFontManifest then
+            pcall(fileSystem.writefile, manifestPath, possibleFontManifest)
+        end
     end
     local fontManifest: FontManifest? = nil
     if possibleFontManifest then
@@ -251,31 +258,29 @@ function fontManager:loadFont(
     -- create folder for the font
     fileSystem.ensureFolder(fontDirectory)
 
-    -- iterate over each font face in the manifest and download it
+    -- iterate over each face, caching each to disk like we do images: a face only downloads once,
+    -- later sessions reuse the local file and just re-resolve it
     for i, face in ipairs(fontManifest and fontManifest.faces or {}) do
-        -- Process each font face
-        local fontFaceId = self.assetResolver:resolve(face.assetId)
-        local fontFaceContent = self.assetResolver:getAssetContentFromId(fontFaceId, false)
-        if fontFaceContent then
-            local fontFacePath = fontDirectory .. "/" .. face.name:gsub(" ", "-") .. ".ttf"
-            fileSystem.writefile(fontFacePath, fontFaceContent)
-            local ok, uri = pcall(env.getcustomasset, fontFacePath)
-            if ok and uri then
-                -- Successfully loaded the font face
-                fontManifest.faces[i].assetId = uri
-                if self._debug then
-                    print("Successfully loaded font face for id: " .. tostring(resolvedId) .. ", face: " .. face.name)
-                end
-            else
-                if self._debug then
-                    warn("Failed to load font face for id: " .. tostring(resolvedId) .. ", face: " .. face.name)
-                end
-                madeAllFontsLocal = false
+        local fontFacePath = fontDirectory .. "/" .. face.name:gsub(" ", "-") .. ".ttf"
+        if not fileSystem.isfile(fontFacePath) then
+            local fontFaceId = self.assetResolver:resolve(face.assetId)
+            local fontFaceContent = self.assetResolver:getAssetContentFromId(fontFaceId, false)
+            if fontFaceContent then
+                fileSystem.writefile(fontFacePath, fontFaceContent)
+            elseif self._debug then
+                warn("Font face content is nil for font id: " .. tostring(resolvedId) .. ", face: " .. face.name)
+            end
+        end
+        local ok, uri = pcall(env.getcustomasset, fontFacePath)
+        if ok and uri then
+            fontManifest.faces[i].assetId = uri
+            if self._debug then
+                print("Loaded font face for id: " .. tostring(resolvedId) .. ", face: " .. face.name)
             end
         else
             madeAllFontsLocal = false
             if self._debug then
-                warn("Font face content is nil for font id: " .. tostring(resolvedId) .. ", face: " .. face.name)
+                warn("Failed to load font face for id: " .. tostring(resolvedId) .. ", face: " .. face.name)
             end
         end
     end
