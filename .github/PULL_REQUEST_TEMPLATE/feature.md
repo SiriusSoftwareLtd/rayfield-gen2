@@ -1,5 +1,9 @@
 <!--
 Use this template for a new capability or public behavior change. Target `dev`.
+
+Submit standalone documentation changes to https://github.com/SiriusSoftwareLtd/docs
+and link companion documentation work below when this feature affects public documentation.
+
 Do not include vulnerability details here; report them privately at
 https://github.com/SiriusSoftwareLtd/rayfield-gen2/security/advisories/new.
 -->
@@ -60,11 +64,17 @@ supported executors, deprecations, and rollout concerns.
 
 -
 
-## Documentation
+## Documentation coordination
 
-<!-- List updated public documentation, examples, comments, and type definitions. -->
+<!--
+Standalone public documentation changes belong in https://github.com/SiriusSoftwareLtd/docs.
+Link the companion docs issue or pull request when this feature affects public
+documentation. Note any code comments, examples, or type definitions updated here.
+-->
 
--
+- Public documentation impact: <!-- None or describe the required update -->
+- Companion docs issue or pull request: <!-- Link or "Not applicable" -->
+- In-repository comments, examples, or types updated:
 
 ## UI evidence
 
@@ -80,7 +90,9 @@ supported executors, deprecations, and rollout concerns.
 - [ ] The feature is focused and contains no unrelated changes.
 - [ ] I reviewed my own changes.
 - [ ] Tests cover the new behavior and relevant regressions where practical.
-- [ ] Public APIs, examples, types, and documentation match the resulting behavior.
+- [ ] Public documentation is unaffected, or I linked companion work in `SiriusSoftwareLtd/docs`.
+- [ ] Required code comments, examples, and types match the resulting behavior.
 - [ ] Breaking changes and migration steps are clearly documented.
+- [ ] I did not commit standalone documentation changes that belong in the docs repository.
 - [ ] I did not commit generated files such as `roblox.yml`, `sourcemap.json`, `globalTypes.d.luau`, or `build/`.
 - [ ] This pull request contains no publicly disclosed vulnerability details.
