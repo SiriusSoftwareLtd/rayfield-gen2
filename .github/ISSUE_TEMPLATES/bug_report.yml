@@ -1,0 +1,97 @@
+name: Bug report
+description: Report a reproducible problem with Rayfield Gen 2
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug.
+
+        Search existing issues before submitting. Do not include credentials, access tokens, private endpoints, personal data, or other sensitive information. Security vulnerabilities must not be reported in a public issue; use the repository's Security tab instead.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission checks
+      options:
+        - label: I searched the existing open and closed issues and did not find a duplicate.
+          required: true
+        - label: This is a bug report, not a support request or security vulnerability.
+          required: true
+        - label: I have removed credentials and other sensitive information from this report.
+          required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Problem
+      description: Clearly and concisely describe the problem and its impact.
+      placeholder: What happened, and how does it affect your use of Rayfield Gen 2?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Affected version or commit
+      description: Provide the Rayfield Gen 2 release, branch, or full commit SHA.
+      placeholder: main at 0db691c... or vX.Y.Z
+    validations:
+      required: true
+  - type: input
+    id: runtime
+    attributes:
+      label: Runtime environment
+      description: Name the Roblox runtime or executor and its version.
+      placeholder: Runtime name and version
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: Include the operating system, device type, and relevant Roblox client version.
+      placeholder: Windows 11, desktop, Roblox client version ...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the smallest reliable sequence that demonstrates the problem.
+      placeholder: |
+        1. Load Rayfield Gen 2 with ...
+        2. Create ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Share the smallest Luau snippet or a link to a repository that reproduces the issue, when available.
+      render: lua
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: Describe what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      placeholder: Describe what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs, screenshots, or recordings
+      description: Paste relevant logs or attach screenshots or recordings. Redact sensitive information first.
+      placeholder: Drag screenshots or recordings here, or paste sanitized logs.
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Include workarounds, frequency, regressions, or anything else that may help investigation.

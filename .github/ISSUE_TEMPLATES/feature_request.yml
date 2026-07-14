@@ -1,0 +1,57 @@
+name: Feature request
+description: Suggest an improvement or new capability for Rayfield Gen 2
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Rayfield Gen 2.
+
+        Search existing issues before submitting. Do not include credentials, access tokens, personal data, or other sensitive information. Security vulnerabilities must not be reported in a public issue; use the repository's Security tab instead.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission checks
+      options:
+        - label: I searched the existing open and closed issues and did not find an existing proposal.
+          required: true
+        - label: This request describes a problem or use case, not a support request or security vulnerability.
+          required: true
+        - label: I have removed credentials and other sensitive information from this request.
+          required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: Describe the user need or limitation independently of any particular solution.
+      placeholder: I am trying to ... but ...
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Explain how you would like Rayfield Gen 2 to address the problem.
+      placeholder: Rayfield Gen 2 could ...
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Describe other solutions, workarounds, or API designs you considered.
+      placeholder: I also considered ...
+  - type: textarea
+    id: example
+    attributes:
+      label: Example usage or interface
+      description: Show how the proposed API or behavior might be used, when applicable.
+      render: lua
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add mockups, references, compatibility concerns, or other relevant information.
+      placeholder: Drag mockups here or add links and context.
