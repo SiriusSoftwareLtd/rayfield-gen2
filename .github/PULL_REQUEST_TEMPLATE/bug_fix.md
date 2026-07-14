@@ -53,7 +53,7 @@ supported executors, regressions, and any migration requirements.
 
 ## Validation
 
-- [ ] I ran `bash scripts/check.sh`.
+- [ ] I ran `make ci`.
 - [ ] I added or updated regression coverage where practical.
 - [ ] I reproduced the previous failure and confirmed the corrected behavior.
 - [ ] I completed applicable Roblox Studio or environment-specific manual testing.

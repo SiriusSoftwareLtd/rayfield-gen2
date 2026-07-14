@@ -52,7 +52,7 @@ supported executors, deprecations, and rollout concerns.
 
 ## Validation
 
-- [ ] I ran `bash scripts/check.sh`.
+- [ ] I ran `make ci`.
 - [ ] I added or updated automated or Roblox-hosted tests where practical.
 - [ ] I completed applicable manual testing in Roblox Studio or the affected environment.
 - [ ] I tested existing behavior for regressions.

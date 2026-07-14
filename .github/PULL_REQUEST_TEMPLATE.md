@@ -47,7 +47,7 @@ and supported executors. Write "None" when there is no compatibility impact.
 
 ## Validation
 
-- [ ] I ran `bash scripts/check.sh`, or explained below why it does not apply.
+- [ ] I ran `make ci`, or explained below why it does not apply.
 - [ ] I added or updated automated or Roblox-hosted tests where practical.
 - [ ] I completed applicable manual testing in Roblox Studio or the affected environment.
 - [ ] I tested the affected compatibility paths.

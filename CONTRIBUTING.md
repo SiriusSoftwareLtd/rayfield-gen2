@@ -12,7 +12,7 @@ You need:
 
 - [Git](https://git-scm.com/).
 - [Rokit](https://github.com/rojo-rbx/rokit), which installs the pinned command-line tools from `rokit.toml`.
-- Bash and `curl`. On Windows, Git Bash is suitable.
+- GNU Make and `curl`.
 - [Roblox Studio](https://create.roblox.com/docs/studio/setup) for changes that require runtime or visual validation.
 
 Do not install separate versions of Rojo, Lune, Darklua, StyLua, Selene, or luau-lsp for this project. Rokit pins compatible versions.
@@ -29,13 +29,7 @@ git pull --ff-only
 Trust the tool sources declared by the repository, then install them:
 
 ```bash
-rokit trust rojo-rbx/rojo
-rokit trust lune-org/lune
-rokit trust seaofvoices/darklua
-rokit trust JohnnyMorganz/StyLua
-rokit trust Kampfkarren/selene
-rokit trust JohnnyMorganz/luau-lsp
-rokit install
+make install
 ```
 
 Create a focused branch from the updated `dev` branch:
@@ -65,7 +59,7 @@ Then open Roblox Studio, connect the Rojo plugin to the server, and use Play mod
 | `src/types.luau` | Shared Luau type definitions. |
 | `tests/spec.luau` | Roblox-hosted tests for pure utilities. |
 | `example.client.luau` | Example client and manual validation surface. |
-| `scripts/check.sh` | The formatting, linting, and type-checking gate used by CI. |
+| `Makefile` | Local development and CI command entry points. |
 | `default.project.json` | Rojo project used for Studio development. |
 | `wax.project.json` | Project definition used for release bundling. |
 | `assets/` | Repository-managed visual assets. |
@@ -78,23 +72,26 @@ Files such as `roblox.yml`, `globalTypes.d.luau`, `sourcemap.json`, and `build/`
 Before every pull request, run the same gate as GitHub Actions:
 
 ```bash
-bash scripts/check.sh
+make ci
 ```
 
 This command is required. It performs:
 
 ```bash
 stylua --syntax Luau --check src
+selene generate-roblox-std
 selene src
+rojo sourcemap default.project.json -o sourcemap.json
+curl -fsSL -o globalTypes.d.luau https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/main/scripts/globalTypes.d.luau
 luau-lsp analyze --sourcemap=sourcemap.json --defs=globalTypes.d.luau --no-strict-dm-types src
 ```
 
-The script generates Selene's Roblox standard library, the Rojo source map, and the luau-lsp Roblox definitions when necessary. Run the script itself instead of trying to reproduce its setup manually.
+The Makefile target generates Selene's Roblox standard library, the Rojo source map, and the luau-lsp Roblox definitions.
 
 To apply formatting before running the required check:
 
 ```bash
-stylua --syntax Luau src
+make format
 ```
 
 ### Tests
@@ -114,16 +111,16 @@ For component, theme, interaction, or executor-specific changes, test the affect
 A local Rojo build is an optional but recommended project-mapping check:
 
 ```bash
-rojo build default.project.json -o "Rayfield Gen2.rbxlx"
+make build
 ```
 
 The release bundle is created automatically only for eligible changes on `main`. If your change affects bundling, you can validate it locally with:
 
 ```bash
-lune run wax bundle output="build/bundled.luau" input="wax.project.json" minify=true
+make bundle
 ```
 
-Neither optional build command replaces the required `bash scripts/check.sh` gate.
+Neither optional build command replaces the required `make ci` gate.
 
 ## Coding and documentation conventions
 
@@ -158,7 +155,7 @@ Report suspected vulnerabilities privately through [GitHub's private vulnerabili
 1. Branch from an up-to-date `dev` branch and keep the branch limited to one issue or coherent change.
 2. Write concise, imperative commit subjects, such as `Fix dropdown focus handling`. Split unrelated changes into separate commits or pull requests.
 3. Rebase or merge the latest `dev` branch when needed to resolve conflicts, without rewriting other contributors' work.
-4. Run `bash scripts/check.sh` and all applicable tests and manual checks.
+4. Run `make ci` and all applicable tests and manual checks.
 5. Open the pull request against `dev`. Complete the description with the change, motivation, user impact, validation, screenshots for UI changes, and any follow-up work.
 6. Link the pull request to its issue with a closing keyword, for example `Closes #42`. Use `Refs #42` when the pull request should not close the issue.
 7. Respond to review feedback and keep CI passing. Prefer follow-up commits during active review; maintainers may squash when merging.
