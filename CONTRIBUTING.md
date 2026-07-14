@@ -59,7 +59,8 @@ Then open Roblox Studio, connect the Rojo plugin to the server, and use Play mod
 | `src/types.luau` | Shared Luau type definitions. |
 | `tests/specs/` | TestEZ specs for pure utilities. |
 | `tests/run.server.luau` | Roblox Studio TestEZ runner for the test project. |
-| `scripts/run-tests.luau` | CI/local runner for the TestEZ-style spec files. |
+| `scripts/run-tests.luau` | CI/local runner for the TestEZ-style spec files and coverage gate. |
+| `coverage-baseline.json` | Current measured coverage baseline and known automation gaps. |
 | `example.client.luau` | Example client and manual validation surface. |
 | `Makefile` | Local development and CI command entry points. |
 | `default.project.json` | Rojo project used for Studio development. |
@@ -67,7 +68,7 @@ Then open Roblox Studio, connect the Rojo plugin to the server, and use Play mod
 | `assets/` | Repository-managed visual assets. |
 | `.github/` | GitHub Actions and community configuration. |
 
-Files such as `roblox.yml`, `globalTypes.d.luau`, `sourcemap.json`, and `build/` are generated locally and ignored by Git. Do not commit them.
+Files such as `roblox.yml`, `globalTypes.d.luau`, `sourcemap.json`, `coverage/`, and `build/` are generated locally and ignored by Git. Do not commit them.
 
 ## Required checks
 
@@ -86,10 +87,10 @@ selene src
 rojo sourcemap default.project.json -o sourcemap.json
 curl -fsSL -o globalTypes.d.luau https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/main/scripts/globalTypes.d.luau
 luau-lsp analyze --sourcemap=sourcemap.json --defs=globalTypes.d.luau --no-strict-dm-types src
-lune run scripts/run-tests.luau
+lune run scripts/run-tests.luau -- --coverage-threshold=70
 ```
 
-The Makefile target generates Selene's Roblox standard library, the Rojo source map, and the luau-lsp Roblox definitions.
+The Makefile target generates Selene's Roblox standard library, the Rojo source map, the luau-lsp Roblox definitions, and coverage reports. The enforced project-wide automated coverage target for the deterministic core utility scope is 70% line coverage.
 
 To apply formatting before running the required check:
 
@@ -108,6 +109,21 @@ make test
 ```
 
 This uses Lune to execute the same spec modules with a small Roblox datatype/service shim, so it can run in CI without opening Roblox Studio.
+
+`make test` also writes:
+
+```bash
+coverage/coverage.txt
+coverage/coverage-summary.json
+```
+
+The coverage report is generated from the deterministic core utility modules listed in `coverage-baseline.json`. Pull requests fail when tests fail or when line coverage for that scope drops below 70%. To experiment with a stricter local threshold:
+
+```bash
+make test COVERAGE_THRESHOLD=80
+```
+
+Update `coverage-baseline.json` when the measured baseline or intentionally enforced scope changes. Do not commit generated files under `coverage/`.
 
 To run tests in Roblox Studio without Avant, build the test place:
 

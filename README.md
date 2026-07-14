@@ -8,6 +8,8 @@ Get Started
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, required checks, and pull-request guidance.
 
+Run `make ci` before opening a pull request. The gate runs formatting, linting, type analysis, tests, and the enforced coverage threshold.
+
 ## License
 
 Mozilla Public License 2.0. See [LICENSE](LICENSE).

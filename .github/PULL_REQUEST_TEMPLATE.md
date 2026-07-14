@@ -47,7 +47,7 @@ and supported executors. Write "None" when there is no compatibility impact.
 
 ## Validation
 
-- [ ] I ran `make ci`, or explained below why it does not apply.
+- [ ] I ran `make ci`, including the coverage threshold, or explained below why it does not apply.
 - [ ] I added or updated automated or Roblox-hosted tests where practical.
 - [ ] I completed applicable manual testing in Roblox Studio or the affected environment.
 - [ ] I tested the affected compatibility paths.
@@ -84,6 +84,7 @@ documentation. Note any code comments, examples, or type definitions updated her
 - [ ] The change is focused and contains no unrelated work.
 - [ ] I reviewed my own changes.
 - [ ] Tests cover the change where practical.
+- [ ] Coverage did not drop below the enforced threshold.
 - [ ] Public documentation is unaffected, or I linked companion work in `SiriusSoftwareLtd/docs`.
 - [ ] Required code comments, examples, and types match the resulting behavior.
 - [ ] I did not commit standalone documentation changes that belong in the docs repository.
