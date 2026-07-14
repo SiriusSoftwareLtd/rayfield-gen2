@@ -28,14 +28,17 @@ TESTEZ_MODEL_URL ?= https://github.com/Roblox/testez/releases/download/v0.3.2/Te
 SOURCEMAP ?= sourcemap.json
 GLOBAL_TYPES ?= globalTypes.d.luau
 GLOBAL_TYPES_URL ?= https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/main/scripts/globalTypes.d.luau
+COVERAGE_THRESHOLD ?= 70
 
-.PHONY: help install ci-format check test testez-model test-place format format-check lint typecheck build bundle serve sourcemap-watch dev clean
+.PHONY: help install ci check test coverage testez-model test-place format format-check lint typecheck build bundle serve sourcemap-watch dev clean
 
 help:
 	@echo Rayfield Gen2 Make targets:
 	@echo   install    Trust and install Rokit tools
-	@echo   check      Run the required format, lint, typecheck, and test gate
-	@echo   test       Run unit tests for CI/local validation
+	@echo   ci         Run the required format, lint, typecheck, test, and coverage gate
+	@echo   check      Alias for the required CI gate
+	@echo   test       Run unit tests and enforce coverage for CI/local validation
+	@echo   coverage   Run tests and write coverage reports
 	@echo   testez-model Download the TestEZ model used by Studio tests
 	@echo   test-place Build the Roblox Studio test place
 	@echo   format     Format Luau source with StyLua
@@ -46,7 +49,6 @@ help:
 	@echo   bundle     Build the release Luau bundle
 	@echo   serve      Start the Rojo development server
 	@echo   clean      Remove generated local outputs
-	@echo   ci-format  Run the CI format, lint, typecheck
 	@echo   dev        Start Rojo serve and watch sourcemap generation
 
 install:
@@ -59,13 +61,16 @@ install:
 	$(ROKIT) trust Roblox/testez
 	$(ROKIT) install
 
-ci-format: format-check lint typecheck
+ci: check
 
 check: format-check lint typecheck test
 	@echo all checks passed
 
 test:
-	$(LUNE) run scripts/run-tests.luau
+	$(LUNE) run scripts/run-tests.luau -- --coverage-threshold=$(COVERAGE_THRESHOLD)
+
+coverage: test
+	@echo coverage reports written to coverage/coverage.txt and coverage/coverage-summary.json
 
 testez-model: $(TESTEZ_MODEL)
 
@@ -107,4 +112,4 @@ dev:
 	$(MAKE) -j2 sourcemap-watch serve
 
 clean:
-	$(GIT) clean -fdX -- build $(SOURCEMAP) roblox.yml $(GLOBAL_TYPES) "$(PLACE_FILE)" "$(TEST_PLACE_FILE)"
+	$(GIT) clean -fdX -- build coverage $(SOURCEMAP) roblox.yml $(GLOBAL_TYPES) "$(PLACE_FILE)" "$(TEST_PLACE_FILE)"

@@ -11,6 +11,7 @@
 
 # Build output + generated files
 /build/
+/coverage/
 /sourcemap.json
 
 # Generated tooling defs (created in CI / locally on demand)

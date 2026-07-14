@@ -1,0 +1,94 @@
+{
+  "scope": "src/utility core modules",
+  "measuredDate": "2026-07-14",
+  "command": "make test",
+  "threshold": 70.0,
+  "lineCoverage": 97.24,
+  "coveredLines": 317,
+  "coverableLines": 326,
+  "notes": [
+    "Generated reports are written to coverage/coverage.txt and coverage/coverage-summary.json.",
+    "The enforced Lune coverage scope is the deterministic core utility set used by CI.",
+    "Roblox-hosted UI components, themes, font download paths, and executor-specific integrations remain outside this Lune gate and require Studio/manual validation where changed."
+  ],
+  "files": [
+    {
+      "path": "src/utility/assetResolver.luau",
+      "lineCoverage": 97.62,
+      "coveredLines": 41,
+      "coverableLines": 42
+    },
+    {
+      "path": "src/utility/colors.luau",
+      "lineCoverage": 100.0,
+      "coveredLines": 10,
+      "coverableLines": 10
+    },
+    {
+      "path": "src/utility/filesystemManager.luau",
+      "lineCoverage": 100.0,
+      "coveredLines": 23,
+      "coverableLines": 23
+    },
+    {
+      "path": "src/utility/flagNames.luau",
+      "lineCoverage": 100.0,
+      "coveredLines": 4,
+      "coverableLines": 4
+    },
+    {
+      "path": "src/utility/image.luau",
+      "lineCoverage": 93.94,
+      "coveredLines": 62,
+      "coverableLines": 66
+    },
+    {
+      "path": "src/utility/network.luau",
+      "lineCoverage": 100.0,
+      "coveredLines": 6,
+      "coverableLines": 6
+    },
+    {
+      "path": "src/utility/ordering.luau",
+      "lineCoverage": 100.0,
+      "coveredLines": 5,
+      "coverableLines": 5
+    },
+    {
+      "path": "src/utility/path.luau",
+      "lineCoverage": 100.0,
+      "coveredLines": 20,
+      "coverableLines": 20
+    },
+    {
+      "path": "src/utility/persistence.luau",
+      "lineCoverage": 100.0,
+      "coveredLines": 12,
+      "coverableLines": 12
+    },
+    {
+      "path": "src/utility/persistenceConfig.luau",
+      "lineCoverage": 98.55,
+      "coveredLines": 68,
+      "coverableLines": 69
+    },
+    {
+      "path": "src/utility/persistencePaths.luau",
+      "lineCoverage": 100.0,
+      "coveredLines": 18,
+      "coverableLines": 18
+    },
+    {
+      "path": "src/utility/persistenceSettings.luau",
+      "lineCoverage": 94.12,
+      "coveredLines": 48,
+      "coverableLines": 51
+    }
+  ],
+  "auditGaps": [
+    "src/components/*.luau: UI behavior is still primarily Roblox-hosted and should gain Studio/interaction tests as that harness matures.",
+    "src/themes/*.luau: theme data is not part of the current Lune coverage gate.",
+    "src/utility/fontManager.luau and src/utility/imageCache.luau: network, filesystem, and getcustomasset-heavy paths are not fully covered by deterministic unit tests.",
+    "executor-specific globals and public UI APIs still require manual compatibility validation when touched."
+  ]
+}
