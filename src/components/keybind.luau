@@ -434,7 +434,17 @@ function Keybind:_serialize()
 end
 
 function Keybind:_deserialize(raw)
-    self:Set(Enum[raw[1]]:FromValue(raw[2]))
+    -- the saved type is tostring(EnumType), e.g. "Enum.KeyCode", so strip the prefix before lookup
+    local enumType = Enum[(tostring(raw[1]):gsub("^Enum%.", ""))]
+    if not enumType then
+        return
+    end
+    local ok, item = pcall(function()
+        return enumType:FromValue(raw[2])
+    end)
+    if ok and item then
+        self:Set(item)
+    end
 end
 
 function Keybind:_setShown(shown, animate)
