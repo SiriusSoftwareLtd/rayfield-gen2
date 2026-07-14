@@ -16,6 +16,7 @@ You need:
 - [Roblox Studio](https://create.roblox.com/docs/studio/setup) for changes that require runtime or visual validation.
 
 Do not install separate versions of Rojo, Lune, Darklua, StyLua, Selene, luau-lsp, or TestEZ for this project. Rokit pins compatible versions.
+On Windows, inspect `%USERPROFILE%\.rokit\tool-storage` when troubleshooting the Rokit-managed CLI tools instead of relying on system-wide installs.
 
 ## Set up a clean checkout
 
@@ -66,18 +67,24 @@ Then open Roblox Studio, connect the Rojo plugin to the server, and use Play mod
 | `src/themes/` | Built-in theme definitions. |
 | `src/utility/` | Shared runtime, filesystem, asset, persistence, and other helpers. |
 | `src/types.luau` | Shared Luau type definitions. |
-| `tests/specs/` | TestEZ specs for pure utilities. |
+| `tests/components/` | TestEZ specs for component behavior. |
+| `tests/integration/` | Integration specs for Rayfield workflows. |
+| `tests/runner/` | Specs for the local runner and coverage instrumentation. |
+| `tests/utility/` | TestEZ specs for shared utility modules. |
 | `tests/run.server.luau` | Roblox Studio TestEZ runner for the test project. |
 | `scripts/run-tests.luau` | CI/local runner for the TestEZ-style spec files and coverage gate. |
 | `coverage-baseline.json` | Current measured coverage baseline and known automation gaps. |
 | `example.client.luau` | Example client and manual validation surface. |
 | `Makefile` | Local development and CI command entry points. |
+| `rokit.toml` | Pinned contributor and CI toolchain. |
+| `aftman.toml` | Legacy/minimal Rojo metadata; use Rokit for contributor setup. |
 | `default.project.json` | Rojo project used for Studio development. |
+| `test.project.json` | Rojo project used for Roblox Studio test runs. |
 | `wax.project.json` | Project definition used for release bundling. |
 | `assets/` | Repository-managed visual assets. |
 | `.github/` | GitHub Actions and community configuration. |
 
-Files such as `roblox.yml`, `globalTypes.d.luau`, `sourcemap.json`, `coverage/`, and `build/` are generated locally and ignored by Git. Do not commit them.
+Files such as `build/`, `coverage/`, `sourcemap.json`, `roblox.yml`, `globalTypes.d.luau`, `Rayfield Gen2.rbxlx`, and `Rayfield Gen2 Tests.rbxlx` are generated locally and ignored by Git. Do not commit them.
 
 ## Required checks
 
@@ -87,19 +94,19 @@ Before every pull request, run the same gate as GitHub Actions:
 make ci
 ```
 
-This command is required. It performs:
+This command is required. `make ci` is an alias for `make check`, and GitHub Actions runs it on every push and pull request after installing the Rokit toolchain. It performs:
 
 ```bash
 stylua --syntax Luau --check src tests scripts
 selene generate-roblox-std
-selene src
+selene src tests
 rojo sourcemap default.project.json -o sourcemap.json
 curl -fsSL -o globalTypes.d.luau https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/main/scripts/globalTypes.d.luau
-luau-lsp analyze --sourcemap=sourcemap.json --defs=globalTypes.d.luau --no-strict-dm-types src
+luau-lsp analyze --sourcemap=sourcemap.json --defs=globalTypes.d.luau --no-strict-dm-types src tests/components tests/integration tests/runner tests/utility
 lune run scripts/run-tests.luau -- --coverage-threshold=70
 ```
 
-The Makefile target generates Selene's Roblox standard library, the Rojo source map, the luau-lsp Roblox definitions, and coverage reports. The enforced project-wide automated coverage target for the deterministic core utility scope is 70% line coverage.
+The Makefile target generates Selene's Roblox standard library, the Rojo source map, the luau-lsp Roblox definitions, and coverage reports. The test runner receives a 70% minimum coverage threshold and also enforces the higher tracked line coverage in `coverage-baseline.json` for the current scope.
 
 To apply formatting before running the required check:
 
@@ -109,7 +116,7 @@ make format
 
 ### Tests
 
-Tests live in `tests/specs/` as TestEZ-style `.spec.luau` ModuleScripts. Each spec returns a function and uses TestEZ's `describe`, `it`, `expect`, and lifecycle hooks. Keep spec names ending in `.spec` after Rojo maps them into Studio; the Avant Plugin discovers tests by that suffix.
+Tests live under `tests/components/`, `tests/integration/`, `tests/runner/`, and `tests/utility/` as TestEZ-style `.spec.luau` ModuleScripts. Each spec returns a function and uses TestEZ's `describe`, `it`, `expect`, and lifecycle hooks. Keep spec names ending in `.spec` after Rojo maps them into Studio; the Avant Plugin discovers tests by that suffix.
 
 Run the CI/local unit test path with:
 
@@ -119,6 +126,12 @@ make test
 
 This uses Lune to execute the same spec modules with a small Roblox datatype/service shim, so it can run in CI without opening Roblox Studio.
 
+To run the same path with Rayfield logs enabled:
+
+```bash
+make test-verbose
+```
+
 `make test` also writes:
 
 ```bash
@@ -126,13 +139,25 @@ coverage/coverage.txt
 coverage/coverage-summary.json
 ```
 
-The coverage report is generated from the deterministic core utility modules listed in `coverage-baseline.json`. Pull requests fail when tests fail or when line coverage for that scope drops below 70%. To experiment with a stricter local threshold:
+The coverage report is generated from the default `src` scope tracked in `coverage-baseline.json`. Pull requests fail when tests fail or when line coverage for that scope drops below the effective threshold. To experiment with a stricter local threshold:
 
 ```bash
 make test COVERAGE_THRESHOLD=80
 ```
 
 Update `coverage-baseline.json` when the measured baseline or intentionally enforced scope changes. Do not commit generated files under `coverage/`.
+
+Use the dedicated target when the tracked baseline intentionally needs to change:
+
+```bash
+make coverage-baseline
+```
+
+To produce coverage reports without changing the tracked baseline:
+
+```bash
+make coverage
+```
 
 To run tests in Roblox Studio without Avant, build the test place:
 
@@ -156,13 +181,15 @@ A local Rojo build is an optional but recommended project-mapping check:
 make build
 ```
 
-The release bundle is created automatically only for eligible changes on `main`. If your change affects bundling, you can validate it locally with:
+The release bundle is created automatically from published GitHub releases when the release tag matches `version.txt` and points to a commit on the repository default branch. If your change affects bundling, you can validate it locally with:
 
 ```bash
 make bundle
 ```
 
 Neither optional build command replaces the required `make ci` gate.
+
+Use `make serve` for the normal Rojo development server, `make dev` to run Rojo serve alongside source map watching, and `make clean` to remove ignored local outputs.
 
 ## Coding and documentation conventions
 
@@ -207,11 +234,11 @@ Report suspected vulnerabilities privately through [GitHub's private vulnerabili
    Mark breaking changes with `!` before the colon, as shown above, or with a `BREAKING CHANGE:` footer after the body.
 3. Rebase or merge the latest `dev` branch when needed to resolve conflicts, without rewriting other contributors' work.
 4. Run `make ci` and all applicable tests and manual checks.
-5. Open the pull request against `dev`. Complete the description with the change, motivation, user impact, validation, screenshots for UI changes, and any follow-up work.
+5. Open the pull request against `dev`. Complete the selected pull request template with the change, motivation, user impact, validation, compatibility notes, UI evidence for UI changes, and any follow-up work.
 6. Link the pull request to its issue with a closing keyword, for example `Closes #42`. Use `Refs #42` when the pull request should not close the issue.
 7. Respond to review feedback and keep CI passing. Prefer follow-up commits during active review; maintainers may squash when merging.
 
-Every behavior change must include tests where practical and documentation when it changes public APIs, configuration, examples, or user-visible behavior. Documentation-only changes should still verify links and commands against the current repository.
+Every behavior change must include tests where practical and documentation when it changes public APIs, configuration, examples, or user-visible behavior. Standalone public documentation changes belong in [`SiriusSoftwareLtd/docs`](https://github.com/SiriusSoftwareLtd/docs); link companion documentation work in the pull request when a code change affects public docs. Documentation-only changes should still verify links and commands against the current repository.
 
 ## Licensing and attribution
 
