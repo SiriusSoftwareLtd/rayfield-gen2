@@ -81,29 +81,30 @@ function imageCache.preload()
     end
 
     local rewrites = imageCache.rewrites
-    for key in rewrites do
-        rewrites[key] = nil
-    end
-
-    local pending = 0
+    local missing = 0
     for id, url in manifest do
-        pending += 1
-        task.spawn(function()
-            rewrites[id] = cacheFile(path.join(cacheFolder, id .. ".png"), url)
-            pending -= 1
-        end)
+        local filePath = path.join(cacheFolder, id .. ".png")
+        local uri
+        if filesystem.isfile(filePath) then
+            local ok, res = pcall(env.getcustomasset, filePath)
+            uri = ok and res or nil
+        end
+        if uri then
+            -- already on disk from a past session: use it right away
+            rewrites[id] = uri
+        else
+            -- not cached yet: fetch it in the background and swap it in once it lands
+            missing += 1
+            task.spawn(function()
+                local cached = cacheFile(filePath, url)
+                if cached then
+                    rewrites[id] = cached
+                end
+            end)
+        end
     end
 
-    local deadline = os.clock() + 10
-    while pending > 0 and os.clock() < deadline do
-        task.wait(0.05)
-    end
-
-    local cached = 0
-    for _ in rewrites do
-        cached += 1
-    end
-    return cached == manifestSize, manifestSize - cached
+    return missing == 0, missing
 end
 
 function imageCache.avatar(userId, onReady)

@@ -1,7 +1,6 @@
 local rayfield = {}
 local variables = require(script.utility.variables)
 local image = require(script.utility.image)
-local locale = require(script.utility.locale)
 local constants = require(script.utility.constants)
 local types = require(script.types)
 
@@ -51,11 +50,10 @@ end
 function rayfield:CreateWindow(properties: types.WindowProps): types.Window
     local banner = createBanner()
 
-    local cacheFailures = 0
     if variables.secureMode then
-        -- cache assets locally so secureMode doesnt leak asset ids
-        local _, failed = image.preload()
-        cacheFailures = failed or 0
+        -- cache icons locally so secureMode doesnt leak asset ids. non-blocking: whats already on
+        -- disk applies now, the rest download in the background and pop in once ready
+        image.preload()
     end
 
     local window = require(script.components.window).new(properties)
@@ -80,18 +78,6 @@ function rayfield:CreateWindow(properties: types.WindowProps): types.Window
 
         task.wait(0.5)
         window:Show()
-
-        -- uncached assets resolve blank in secureMode, so tell the dev instead of leaving
-        -- them to wonder why icons are missing. on-screen only: secureMode exists to stay
-        -- quiet, so we never touch the console here
-        if cacheFailures > 0 then
-            window:Notify({
-                title = locale.resolve("Secure mode"),
-                content = if cacheFailures == 1
-                    then locale.resolve("An asset couldn't be cached and won't appear.")
-                    else locale.resolve("Some assets couldn't be cached and won't appear."),
-            })
-        end
     end)
 
     return window :: any
