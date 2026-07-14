@@ -10,12 +10,12 @@ jobs:
     name: Lint, Format, Typecheck and Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           submodules: true
 
       - name: Setup RoKit
-        uses: CompeyDev/setup-rokit@v0.2.1
+        uses: CompeyDev/setup-rokit@1d9390883f7ebce19d48f5b8d006e11d387c92ab
 
       - name: Install RoKit packages
         run: make install

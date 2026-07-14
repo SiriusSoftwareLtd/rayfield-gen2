@@ -22,7 +22,7 @@ jobs:
       release_tag: ${{ steps.validate.outputs.release_tag }}
     steps:
       # actions/checkout@v4
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           ref: ${{ github.event.release.tag_name }}
           fetch-depth: 0
@@ -52,7 +52,7 @@ jobs:
           printf 'release_tag=%s\n' "$RELEASE_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Setup RoKit
-        uses: CompeyDev/setup-rokit@v0.2.1
+        uses: CompeyDev/setup-rokit@1d9390883f7ebce19d48f5b8d006e11d387c92ab
 
       - name: Install RoKit packages
         run: make install
@@ -65,7 +65,7 @@ jobs:
 
       - name: Upload bundle artifact
         # actions/upload-artifact@v4
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: bundled-luau
           path: |
@@ -85,7 +85,7 @@ jobs:
     steps:
       - name: Download bundle artifact
         # actions/download-artifact@v4
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: bundled-luau
           path: build
