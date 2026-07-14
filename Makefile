@@ -1,0 +1,130 @@
+# Convenience targets for Rayfield Gen2.
+# Requires GNU Make plus the Rokit-managed tools listed in rokit.toml.
+
+.DEFAULT_GOAL := help
+
+ROKIT ?= rokit
+ROJO ?= rojo
+LUNE ?= lune
+STYLUA ?= stylua
+SELENE ?= selene
+LUAU_LSP ?= luau-lsp
+TESTEZ ?= testez
+CURL ?= curl
+GIT ?= git
+MKDIR ?= mkdir -p
+HOOKS_DIR ?= .githooks
+
+SRC_DIR ?= src
+TESTS_DIR ?= tests
+TEST_SPECS_DIR ?= tests/components tests/integration tests/runner tests/utility
+SCRIPTS_DIR ?= scripts
+PROJECT_FILE ?= default.project.json
+TEST_PROJECT_FILE ?= test.project.json
+WAX_PROJECT ?= wax.project.json
+PLACE_FILE ?= Rayfield Gen2.rbxlx
+TEST_PLACE_FILE ?= Rayfield Gen2 Tests.rbxlx
+BUNDLE_FILE ?= build/bundled.luau
+TESTEZ_MODEL ?= build/TestEZ.rbxm
+TESTEZ_MODEL_URL ?= https://github.com/Roblox/testez/releases/download/v0.3.2/TestEZ.rbxm
+SOURCEMAP ?= sourcemap.json
+GLOBAL_TYPES ?= globalTypes.d.luau
+GLOBAL_TYPES_URL ?= https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/main/scripts/globalTypes.d.luau
+COVERAGE_THRESHOLD ?= 70
+
+.PHONY: help install hooks ci check test test-verbose coverage coverage-baseline testez-model test-place format format-check lint typecheck build bundle serve sourcemap-watch dev clean
+
+help:
+	@echo Rayfield Gen2 Make targets:
+	@echo   install    Trust and install Rokit tools
+	@echo   hooks      Configure Git to use repository hooks
+	@echo   ci         Run the required format, lint, typecheck, test, and coverage gate
+	@echo   check      Alias for the required CI gate
+	@echo   test       Run unit tests and enforce coverage for CI/local validation
+	@echo   test-verbose  Run unit tests with Rayfield logs enabled
+	@echo   coverage   Run tests and write coverage reports
+	@echo   coverage-baseline Refresh coverage-baseline.json from current coverage
+	@echo   testez-model Download the TestEZ model used by Studio tests
+	@echo   test-place Build the Roblox Studio test place
+	@echo   format     Format Luau source with StyLua
+	@echo   format-check Check Luau source formatting with StyLua
+	@echo   lint       Lint Luau source with Selene
+	@echo   typecheck  Generate sourcemap and run luau-lsp analysis
+	@echo   build      Build the Rojo place file
+	@echo   bundle     Build the release Luau bundle
+	@echo   serve      Start the Rojo development server
+	@echo   clean      Remove generated local outputs
+	@echo   dev        Start Rojo serve and watch sourcemap generation
+
+install:
+	$(ROKIT) trust rojo-rbx/rojo
+	$(ROKIT) trust lune-org/lune
+	$(ROKIT) trust seaofvoices/darklua
+	$(ROKIT) trust JohnnyMorganz/StyLua
+	$(ROKIT) trust Kampfkarren/selene
+	$(ROKIT) trust JohnnyMorganz/luau-lsp
+	$(ROKIT) trust Roblox/testez
+	$(ROKIT) install
+
+hooks:
+	$(GIT) config --local core.hooksPath $(HOOKS_DIR)
+
+ci: check
+
+check: format-check lint typecheck test
+	@echo all checks passed
+
+test:
+	$(LUNE) run scripts/run-tests.luau -- --coverage-threshold=$(COVERAGE_THRESHOLD)
+
+test-verbose:
+	$(LUNE) run scripts/run-tests.luau -- --coverage-threshold=$(COVERAGE_THRESHOLD) --verbose-logs
+
+coverage: test
+	@echo coverage reports written to coverage/coverage.txt and coverage/coverage-summary.json
+
+coverage-baseline:
+	$(LUNE) run scripts/run-tests.luau -- --coverage-threshold=$(COVERAGE_THRESHOLD) --update-coverage-baseline
+	@echo coverage baseline written to coverage-baseline.json
+
+testez-model: $(TESTEZ_MODEL)
+
+test-place: $(TESTEZ_MODEL)
+	$(ROJO) build $(TEST_PROJECT_FILE) -o "$(TEST_PLACE_FILE)"
+
+$(TESTEZ_MODEL):
+	$(MKDIR) "$(dir $(TESTEZ_MODEL))"
+	$(CURL) -fsSL -o "$(TESTEZ_MODEL)" "$(TESTEZ_MODEL_URL)"
+
+format:
+	$(STYLUA) --syntax Luau $(SRC_DIR) $(TESTS_DIR) $(SCRIPTS_DIR)
+
+format-check:
+	$(STYLUA) --syntax Luau --check $(SRC_DIR) $(TESTS_DIR) $(SCRIPTS_DIR)
+
+lint:
+	$(SELENE) generate-roblox-std
+	$(SELENE) $(SRC_DIR) $(TESTS_DIR)
+
+typecheck:
+	$(ROJO) sourcemap $(PROJECT_FILE) -o $(SOURCEMAP)
+	$(CURL) -fsSL -o $(GLOBAL_TYPES) $(GLOBAL_TYPES_URL)
+	$(LUAU_LSP) analyze --sourcemap=$(SOURCEMAP) --defs=$(GLOBAL_TYPES) --no-strict-dm-types $(SRC_DIR) $(TEST_SPECS_DIR)
+
+build:
+	$(ROJO) build $(PROJECT_FILE) -o "$(PLACE_FILE)"
+
+bundle:
+	$(LUNE) run wax bundle output="$(BUNDLE_FILE)" input="$(WAX_PROJECT)" minify=true
+
+serve:
+	$(ROJO) serve $(PROJECT_FILE)
+
+sourcemap-watch:
+	$(ROJO) sourcemap $(PROJECT_FILE) -o $(SOURCEMAP) --watch
+
+dev:
+	$(MAKE) -j2 sourcemap-watch serve
+
+clean:
+	$(GIT) clean -fdX -- build coverage $(SOURCEMAP) roblox.yml $(GLOBAL_TYPES) "$(PLACE_FILE)" "$(TEST_PLACE_FILE)"

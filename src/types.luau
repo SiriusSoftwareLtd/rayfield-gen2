@@ -1,4 +1,10 @@
 --!strict
+
+-- Copyright (c) 2026 Corridon Capital
+-- This Source Code Form is subject to the terms of the Mozilla Public
+-- License, v. 2.0. If a copy of the MPL was not distributed with this
+-- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 -- Public API types. camelCase is the documented surface; PascalCase keys still work.
 
 export type Theme = string | { [string]: any }

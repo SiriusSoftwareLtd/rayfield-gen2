@@ -1,0 +1,23 @@
+#!/usr/bin/env sh
+set -eu
+
+MAKE_CMD=${MAKE:-make}
+REPO_ROOT=$(git rev-parse --show-toplevel)
+
+cd "$REPO_ROOT"
+
+if ! command -v "$MAKE_CMD" >/dev/null 2>&1; then
+    echo "pre-commit: $MAKE_CMD was not found. Install GNU Make or set MAKE to its executable name." >&2
+    exit 1
+fi
+
+echo "pre-commit: running $MAKE_CMD check"
+"$MAKE_CMD" check
+
+echo "pre-commit: running $MAKE_CMD coverage-baseline"
+"$MAKE_CMD" coverage-baseline
+
+if ! git diff --quiet -- coverage-baseline.json; then
+    echo "pre-commit: coverage-baseline.json changed; stage it and commit again." >&2
+    exit 1
+fi

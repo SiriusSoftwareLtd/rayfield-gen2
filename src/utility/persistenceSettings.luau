@@ -1,10 +1,39 @@
 --!nocheck
 
+-- Copyright (c) 2026 Corridon Capital
+-- This Source Code Form is subject to the terms of the Mozilla Public
+-- License, v. 2.0. If a copy of the MPL was not distributed with this
+-- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 local variables = require(script.Parent.variables)
 local filesystem = require(script.Parent.filesystem)
 local paths = require(script.Parent.persistencePaths)
 
 local persistenceSettings = {}
+
+local function enumItemFromValue(enumType, value)
+    local ok, enumItem = pcall(function()
+        return enumType:FromValue(value)
+    end)
+    if ok and enumItem then
+        return enumItem
+    end
+
+    local itemsOk, items = pcall(function()
+        return enumType:GetEnumItems()
+    end)
+    if not itemsOk then
+        return nil
+    end
+
+    for _, item in items do
+        if item.Value == value then
+            return item
+        end
+    end
+
+    return nil
+end
 
 function persistenceSettings.getSettingsPath()
     return paths.getSettingsPath()
@@ -61,7 +90,14 @@ function persistenceSettings.loadSettings(window)
 
     if parsed.toggleKeybind then
         pcall(function()
-            window.settings.toggleKeybind = Enum[parsed.toggleKeybind[1]]:FromValue(parsed.toggleKeybind[2])
+            local enumName = tostring(parsed.toggleKeybind[1]):gsub("^Enum%.", "")
+            local enumType = Enum[enumName]
+            if enumType then
+                local enumItem = enumItemFromValue(enumType, parsed.toggleKeybind[2])
+                if enumItem then
+                    window.settings.toggleKeybind = enumItem
+                end
+            end
         end)
     end
 

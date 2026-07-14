@@ -1,0 +1,24 @@
+{
+  "name": "Rayfield Gen2 Tests",
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "Rayfield": {
+        "$path": "src"
+      },
+      "Tests": {
+        "$path": "tests"
+      },
+      "TestEZ": {
+        "$path": "build/TestEZ.rbxm"
+      }
+    },
+
+    "ServerScriptService": {
+      "RunTests": {
+        "$path": "tests/run.server.luau"
+      }
+    }
+  }
+}

@@ -1,12 +1,21 @@
 --!nocheck
 
+-- Copyright (c) 2026 Corridon Capital
+-- This Source Code Form is subject to the terms of the Mozilla Public
+-- License, v. 2.0. If a copy of the MPL was not distributed with this
+-- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 local runtime = require(script.Parent.runtime)
 local constants = require(script.Parent.constants)
+local log = require(script.Parent.log)
 local fileSystemManager = require(script.Parent.filesystemManager)
 local assetResolver = require(script.Parent.assetResolver)
 local fontManager = require(script.Parent.fontManager)
 
 local variables = table.clone(runtime)
+log.setSuppressPredicate(function()
+    return variables.secureMode
+end)
 
 -- built-in stand-in shown in secure mode until the real brand faces download. a dev can override
 -- it per window with the FallbackFont prop (see setFallbackFont); defaults to BuilderSans.

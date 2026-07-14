@@ -1,9 +1,16 @@
 --!nocheck
+
+-- Copyright (c) 2026 Corridon Capital
+-- This Source Code Form is subject to the terms of the Mozilla Public
+-- License, v. 2.0. If a copy of the MPL was not distributed with this
+-- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 local services = require(script.Parent.services)
 local httpService = services.getService("HttpService")
 local runService = services.getService("RunService")
 local fileSystem = require(script.Parent.filesystem)
 local assetResolver = require(script.Parent.assetResolver)
+local log = require(script.Parent.log)
 
 local function jsonEncode(data)
     local success, result = pcall(function()
@@ -12,7 +19,7 @@ local function jsonEncode(data)
     if success then
         return result
     else
-        warn("Failed to encode JSON:", result)
+        log.warn("Failed to encode JSON:", result)
         return nil
     end
 end
@@ -24,7 +31,7 @@ local function jsonDecode(jsonString)
     if success then
         return result
     else
-        warn("Failed to decode JSON:", result)
+        log.warn("Failed to decode JSON:", result)
         return nil
     end
 end
@@ -171,7 +178,7 @@ function fontManager:loadFont(
     local rawId = self.assetResolver:resolve(id)
     local resolvedId = resolveId(rawId)
     if not resolvedId then
-        warn("Invalid font id: " .. tostring(id))
+        log.warn("Invalid font id: " .. tostring(id))
         return self.defaultOptions.fallbackFont
     end
     -- if the font is already cached, return it
@@ -181,7 +188,7 @@ function fontManager:loadFont(
             local cachedVariant = cachedFont.variants and cachedFont.variants[cacheKey]
             if cachedVariant then
                 if self._debug then
-                    print("Loaded font from cache for id: " .. tostring(resolvedId))
+                    log.print("Loaded font from cache for id: " .. tostring(resolvedId))
                 end
                 return cachedVariant
             end
@@ -191,12 +198,12 @@ function fontManager:loadFont(
                 cachedFont.variants = cachedFont.variants or {}
                 cachedFont.variants[cacheKey] = loadedFont
                 if self._debug then
-                    print("Loaded font variant from cache for id: " .. tostring(resolvedId))
+                    log.print("Loaded font variant from cache for id: " .. tostring(resolvedId))
                 end
                 return loadedFont
             else
                 if self._debug then
-                    warn("Failed to load font from cache for id: " .. tostring(resolvedId))
+                    log.warn("Failed to load font from cache for id: " .. tostring(resolvedId))
                 end
                 self.fontCache[resolvedId] = nil
                 return self.defaultOptions.fallbackFont
@@ -207,7 +214,7 @@ function fontManager:loadFont(
     -- if saveToDisk is false, we cannot load the font from disk, so we return the default font
     if not saveToDisk then
         if self._debug then
-            warn("Font loading without saving to disk can be detected by Anti-cheats.")
+            log.warn("Font loading without saving to disk can be detected by Anti-cheats.")
         end
 
         return self.defaultOptions.fallbackFont
@@ -217,7 +224,7 @@ function fontManager:loadFont(
     local manifestPath = self.rootFolder .. "/" .. resolvedId .. ".json"
     local possibleFontManifest: string? = nil
     if runService:IsStudio() and self._debug then
-        warn("Font manifest loading is not supported in Studio. Using default font manifest for testing.")
+        log.warn("Font manifest loading is not supported in Studio. Using default font manifest for testing.")
         possibleFontManifest =
             '{"name":"Inter","faces":[{"name":"Thin","weight":100,"style":"normal","assetId":"rbxassetid://12187277209"},{"name":"Extra Light","weight":200,"style":"normal","assetId":"rbxassetid://12187293441"},{"name":"Light","weight":300,"style":"normal","assetId":"rbxassetid://12187268450"},{"name":"Regular","weight":400,"style":"normal","assetId":"rbxassetid://12187266066"},{"name":"Medium","weight":500,"style":"normal","assetId":"rbxassetid://12187336822"},{"name":"Semi Bold","weight":600,"style":"normal","assetId":"rbxassetid://12187254443"},{"name":"Bold","weight":700,"style":"normal","assetId":"rbxassetid://12187275575"},{"name":"Extra Bold","weight":800,"style":"normal","assetId":"rbxassetid://12187267750"},{"name":"Black","weight":900,"style":"normal","assetId":"rbxassetid://12187359223"}]}'
     elseif fileSystem.isfile(manifestPath) then
@@ -236,7 +243,7 @@ function fontManager:loadFont(
             fontManifest = parsedManifest
         else
             if self._debug then
-                warn(
+                log.warn(
                     "Failed to parse font manifest for font id: "
                         .. tostring(resolvedId)
                         .. ". Error: "
@@ -249,7 +256,7 @@ function fontManager:loadFont(
     end
     if not fontManifest then
         if self._debug then
-            warn("Font manifest is nil for font id: " .. tostring(resolvedId))
+            log.warn("Font manifest is nil for font id: " .. tostring(resolvedId))
         end
         return self.defaultOptions.fallbackFont
     end
@@ -268,19 +275,19 @@ function fontManager:loadFont(
             if fontFaceContent then
                 fileSystem.writefile(fontFacePath, fontFaceContent)
             elseif self._debug then
-                warn("Font face content is nil for font id: " .. tostring(resolvedId) .. ", face: " .. face.name)
+                log.warn("Font face content is nil for font id: " .. tostring(resolvedId) .. ", face: " .. face.name)
             end
         end
         local ok, uri = pcall(env.getcustomasset, fontFacePath)
         if ok and uri then
             fontManifest.faces[i].assetId = uri
             if self._debug then
-                print("Loaded font face for id: " .. tostring(resolvedId) .. ", face: " .. face.name)
+                log.print("Loaded font face for id: " .. tostring(resolvedId) .. ", face: " .. face.name)
             end
         else
             madeAllFontsLocal = false
             if self._debug then
-                warn("Failed to load font face for id: " .. tostring(resolvedId) .. ", face: " .. face.name)
+                log.warn("Failed to load font face for id: " .. tostring(resolvedId) .. ", face: " .. face.name)
             end
         end
     end
@@ -294,7 +301,7 @@ function fontManager:loadFont(
             fontManifestId = uri
         else
             if self._debug then
-                warn("Failed to load font manifest for id: " .. tostring(resolvedId))
+                log.warn("Failed to load font manifest for id: " .. tostring(resolvedId))
             end
             return self.defaultOptions.fallbackFont
         end
@@ -303,7 +310,7 @@ function fontManager:loadFont(
     local ok, loadedFont = pcall(Font.new, fontManifestId, fontWeight, fontStyle)
     if not ok or not loadedFont then
         if self._debug then
-            warn("Failed to load font for id: " .. tostring(resolvedId))
+            log.warn("Failed to load font for id: " .. tostring(resolvedId))
         end
         return self.defaultOptions.fallbackFont
     end
@@ -319,7 +326,7 @@ function fontManager:loadFont(
             },
         }
         if self._debug then
-            print("Cached font for id: " .. tostring(resolvedId))
+            log.print("Cached font for id: " .. tostring(resolvedId))
         end
     end
     return loadedFont
@@ -335,7 +342,7 @@ function fontManager:resolve(id: number | string): Font?
         local cached = self.fontCache[resolvedId]
         if cached then
             if self._debug then
-                print("Resolved font for id: " .. tostring(resolvedId))
+                log.print("Resolved font for id: " .. tostring(resolvedId))
             end
             for _, font in pairs(cached.variants or {}) do
                 return font

@@ -1,3 +1,8 @@
+-- Copyright (c) 2026 Corridon Capital
+-- This Source Code Form is subject to the terms of the Mozilla Public
+-- License, v. 2.0. If a copy of the MPL was not distributed with this
+-- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 local Keybind = {}
 Keybind.__index = Keybind
 Keybind.__type = "Keybind"
@@ -44,6 +49,30 @@ local function coerceKey(value)
         end
     end
     return Enum.KeyCode.Unknown
+end
+
+local function enumItemFromValue(enumType, value)
+    local ok, item = pcall(function()
+        return enumType:FromValue(value)
+    end)
+    if ok and item then
+        return item
+    end
+
+    local itemsOk, items = pcall(function()
+        return enumType:GetEnumItems()
+    end)
+    if not itemsOk then
+        return nil
+    end
+
+    for _, enumItem in items do
+        if enumItem.Value == value then
+            return enumItem
+        end
+    end
+
+    return nil
 end
 
 function Keybind.new(tab, properties)
@@ -429,7 +458,19 @@ function Keybind:_serialize()
 end
 
 function Keybind:_deserialize(raw)
-    self:Set(Enum[raw[1]]:FromValue(raw[2]))
+    -- the saved type is tostring(EnumType), e.g. "Enum.KeyCode", so strip the prefix before lookup
+    local enumName = tostring(raw[1]):gsub("^Enum%.", "")
+    local enumOk, enumType = pcall(function()
+        return Enum[enumName]
+    end)
+    if not enumOk or not enumType then
+        return
+    end
+
+    local item = enumItemFromValue(enumType, raw[2])
+    if item then
+        self:Set(item)
+    end
 end
 
 function Keybind:_setShown(shown, animate)

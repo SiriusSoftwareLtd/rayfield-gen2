@@ -1,3 +1,8 @@
+-- Copyright (c) 2026 Corridon Capital
+-- This Source Code Form is subject to the terms of the Mozilla Public
+-- License, v. 2.0. If a copy of the MPL was not distributed with this
+-- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 -- Popup: a modal that dims the screen and floats a card in the centre. Modular by design -
 -- give it a title and buttons for a choice dialog, or a list of boxes for a changelog. Built
 -- from the window's own gradient/corner/stroke/shadow so it reads as part of the same UI.

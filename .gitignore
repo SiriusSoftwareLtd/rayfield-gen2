@@ -1,5 +1,6 @@
 # Project place file
 /Rayfield Gen2.rbxlx
+/Rayfield Gen2 Tests.rbxlx
 
 # Roblox Studio lock files
 /*.rbxlx.lock
@@ -10,6 +11,7 @@
 
 # Build output + generated files
 /build/
+/coverage/
 /sourcemap.json
 
 # Generated tooling defs (created in CI / locally on demand)

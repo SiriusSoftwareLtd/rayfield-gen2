@@ -12,10 +12,10 @@ You need:
 
 - [Git](https://git-scm.com/).
 - [Rokit](https://github.com/rojo-rbx/rokit), which installs the pinned command-line tools from `rokit.toml`.
-- Bash and `curl`. On Windows, Git Bash is suitable.
+- GNU Make and `curl`.
 - [Roblox Studio](https://create.roblox.com/docs/studio/setup) for changes that require runtime or visual validation.
 
-Do not install separate versions of Rojo, Lune, Darklua, StyLua, Selene, or luau-lsp for this project. Rokit pins compatible versions.
+Do not install separate versions of Rojo, Lune, Darklua, StyLua, Selene, luau-lsp, or TestEZ for this project. Rokit pins compatible versions.
 
 ## Set up a clean checkout
 
@@ -29,14 +29,17 @@ git pull --ff-only
 Trust the tool sources declared by the repository, then install them:
 
 ```bash
-rokit trust rojo-rbx/rojo
-rokit trust lune-org/lune
-rokit trust seaofvoices/darklua
-rokit trust JohnnyMorganz/StyLua
-rokit trust Kampfkarren/selene
-rokit trust JohnnyMorganz/luau-lsp
-rokit install
+make install
 ```
+
+Enable the repository's Git hooks:
+
+```bash
+make hooks
+```
+
+The pre-commit hook runs `make check` and then refreshes `coverage-baseline.json` with `make coverage-baseline`.
+If the baseline changes, stage the refreshed file and commit again.
 
 Create a focused branch from the updated `dev` branch:
 
@@ -63,49 +66,85 @@ Then open Roblox Studio, connect the Rojo plugin to the server, and use Play mod
 | `src/themes/` | Built-in theme definitions. |
 | `src/utility/` | Shared runtime, filesystem, asset, persistence, and other helpers. |
 | `src/types.luau` | Shared Luau type definitions. |
-| `tests/spec.luau` | Roblox-hosted tests for pure utilities. |
+| `tests/specs/` | TestEZ specs for pure utilities. |
+| `tests/run.server.luau` | Roblox Studio TestEZ runner for the test project. |
+| `scripts/run-tests.luau` | CI/local runner for the TestEZ-style spec files and coverage gate. |
+| `coverage-baseline.json` | Current measured coverage baseline and known automation gaps. |
 | `example.client.luau` | Example client and manual validation surface. |
-| `scripts/check.sh` | The formatting, linting, and type-checking gate used by CI. |
+| `Makefile` | Local development and CI command entry points. |
 | `default.project.json` | Rojo project used for Studio development. |
 | `wax.project.json` | Project definition used for release bundling. |
 | `assets/` | Repository-managed visual assets. |
 | `.github/` | GitHub Actions and community configuration. |
 
-Files such as `roblox.yml`, `globalTypes.d.luau`, `sourcemap.json`, and `build/` are generated locally and ignored by Git. Do not commit them.
+Files such as `roblox.yml`, `globalTypes.d.luau`, `sourcemap.json`, `coverage/`, and `build/` are generated locally and ignored by Git. Do not commit them.
 
 ## Required checks
 
 Before every pull request, run the same gate as GitHub Actions:
 
 ```bash
-bash scripts/check.sh
+make ci
 ```
 
 This command is required. It performs:
 
 ```bash
-stylua --syntax Luau --check src
+stylua --syntax Luau --check src tests scripts
+selene generate-roblox-std
 selene src
+rojo sourcemap default.project.json -o sourcemap.json
+curl -fsSL -o globalTypes.d.luau https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/main/scripts/globalTypes.d.luau
 luau-lsp analyze --sourcemap=sourcemap.json --defs=globalTypes.d.luau --no-strict-dm-types src
+lune run scripts/run-tests.luau -- --coverage-threshold=70
 ```
 
-The script generates Selene's Roblox standard library, the Rojo source map, and the luau-lsp Roblox definitions when necessary. Run the script itself instead of trying to reproduce its setup manually.
+The Makefile target generates Selene's Roblox standard library, the Rojo source map, the luau-lsp Roblox definitions, and coverage reports. The enforced project-wide automated coverage target for the deterministic core utility scope is 70% line coverage.
 
 To apply formatting before running the required check:
 
 ```bash
-stylua --syntax Luau src
+make format
 ```
 
 ### Tests
 
-`tests/spec.luau` contains tests that depend on Roblox globals. They run in a Roblox host, not in the current static CI gate. For changes to covered utilities, update these tests and run them in Studio or the Roblox test runner used for the change. The module documents its invocation:
+Tests live in `tests/specs/` as TestEZ-style `.spec.luau` ModuleScripts. Each spec returns a function and uses TestEZ's `describe`, `it`, `expect`, and lifecycle hooks. Keep spec names ending in `.spec` after Rojo maps them into Studio; the Avant Plugin discovers tests by that suffix.
 
-```luau
-local passed, failed, report = require(path.to.spec)(game.ReplicatedStorage.Rayfield)
-assert(failed == 0, report)
-print(`{passed} tests passed`)
+Run the CI/local unit test path with:
+
+```bash
+make test
 ```
+
+This uses Lune to execute the same spec modules with a small Roblox datatype/service shim, so it can run in CI without opening Roblox Studio.
+
+`make test` also writes:
+
+```bash
+coverage/coverage.txt
+coverage/coverage-summary.json
+```
+
+The coverage report is generated from the deterministic core utility modules listed in `coverage-baseline.json`. Pull requests fail when tests fail or when line coverage for that scope drops below 70%. To experiment with a stricter local threshold:
+
+```bash
+make test COVERAGE_THRESHOLD=80
+```
+
+Update `coverage-baseline.json` when the measured baseline or intentionally enforced scope changes. Do not commit generated files under `coverage/`.
+
+To run tests in Roblox Studio without Avant, build the test place:
+
+```bash
+make test-place
+```
+
+Open `Rayfield Gen2 Tests.rbxlx` in Roblox Studio. The `ServerScriptService.RunTests` script requires `ReplicatedStorage.TestEZ`, runs `ReplicatedStorage.Tests`, and errors if any TestEZ test fails.
+
+To run tests with the Avant Plugin, either open the place from `make test-place` or run `make testez-model` before serving `test.project.json` with Rojo. In Studio, use Avant's `Unit Tests` window. Avant currently supports TestEZ and lists every `ModuleScript` whose name ends with `.spec`.
+
+The Studio test project downloads `build/TestEZ.rbxm` from the pinned TestEZ release when `make test-place` is run. The model is generated local output and must not be committed.
 
 For component, theme, interaction, or executor-specific changes, test the affected path in Roblox Studio and describe the scenarios and results in the pull request. Tests and relevant manual validation are required for behavior changes; explain in the pull request when an automated test is not practical.
 
@@ -114,16 +153,16 @@ For component, theme, interaction, or executor-specific changes, test the affect
 A local Rojo build is an optional but recommended project-mapping check:
 
 ```bash
-rojo build default.project.json -o "Rayfield Gen2.rbxlx"
+make build
 ```
 
 The release bundle is created automatically only for eligible changes on `main`. If your change affects bundling, you can validate it locally with:
 
 ```bash
-lune run wax bundle output="build/bundled.luau" input="wax.project.json" minify=true
+make bundle
 ```
 
-Neither optional build command replaces the required `bash scripts/check.sh` gate.
+Neither optional build command replaces the required `make ci` gate.
 
 ## Coding and documentation conventions
 
@@ -156,9 +195,18 @@ Report suspected vulnerabilities privately through [GitHub's private vulnerabili
 ## Commits and pull requests
 
 1. Branch from an up-to-date `dev` branch and keep the branch limited to one issue or coherent change.
-2. Write concise, imperative commit subjects, such as `Fix dropdown focus handling`. Split unrelated changes into separate commits or pull requests.
+2. Write every commit message using [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/): `<type>[optional scope][!]: <description>`. Keep descriptions concise and imperative. Use `feat` for features, `fix` for bug fixes, and other clear types such as `docs`, `test`, `refactor`, `perf`, `build`, `ci`, `style`, or `chore` when they describe the change. Split unrelated changes into separate commits or pull requests.
+
+   Examples:
+
+   - `fix: correct dropdown focus handling`
+   - `feat(theme): add high contrast palette`
+   - `docs: update contributor guide`
+   - `refactor(window)!: remove legacy resize behavior`
+
+   Mark breaking changes with `!` before the colon, as shown above, or with a `BREAKING CHANGE:` footer after the body.
 3. Rebase or merge the latest `dev` branch when needed to resolve conflicts, without rewriting other contributors' work.
-4. Run `bash scripts/check.sh` and all applicable tests and manual checks.
+4. Run `make ci` and all applicable tests and manual checks.
 5. Open the pull request against `dev`. Complete the description with the change, motivation, user impact, validation, screenshots for UI changes, and any follow-up work.
 6. Link the pull request to its issue with a closing keyword, for example `Closes #42`. Use `Refs #42` when the pull request should not close the issue.
 7. Respond to review feedback and keep CI passing. Prefer follow-up commits during active review; maintainers may squash when merging.
@@ -166,6 +214,8 @@ Report suspected vulnerabilities privately through [GitHub's private vulnerabili
 Every behavior change must include tests where practical and documentation when it changes public APIs, configuration, examples, or user-visible behavior. Documentation-only changes should still verify links and commands against the current repository.
 
 ## Licensing and attribution
+
+Rayfield Gen2 is licensed under the Mozilla Public License 2.0. By contributing, you agree your contributions are licensed under the same terms.
 
 The repository does not currently define a Contributor License Agreement or Developer Certificate of Origin sign-off requirement. No additional contributor sign-off is required at this time.
 

@@ -53,7 +53,7 @@ supported executors, regressions, and any migration requirements.
 
 ## Validation
 
-- [ ] I ran `bash scripts/check.sh`.
+- [ ] I ran `make ci`, including the coverage threshold.
 - [ ] I added or updated regression coverage where practical.
 - [ ] I reproduced the previous failure and confirmed the corrected behavior.
 - [ ] I completed applicable Roblox Studio or environment-specific manual testing.
@@ -91,6 +91,7 @@ Note any code comments, examples, or type definitions updated here.
 - [ ] The fix is focused and contains no unrelated changes.
 - [ ] I reviewed my own changes.
 - [ ] The regression is covered by tests where practical.
+- [ ] Coverage did not drop below the enforced threshold.
 - [ ] Public documentation is unaffected, or I linked companion work in `SiriusSoftwareLtd/docs`.
 - [ ] Required code comments, examples, and types match the corrected behavior.
 - [ ] I did not commit standalone documentation changes that belong in the docs repository.

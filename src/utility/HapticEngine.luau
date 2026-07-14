@@ -1,3 +1,8 @@
+-- Copyright (c) 2026 Corridon Capital
+-- This Source Code Form is subject to the terms of the Mozilla Public
+-- License, v. 2.0. If a copy of the MPL was not distributed with this
+-- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 -- Haptic feedback. A thin wrapper over HapticEffect that buzzes the player's device
 -- (phone, gamepad, VR controller) on two interactions: a press and a notification. We map
 -- them to the presets that feel best in practice - the softer UIHover tick for a press, the

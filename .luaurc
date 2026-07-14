@@ -14,6 +14,13 @@
         "cloneref",
         "gethui",
         "getcustomasset",
-        "getgenv"
+        "getgenv",
+        "describe",
+        "it",
+        "expect",
+        "beforeEach",
+        "afterEach",
+        "beforeAll",
+        "afterAll"
     ]
 }

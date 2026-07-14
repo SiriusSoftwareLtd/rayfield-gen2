@@ -1,5 +1,10 @@
 --!nocheck
 
+-- Copyright (c) 2026 Corridon Capital
+-- This Source Code Form is subject to the terms of the Mozilla Public
+-- License, v. 2.0. If a copy of the MPL was not distributed with this
+-- file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 -- Utility
 local utility = script.Parent.Parent.utility
 local image = require(utility.image)
@@ -475,14 +480,15 @@ function Window.new(properties)
     self.tabList = self:Create("ScrollingFrame", {
         Name = "Tabs",
         Active = true,
-        Size = UDim2.new(1, 0, 0, 36),
-        Position = UDim2.new(0.5, 0, 0, 66),
+        Size = UDim2.new(1, 0, 0, 38),
+        Position = UDim2.new(0.5, 0, 0, 65),
         AnchorPoint = Vector2.new(0.5, 0),
 
         BackgroundTransparency = 1,
         AutomaticCanvasSize = Enum.AutomaticSize.X,
         CanvasSize = UDim2.new(0, 0, 0, 0),
         ScrollBarThickness = 0,
+        ScrollBarImageTransparency = 1,
         ScrollingDirection = Enum.ScrollingDirection.X,
 
         Parent = self.main,
