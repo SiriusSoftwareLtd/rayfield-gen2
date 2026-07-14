@@ -147,6 +147,45 @@ return function()
             expect(readyUri).to.be.ok()
         end)
 
+        it("ignores malformed thumbnail responses while polling avatars", function()
+            getfenv().getcustomasset = function(path)
+                return "asset://" .. path
+            end
+            local decodeCalls = 0
+            variables.httpService.JSONDecode = function()
+                decodeCalls += 1
+                if decodeCalls == 1 then
+                    error("malformed json")
+                elseif decodeCalls == 2 then
+                    return {
+                        data = "not-a-list",
+                    }
+                elseif decodeCalls == 3 then
+                    return {
+                        data = {
+                            "not-an-entry",
+                        },
+                    }
+                end
+                return {
+                    data = {
+                        {
+                            state = "Completed",
+                            imageUrl = "https://cdn.example/avatar.png",
+                        },
+                    },
+                }
+            end
+            local readyUri
+
+            expect(imageCache.avatar(101, function(uri)
+                readyUri = uri
+            end)).to.equal("")
+
+            expect(decodeCalls).to.equal(4)
+            expect(readyUri).to.be.ok()
+        end)
+
         it("leaves avatars unresolved when thumbnail polling never completes", function()
             getfenv().getcustomasset = function(path)
                 return "asset://" .. path

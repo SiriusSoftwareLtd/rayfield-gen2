@@ -1,4 +1,4 @@
---!nocheck
+--!nonstrict
 
 -- Copyright (c) 2026 Corridon Capital
 -- This Source Code Form is subject to the terms of the Mozilla Public
@@ -122,7 +122,7 @@ local function themeOverrides(value)
         if named then
             return require(named)
         end
-        -- a typo'd name shouldnt crash the menu; warn and fall back so the UI still builds
+        -- a typo'd name shouldn't crash the menu; warn and fall back so the UI still builds
         log.warn("Rayfield: unknown theme '" .. value .. "', using default")
     elseif value ~= nil then
         log.warn("Rayfield: invalid theme (expected a built-in name or a theme table), using default")
@@ -689,7 +689,7 @@ function Window:CreateTag(properties)
 end
 
 -- Register a saveable control under its flag. Keeps flags unique so two same-named
--- elements dont clobber each other's saved value. Updates control.flag to the key we
+-- elements don't clobber each other's saved value. Updates control.flag to the key we
 -- actually stored under and returns it.
 function Window:_registerControl(control)
     if not control.flag or control.flag == "" or control.forgetState then
@@ -738,7 +738,7 @@ end
 
 -- find a keybind element currently bound to `key`, skipping `exclude` and unbound keys. lets
 -- the menu-toggle keybind refuse a key an element keybind already owns. keybinds only live at
--- tab level (groups dont hold them), so a scan over each tab's elements catches them all.
+-- tab level (groups don't hold them), so a scan over each tab's elements catches them all.
 function Window:_keybindUsing(key, exclude)
     if typeof(key) ~= "EnumItem" or key == Enum.KeyCode.Unknown then
         return nil
@@ -812,7 +812,7 @@ function Window:Toast(properties)
 end
 
 -- Centred modal over a dimmed backdrop. Takes { title, subtitle?, icon?, content?, boxes?,
--- options?, dismissable? } - give it options for a choice dialog, or boxes for a changelog.
+-- options?, dismissible? } - give it options for a choice dialog, or boxes for a changelog.
 -- Returns the popup handle (call :Close() to dismiss it yourself).
 function Window:Popup(properties)
     return require(script.Parent.popup).new(self, properties)
@@ -1044,7 +1044,7 @@ end
 function Window:_bindKeybind()
     self:Connect(variables.userInputService.InputBegan, function(input, processed)
         if processed or self._recordingKeybind then
-            return -- a keybind element is mid-rebind, dont eat its capture
+            return -- a keybind element is mid-rebind, don't eat its capture
         end
         if input.KeyCode == self.settings.toggleKeybind or input.UserInputType == self.settings.toggleKeybind then
             self:ToggleHide()
@@ -1081,7 +1081,7 @@ function Window:_bindMouseOverride()
     self:Connect(uis:GetPropertyChangedSignal("MouseBehavior"), free)
     self:Connect(uis:GetPropertyChangedSignal("MouseIconEnabled"), free)
 
-    -- right-release doesnt always flip MouseBehavior back (so the signals above wouldnt fire),
+    -- right-release doesn't always flip MouseBehavior back (so the signals above wouldn't fire),
     -- so re-free explicitly once the pan ends
     self:Connect(uis.InputEnded, function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton2 then
@@ -1799,7 +1799,7 @@ function Window:_wireElementHover(element)
 
     self:Connect(element.main.MouseEnter, function()
         if not self:_interactive() then
-            return -- window still revealing/hiding: dont light up mid-animation
+            return -- window still revealing/hiding: don't light up mid-animation
         end
         variables.tweenService
             :Create(
@@ -2057,7 +2057,7 @@ function Window:ConnectFor(owner, signal, callback)
 end
 
 -- Disconnect a connection from Window:Connect and drop it from the tracked list.
--- Transient UI (dropdown popups, removed tabs) calls this so open/close churn doesnt
+-- Transient UI (dropdown popups, removed tabs) calls this so open/close churn doesn't
 -- pile up dead entries that only get cleared at Unload.
 function Window:Disconnect(connection)
     if not connection then
@@ -2071,7 +2071,7 @@ function Window:Disconnect(connection)
 end
 
 -- Destroy a subtree and forget every tracked instance inside it. Transient elements
--- (notifications) use this instead of a bare Destroy so self.instances doesnt grow
+-- (notifications) use this instead of a bare Destroy so self.instances doesn't grow
 -- for the whole session.
 function Window:DestroySubtree(root)
     if not root then

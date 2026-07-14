@@ -57,6 +57,29 @@ return function()
             expect(lastRequest.Method).to.equal("GET")
         end)
 
+        it("ignores missing or non-string response bodies without caching them", function()
+            local calls = 0
+            local responses = {
+                {},
+                { Body = 123 },
+                { Body = "asset-body" },
+            }
+
+            resolver = assetResolver.new(true, "https://example.invalid/asset?id=%d")
+            network.getRequestFn = function()
+                return function()
+                    calls += 1
+                    return responses[calls]
+                end
+            end
+
+            expect(resolver:getAssetContentFromUrl("https://example.invalid/raw", "asset", true)).never.to.be.ok()
+            expect(resolver:getAssetContentFromUrl("https://example.invalid/raw", "asset", true)).never.to.be.ok()
+            expect(resolver:getAssetContentFromUrl("https://example.invalid/raw", "asset", true)).to.equal("asset-body")
+            expect(resolver:getAssetContentFromUrl("https://example.invalid/raw", "asset", true)).to.equal("asset-body")
+            expect(calls).to.equal(3)
+        end)
+
         it("returns nil when no request function is available", function()
             network.getRequestFn = function()
                 return nil

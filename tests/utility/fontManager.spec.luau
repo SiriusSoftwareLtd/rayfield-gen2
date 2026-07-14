@@ -125,6 +125,12 @@ return function()
             expect(manager:resolve(123)).to.equal(regular)
             expect(manager:getFontFromId(123)).to.equal(regular)
 
+            Font.new = function()
+                error("cached variants should not be recreated")
+            end
+            expect(manager:loadFont(123)).to.equal(regular)
+            Font.new = originalFontNew
+
             local bold = manager:loadFont(123, Enum.FontWeight.Bold, Enum.FontStyle.Normal)
             expect(bold.Family).to.equal("asset://regular")
             expect(

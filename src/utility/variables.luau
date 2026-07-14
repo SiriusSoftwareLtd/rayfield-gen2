@@ -1,4 +1,4 @@
---!nocheck
+--!nonstrict
 
 -- Copyright (c) 2026 Corridon Capital
 -- This Source Code Form is subject to the terms of the Mozilla Public
@@ -12,6 +12,9 @@ local fileSystemManager = require(script.Parent.filesystemManager)
 local assetResolver = require(script.Parent.assetResolver)
 local fontManager = require(script.Parent.fontManager)
 
+type AssetResolver = assetResolver.AssetResolver
+type FontManager = fontManager.FontManager
+
 local variables = table.clone(runtime)
 log.setSuppressPredicate(function()
     return variables.secureMode
@@ -22,7 +25,8 @@ end)
 variables.fallbackFont = Font.fromEnum(Enum.Font.BuilderSans)
 
 variables.fileSystemManager = fileSystemManager.new()
-variables.assetResolver = assetResolver.new(true, assetResolver.Enum.AssetDownloadUrl.RoProxyDownloadUrl)
+variables.assetResolver =
+    assetResolver.new(true, assetResolver.Enum.AssetDownloadUrl.RoProxyDownloadUrl) :: AssetResolver
 variables.fontManager = fontManager.new(
     variables.fileSystemManager:getAssetsFolder("fonts"),
     false,
@@ -33,11 +37,11 @@ variables.fontManager = fontManager.new(
         skipCache = false,
         fallbackFont = variables.fallbackFont,
     }
-)
+) :: FontManager
 
 -- let a dev pick the stand-in font, as an Enum.Font or a ready Font. keeps the font managers
 -- own fallback in step so the swap check in init still lines up.
-function variables.setFallbackFont(font)
+function variables.setFallbackFont(font: Enum.Font | Font)
     if typeof(font) == "EnumItem" then
         font = Font.fromEnum(font)
     end

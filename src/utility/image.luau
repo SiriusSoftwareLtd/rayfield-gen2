@@ -1,4 +1,4 @@
---!nocheck
+--!nonstrict
 
 -- Copyright (c) 2026 Corridon Capital
 -- This Source Code Form is subject to the terms of the Mozilla Public
@@ -7,6 +7,9 @@
 
 local imageCache = require(script.Parent.imageCache)
 local variables = require(script.Parent.variables)
+
+type AvatarCallback = imageCache.AvatarCallback
+type PreloadCallback = imageCache.PreloadCallback
 
 local image = {}
 
@@ -39,11 +42,11 @@ local function blocked(value)
     return ""
 end
 
-function image.preload(onSettled)
+function image.preload(onSettled: PreloadCallback?): (boolean, number)
     return imageCache.preload(onSettled)
 end
 
-function image.avatar(userId, onReady)
+function image.avatar(userId: number, onReady: AvatarCallback?): string
     if not variables.secureMode then
         return `rbxthumb://type=AvatarHeadShot&id={userId}&w=48&h=48`
     end
@@ -51,7 +54,7 @@ function image.avatar(userId, onReady)
     return imageCache.avatar(userId, onReady)
 end
 
-function image.assign(instance, property, value)
+function image.assign(instance: Instance, property: string, value: unknown)
     if not imageProperties[property] then
         instance[property] = value
         return
@@ -87,7 +90,7 @@ imageCache.onCached = function(id)
     image.pending[id] = nil
 end
 
-function image.resolve(value)
+function image.resolve(value: unknown): string
     if value == nil or value == 0 or value == "" then
         return ""
     end
