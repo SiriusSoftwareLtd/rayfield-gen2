@@ -21,7 +21,6 @@ jobs:
     outputs:
       release_tag: ${{ steps.validate.outputs.release_tag }}
     steps:
-      # actions/checkout@v4
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           ref: ${{ github.event.release.tag_name }}
@@ -64,7 +63,6 @@ jobs:
         run: sha256sum build/bundled.luau > build/bundled.luau.sha256
 
       - name: Upload bundle artifact
-        # actions/upload-artifact@v4
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: bundled-luau
@@ -84,7 +82,6 @@ jobs:
       contents: write
     steps:
       - name: Download bundle artifact
-        # actions/download-artifact@v4
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: bundled-luau
