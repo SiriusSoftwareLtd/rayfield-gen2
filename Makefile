@@ -30,7 +30,7 @@ GLOBAL_TYPES ?= globalTypes.d.luau
 GLOBAL_TYPES_URL ?= https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/main/scripts/globalTypes.d.luau
 COVERAGE_THRESHOLD ?= 70
 
-.PHONY: help install ci check test coverage testez-model test-place format format-check lint typecheck build bundle serve sourcemap-watch dev clean
+.PHONY: help install ci check test coverage coverage-baseline testez-model test-place format format-check lint typecheck build bundle serve sourcemap-watch dev clean
 
 help:
 	@echo Rayfield Gen2 Make targets:
@@ -39,6 +39,7 @@ help:
 	@echo   check      Alias for the required CI gate
 	@echo   test       Run unit tests and enforce coverage for CI/local validation
 	@echo   coverage   Run tests and write coverage reports
+	@echo   coverage-baseline Refresh coverage-baseline.json from current coverage
 	@echo   testez-model Download the TestEZ model used by Studio tests
 	@echo   test-place Build the Roblox Studio test place
 	@echo   format     Format Luau source with StyLua
@@ -71,6 +72,10 @@ test:
 
 coverage: test
 	@echo coverage reports written to coverage/coverage.txt and coverage/coverage-summary.json
+
+coverage-baseline:
+	$(LUNE) run scripts/run-tests.luau -- --coverage-threshold=$(COVERAGE_THRESHOLD) --update-coverage-baseline
+	@echo coverage baseline written to coverage-baseline.json
 
 testez-model: $(TESTEZ_MODEL)
 

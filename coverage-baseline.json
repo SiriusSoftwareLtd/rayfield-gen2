@@ -1,17 +1,23 @@
 {
-  "scope": "src/utility core modules",
+  "scope": "src/utility",
   "measuredDate": "2026-07-14",
-  "command": "make test",
-  "threshold": 70.0,
-  "lineCoverage": 97.24,
-  "coveredLines": 317,
-  "coverableLines": 326,
+  "command": "make coverage-baseline",
+  "threshold": 70.00,
+  "lineCoverage": 78.60,
+  "coveredLines": 856,
+  "coverableLines": 1089,
   "notes": [
     "Generated reports are written to coverage/coverage.txt and coverage/coverage-summary.json.",
-    "The enforced Lune coverage scope is the deterministic core utility set used by CI.",
-    "Roblox-hosted UI components, themes, font download paths, and executor-specific integrations remain outside this Lune gate and require Studio/manual validation where changed."
+    "The enforced Lune coverage scope is discovered dynamically from src/utility by default.",
+    "Run `make coverage-baseline` after intentional coverage changes to refresh this file."
   ],
   "files": [
+    {
+      "path": "src/utility/HapticEngine.luau",
+      "lineCoverage": 91.43,
+      "coveredLines": 32,
+      "coverableLines": 35
+    },
     {
       "path": "src/utility/assetResolver.luau",
       "lineCoverage": 97.62,
@@ -20,21 +26,45 @@
     },
     {
       "path": "src/utility/colors.luau",
-      "lineCoverage": 100.0,
+      "lineCoverage": 100.00,
       "coveredLines": 10,
       "coverableLines": 10
     },
     {
+      "path": "src/utility/constants.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 9,
+      "coverableLines": 9
+    },
+    {
+      "path": "src/utility/filesystem.luau",
+      "lineCoverage": 84.72,
+      "coveredLines": 122,
+      "coverableLines": 144
+    },
+    {
       "path": "src/utility/filesystemManager.luau",
-      "lineCoverage": 100.0,
+      "lineCoverage": 100.00,
       "coveredLines": 23,
       "coverableLines": 23
     },
     {
       "path": "src/utility/flagNames.luau",
-      "lineCoverage": 100.0,
+      "lineCoverage": 100.00,
       "coveredLines": 4,
       "coverableLines": 4
+    },
+    {
+      "path": "src/utility/fontManager.luau",
+      "lineCoverage": 78.92,
+      "coveredLines": 131,
+      "coverableLines": 166
+    },
+    {
+      "path": "src/utility/functions.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 11,
+      "coverableLines": 11
     },
     {
       "path": "src/utility/image.luau",
@@ -43,26 +73,56 @@
       "coverableLines": 66
     },
     {
+      "path": "src/utility/imageCache.luau",
+      "lineCoverage": 95.60,
+      "coveredLines": 87,
+      "coverableLines": 91
+    },
+    {
+      "path": "src/utility/locale.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 51,
+      "coverableLines": 51
+    },
+    {
+      "path": "src/utility/log.luau",
+      "lineCoverage": 63.64,
+      "coveredLines": 7,
+      "coverableLines": 11
+    },
+    {
+      "path": "src/utility/moveable.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 17,
+      "coverableLines": 17
+    },
+    {
       "path": "src/utility/network.luau",
-      "lineCoverage": 100.0,
+      "lineCoverage": 100.00,
       "coveredLines": 6,
       "coverableLines": 6
     },
     {
+      "path": "src/utility/odometer.luau",
+      "lineCoverage": 0.00,
+      "coveredLines": 0,
+      "coverableLines": 149
+    },
+    {
       "path": "src/utility/ordering.luau",
-      "lineCoverage": 100.0,
+      "lineCoverage": 100.00,
       "coveredLines": 5,
       "coverableLines": 5
     },
     {
       "path": "src/utility/path.luau",
-      "lineCoverage": 100.0,
+      "lineCoverage": 100.00,
       "coveredLines": 20,
       "coverableLines": 20
     },
     {
       "path": "src/utility/persistence.luau",
-      "lineCoverage": 100.0,
+      "lineCoverage": 100.00,
       "coveredLines": 12,
       "coverableLines": 12
     },
@@ -74,7 +134,7 @@
     },
     {
       "path": "src/utility/persistencePaths.luau",
-      "lineCoverage": 100.0,
+      "lineCoverage": 100.00,
       "coveredLines": 18,
       "coverableLines": 18
     },
@@ -83,12 +143,36 @@
       "lineCoverage": 94.12,
       "coveredLines": 48,
       "coverableLines": 51
+    },
+    {
+      "path": "src/utility/runtime.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 17,
+      "coverableLines": 17
+    },
+    {
+      "path": "src/utility/services.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 5,
+      "coverableLines": 5
+    },
+    {
+      "path": "src/utility/textMetrics.luau",
+      "lineCoverage": 94.44,
+      "coveredLines": 34,
+      "coverableLines": 36
+    },
+    {
+      "path": "src/utility/variables.luau",
+      "lineCoverage": 76.19,
+      "coveredLines": 16,
+      "coverableLines": 21
     }
   ],
   "auditGaps": [
     "src/components/*.luau: UI behavior is still primarily Roblox-hosted and should gain Studio/interaction tests as that harness matures.",
     "src/themes/*.luau: theme data is not part of the current Lune coverage gate.",
-    "src/utility/fontManager.luau and src/utility/imageCache.luau: network, filesystem, and getcustomasset-heavy paths are not fully covered by deterministic unit tests.",
+    "src/utility/odometer.luau: animated UI behavior remains outside the deterministic Lune unit coverage.",
     "executor-specific globals and public UI APIs still require manual compatibility validation when touched."
   ]
 }

@@ -70,6 +70,17 @@ local function parseNumberArg(name, default)
     return default
 end
 
+local function parseFlagArg(name)
+    local longName = "--" .. name
+    for _, arg in process.args do
+        if arg == longName then
+            return true
+        end
+    end
+
+    return false
+end
+
 local function parseDirectoryArg(default)
     local positional = nil
     local skipNext = false
@@ -111,6 +122,7 @@ local function resolveCoverageDirectory(path)
 end
 
 local coverageThreshold = parseNumberArg("coverage-threshold", tonumber(process.env.RAYFIELD_COVERAGE_THRESHOLD) or 70)
+local updateCoverageBaseline = parseFlagArg("update-coverage-baseline")
 local coverageDirectory, coverageScope = resolveCoverageDirectory(parseDirectoryArg(defaultCoverageDirectory))
 
 local coverage = {
@@ -779,12 +791,70 @@ local function writeCoverageReports()
     )
     print("coverage reports: coverage/coverage.txt, coverage/coverage-summary.json")
 
-    return totalPercent
+    return {
+        rows = rows,
+        lineCoverage = totalPercent,
+        coveredLines = totalCovered,
+        coverableLines = totalCoverable,
+    }
+end
+
+local function appendJsonStringArray(lines, name, values, trailingComma)
+    table.insert(lines, string.format('  "%s": [', name))
+    for index, value in values do
+        table.insert(lines, string.format('    "%s"%s', jsonEscape(value), if index == #values then "" else ","))
+    end
+    table.insert(lines, "  ]" .. if trailingComma then "," else "")
+end
+
+local function writeCoverageBaseline(summary)
+    local baselineNotes = {
+        "Generated reports are written to coverage/coverage.txt and coverage/coverage-summary.json.",
+        "The enforced Lune coverage scope is discovered dynamically from src/utility by default.",
+        "Run `make coverage-baseline` after intentional coverage changes to refresh this file.",
+    }
+
+    local baselineAuditGaps = {
+        "src/components/*.luau: UI behavior is still primarily Roblox-hosted and should gain Studio/interaction tests as that harness matures.",
+        "src/themes/*.luau: theme data is not part of the current Lune coverage gate.",
+        "src/utility/odometer.luau: animated UI behavior remains outside the deterministic Lune unit coverage.",
+        "executor-specific globals and public UI APIs still require manual compatibility validation when touched.",
+    }
+
+    local jsonLines = {
+        "{",
+        string.format('  "scope": "%s",', jsonEscape(coverageScope)),
+        string.format('  "measuredDate": "%s",', os.date("!%Y-%m-%d")),
+        '  "command": "make coverage-baseline",',
+        string.format('  "threshold": %.2f,', coverageThreshold),
+        string.format('  "lineCoverage": %.2f,', summary.lineCoverage),
+        string.format('  "coveredLines": %d,', summary.coveredLines),
+        string.format('  "coverableLines": %d,', summary.coverableLines),
+    }
+
+    appendJsonStringArray(jsonLines, "notes", baselineNotes, true)
+    table.insert(jsonLines, '  "files": [')
+
+    for index, row in summary.rows do
+        table.insert(jsonLines, "    {")
+        table.insert(jsonLines, string.format('      "path": "%s",', jsonEscape(row.path)))
+        table.insert(jsonLines, string.format('      "lineCoverage": %.2f,', row.lineCoverage))
+        table.insert(jsonLines, string.format('      "coveredLines": %d,', row.coveredLines))
+        table.insert(jsonLines, string.format('      "coverableLines": %d', row.coverableLines))
+        table.insert(jsonLines, "    }" .. if index == #summary.rows then "" else ",")
+    end
+
+    table.insert(jsonLines, "  ],")
+    appendJsonStringArray(jsonLines, "auditGaps", baselineAuditGaps, false)
+    table.insert(jsonLines, "}")
+
+    fs.writeFile(root .. "/coverage-baseline.json", table.concat(jsonLines, "\n") .. "\n")
+    print("coverage baseline updated: coverage-baseline.json")
 end
 
 print(string.format("%d/%d tests passed", results.successCount, results.testsRan))
 
-local coveragePercent = writeCoverageReports()
+local coverageSummary = writeCoverageReports()
 
 if results.failureCount > 0 then
     for _, failure in results.errors do
@@ -793,9 +863,19 @@ if results.failureCount > 0 then
     process.exit(1)
 end
 
-if coveragePercent + 0.0001 < coverageThreshold then
-    warn(string.format("Coverage %.2f%% is below the required %.2f%% threshold.", coveragePercent, coverageThreshold))
+if coverageSummary.lineCoverage + 0.0001 < coverageThreshold then
+    warn(
+        string.format(
+            "Coverage %.2f%% is below the required %.2f%% threshold.",
+            coverageSummary.lineCoverage,
+            coverageThreshold
+        )
+    )
     process.exit(1)
+end
+
+if updateCoverageBaseline then
+    writeCoverageBaseline(coverageSummary)
 end
 
 process.exit(0)
