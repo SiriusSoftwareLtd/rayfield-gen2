@@ -12,7 +12,11 @@ LUAU_LSP ?= luau-lsp
 TESTEZ ?= testez
 CURL ?= curl
 GIT ?= git
+ifeq ($(OS),Windows_NT)
+MKDIR ?= powershell -NoProfile -Command "& { param($$p) New-Item -ItemType Directory -Force -Path $$p | Out-Null }"
+else
 MKDIR ?= mkdir -p
+endif
 HOOKS_DIR ?= .githooks
 
 SRC_DIR ?= src
@@ -115,6 +119,7 @@ build:
 	$(ROJO) build $(PROJECT_FILE) -o "$(PLACE_FILE)"
 
 bundle:
+	$(MKDIR) "$(dir $(BUNDLE_FILE))"
 	$(LUNE) run wax bundle output="$(BUNDLE_FILE)" input="$(WAX_PROJECT)" minify=true
 
 serve:

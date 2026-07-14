@@ -89,9 +89,12 @@ jobs:
       - name: Verify bundle checksum
         run: sha256sum --check build/bundled.luau.sha256
 
+      - name: Create raw text file of bundle
+        run: cp build/bundled.luau build/bundled.txt
+
       - name: Upload bundle to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
-        run: gh release upload "$RELEASE_TAG" build/bundled.luau
+        run: gh release upload "$RELEASE_TAG" build/bundled.luau build/bundled.luau.sha256 build/bundled.txt
