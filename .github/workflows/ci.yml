@@ -15,7 +15,7 @@ jobs:
           submodules: true
 
       - name: Setup RoKit
-        uses: CompeyDev/setup-rokit@v0.1.2
+        uses: CompeyDev/setup-rokit@v0.2.1
 
       - name: Install RoKit packages
         run: make install
