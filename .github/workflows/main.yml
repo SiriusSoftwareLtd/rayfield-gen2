@@ -10,7 +10,7 @@ on:
 
 jobs:
   check:
-    name: Lint, Format and Typecheck
+    name: Lint, Format, Typecheck and Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,16 +21,9 @@ jobs:
         uses: CompeyDev/setup-rokit@v0.1.2
 
       - name: Install RoKit packages
-        run: |
-          rokit trust rojo-rbx/rojo
-          rokit trust lune-org/lune
-          rokit trust seaofvoices/darklua
-          rokit trust JohnnyMorganz/StyLua
-          rokit trust Kampfkarren/selene
-          rokit trust JohnnyMorganz/luau-lsp
-          rokit install
+        run: make install
 
-      - name: Format, lint and typecheck
+      - name: Format, lint, typecheck and test
         run: make ci
 
   build_and_bundle:
