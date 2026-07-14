@@ -11,9 +11,11 @@ local runtime = require(script.Parent.runtime)
 
 local log = {}
 
-local suppressPredicate = function()
+local function defaultSuppressPredicate()
     return runtime.secureMode
 end
+
+local suppressPredicate = defaultSuppressPredicate
 
 local function shouldSuppress()
     local testHelpers = _G.__RAYFIELD_TEST_HELPERS
@@ -25,11 +27,7 @@ local function shouldSuppress()
 end
 
 function log.setSuppressPredicate(predicate)
-    suppressPredicate = if type(predicate) == "function"
-        then predicate
-        else function()
-            return runtime.secureMode
-        end
+    suppressPredicate = if type(predicate) == "function" then predicate else defaultSuppressPredicate
 end
 
 function log.warn(...)
