@@ -1,25 +1,59 @@
 name: Release Bundle
 
-permissions:
-  contents: write
+permissions: {}
 
 on:
   release:
     types:
-      - created
+      - published
+
+concurrency:
+  group: release-bundle-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
 
 jobs:
-  build_and_upload:
-    name: Build and Upload Release Bundle
+  build:
+    name: Build Release Bundle
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      release_tag: ${{ steps.validate.outputs.release_tag }}
     steps:
-      - uses: actions/checkout@v4
+      # actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 0
           submodules: true
+          persist-credentials: false
+
+      - name: Validate release ref
+        id: validate
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          VERSION="$(tr -d '[:space:]' < version.txt)"
+          if [ "$RELEASE_TAG" != "$VERSION" ]; then
+            echo "Release tag '$RELEASE_TAG' must match version.txt '$VERSION'." >&2
+            exit 1
+          fi
+
+          git fetch --no-tags origin "$DEFAULT_BRANCH:refs/remotes/origin/$DEFAULT_BRANCH"
+          if ! git merge-base --is-ancestor HEAD "origin/$DEFAULT_BRANCH"; then
+            echo "Release tag '$RELEASE_TAG' does not point to a commit on '$DEFAULT_BRANCH'." >&2
+            exit 1
+          fi
+
+          printf 'release_tag=%s\n' "$RELEASE_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Setup RoKit
-        uses: CompeyDev/setup-rokit@v0.1.2
+        # CompeyDev/setup-rokit@v0.1.2
+        uses: CompeyDev/setup-rokit@d49be92bd9502180218c3f43e7988faa945217b0
 
       - name: Install RoKit packages
         run: make install
@@ -27,8 +61,42 @@ jobs:
       - name: Bundle
         run: make bundle
 
+      - name: Generate bundle checksum
+        run: sha256sum build/bundled.luau > build/bundled.luau.sha256
+
+      - name: Upload bundle artifact
+        # actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: bundled-luau
+          path: |
+            build/bundled.luau
+            build/bundled.luau.sha256
+          if-no-files-found: error
+          retention-days: 1
+
+  upload:
+    name: Upload Bundle to Release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Download bundle artifact
+        # actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: bundled-luau
+          path: build
+
+      - name: Verify bundle checksum
+        run: sha256sum --check build/bundled.luau.sha256
+
       - name: Upload bundle to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: gh release upload "$RELEASE_TAG" build/bundled.luau --clobber
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
+        run: gh release upload "$RELEASE_TAG" build/bundled.luau
