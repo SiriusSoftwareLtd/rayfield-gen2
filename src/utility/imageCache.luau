@@ -81,6 +81,7 @@ function imageCache.preload()
     end
 
     local rewrites = imageCache.rewrites
+    table.clear(rewrites) -- drop stale entries before remapping (no-op on the fixed built-in manifest)
     local missing = 0
     for id, url in manifest do
         local filePath = path.join(cacheFolder, id .. ".png")

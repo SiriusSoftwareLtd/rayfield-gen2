@@ -65,7 +65,8 @@ function rayfield:CreateWindow(properties: types.WindowProps): types.Window
             local body = variables.fontManager:loadFont(constants.fontAsset, Enum.FontWeight.Medium)
             local title = variables.fontManager:loadFont(constants.fontAsset, Enum.FontWeight.SemiBold)
             local fallback = variables.fontManager.defaultOptions.fallbackFont
-            if body and title and body ~= fallback and title ~= fallback then
+            -- the download can outlast the window; dont swap into one thats been unloaded
+            if not window.unloaded and body and title and body ~= fallback and title ~= fallback then
                 window:ChangeTheme({ Font = body, TitleFont = title })
             end
         end)
