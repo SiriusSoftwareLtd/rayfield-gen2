@@ -334,6 +334,9 @@ function Window.new(properties)
 
         BackgroundTransparency = 1,
         Size = UDim2.new(1, 0, 0, 66),
+        -- Active so empty topbar space can catch input directly - tabs/actions/search sit on
+        -- top and still get first pick, this is just the backdrop becoming a drag handle
+        Active = true,
 
         Parent = self.main,
     })
@@ -607,6 +610,7 @@ function Window.new(properties)
     chrome.buildCollapsedFace(self)
     self:_bindKeybind()
     self:_bindMouseOverride()
+    self:_bindTopbarDrag()
     self:_buildSettingsUI()
 
     self:_syncLiveAnimation()
@@ -1173,6 +1177,103 @@ function Window:_bindMouseOverride()
 
     -- Show calls this on open to free the cursor immediately (the signals above only fire on change)
     self._freeMouse = free
+end
+
+-- Grabbing the topbar drags the whole window too, its own separate handle from the bar
+-- underneath - tracks the cursor 1:1 with no lag, unlike the bars own deliberate smoothing, and
+-- the bar just glues to wherever main currently is each frame so it never drifts off on its own
+function Window:_bindTopbarDrag()
+    local uis = variables.userInputService
+    local dragging = false
+    local relative = Vector2.zero
+
+    -- main.Position lives in a space shifted from AbsolutePosition by the gui inset, even
+    -- though the ScreenGui ignores it - add it back or the window jumps on the first move
+    local offset = Vector2.zero
+    if self.screenGui and self.screenGui.IgnoreGuiInset then
+        offset = variables.guiService:GetGuiInset()
+    end
+
+    local function getTarget()
+        local position = uis:GetMouseLocation() + relative + offset
+        local x, y = position.X, position.Y
+
+        if self.settings and self.settings.keepOnScreen then
+            local size = self.main.AbsoluteSize
+            local screen = self.screenGui.AbsoluteSize
+            local margin = 8
+            local halfX, halfY = size.X / 2, size.Y / 2
+            x = math.clamp(x, halfX + margin, math.max(halfX + margin, screen.X - halfX - margin))
+            y = math.clamp(y, halfY + margin, math.max(halfY + margin, screen.Y - halfY - margin))
+        end
+
+        return UDim2.fromOffset(x, y)
+    end
+
+    -- Global ZIndexBehavior still delivers InputBegan to an Active ancestor even when a child
+    -- button covers that exact pixel, so checking the event alone isnt enough - a press over the
+    -- tabs or the actions has to be rejected by where it actually landed, not just left to bubble
+    local function overInteractiveChild(x, y)
+        for _, region in { self.tabList, self.actionContainer } do
+            local position, size = region.AbsolutePosition, region.AbsoluteSize
+            if x >= position.X and x <= position.X + size.X and y >= position.Y and y <= position.Y + size.Y then
+                return true
+            end
+        end
+        return false
+    end
+
+    self:Connect(self.topbar.InputBegan, function(input, processed)
+        if processed then
+            return
+        end
+
+        local inputType = input.UserInputType.Name
+        if inputType ~= "MouseButton1" and inputType ~= "Touch" then
+            return
+        end
+
+        if overInteractiveChild(input.Position.X, input.Position.Y) then
+            return
+        end
+
+        dragging = true
+
+        if self.screenGui and self.screenGui.IgnoreGuiInset then
+            offset = variables.guiService:GetGuiInset()
+        end
+
+        relative = self.main.AbsolutePosition + self.main.AbsoluteSize * self.main.AnchorPoint - uis:GetMouseLocation()
+    end)
+
+    self:Connect(uis.InputEnded, function(input)
+        if not dragging then
+            return
+        end
+
+        local inputType = input.UserInputType.Name
+        if inputType == "MouseButton1" or inputType == "Touch" then
+            dragging = false
+        end
+    end)
+
+    self:Connect(variables.runService.RenderStepped, function()
+        if not dragging or self.hidden then
+            return
+        end
+
+        self.main.Position = getTarget()
+
+        if self.drag and self.drag.drag then
+            local mainPosition = self.main.Position
+            self.drag.drag.Position = UDim2.new(
+                mainPosition.X.Scale,
+                mainPosition.X.Offset,
+                mainPosition.Y.Scale,
+                mainPosition.Y.Offset + (self.main.Size.Y.Offset / 2 + 15)
+            )
+        end
+    end)
 end
 
 function Window:_buildSettingsUI()
