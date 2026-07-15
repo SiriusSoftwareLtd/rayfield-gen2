@@ -16,9 +16,6 @@ export type AssetRequestPayload = {
     Url: string,
     Method: string,
 }
-export type AssetRequestResponse = {
-    Body: string,
-}
 local assetResolver = {
     Enum = {
         AssetDownloadUrl = {

@@ -22,13 +22,6 @@ export type ThumbnailEntry = {
 export type ThumbnailResponse = {
     data: { ThumbnailEntry }?,
 }
-export type ImageCache = {
-    rewrites: RewriteMap,
-    onCached: OnCachedCallback?,
-    preload: (onSettled: PreloadCallback?) -> (boolean, number),
-    avatar: (userId: unknown, onReady: AvatarCallback?) -> string,
-}
-
 local imageCache = {}
 
 local cacheRoot = variables.fileSystemManager:getRootFolder()
@@ -44,7 +37,8 @@ local thumbEndpoint =
 
 local manifest: { [number]: string } = {}
 for _, id in constants.icons do
-    manifest[id] = assetBase .. tostring(id) .. ".png"
+    local iconId = id :: number
+    manifest[iconId] = assetBase .. tostring(iconId) .. ".png"
 end
 local manifestSize = 0
 for _ in manifest do
