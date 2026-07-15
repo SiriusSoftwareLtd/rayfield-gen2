@@ -20,6 +20,7 @@ local locale = require(utility.locale)
 local constants = require(utility.constants)
 local hapticEngine = require(utility.HapticEngine)
 local enums = require(utility.enums)
+local log = require(utility.log)
 
 local resizeInfo = constants.pillResizeInfo
 local recordInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
@@ -424,7 +425,31 @@ function Keybind:_beginHold(input)
 end
 
 function Keybind:Set(value, skipChanged)
-    self.value = coerceKey(value)
+    local key = coerceKey(value)
+
+    -- same clash rules as interactive capture: a shared bind double-fires, so refuse it and
+    -- keep the current one. covers programmatic sets and config restores alike.
+    if key ~= Enum.KeyCode.Unknown then
+        if self.isMenuToggle then
+            local clash = self.window:_keybindUsing(key, self)
+            if clash then
+                log.warn(
+                    "Rayfield: "
+                        .. keyName(key)
+                        .. " is bound to '"
+                        .. tostring(clash.name)
+                        .. "'; kept "
+                        .. keyName(self.value)
+                )
+                return
+            end
+        elseif key == self.window.settings.toggleKeybind then
+            log.warn("Rayfield: " .. keyName(key) .. " is the menu toggle key; kept " .. keyName(self.value))
+            return
+        end
+    end
+
+    self.value = key
     if self.recording then
         self:_stopRecording() -- also relabels + resizes for us
     else

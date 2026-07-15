@@ -150,7 +150,8 @@ local function restoreUnits(window)
 end
 
 function search.open(window)
-    if window._searching or not window:_interactive() then
+    -- minimised: the results page would render outside the collapsed bar and steal focus
+    if window._searching or window.minimised or not window:_interactive() then
         return
     end
     window._searching = true

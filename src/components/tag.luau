@@ -166,7 +166,8 @@ function Tag:Set(properties)
 end
 
 function Tag:Remove()
-    self.main:Destroy()
+    -- through the window so the tracked instances and theme entries go with it
+    self.window:DestroySubtree(self.main)
     local idx = table.find(self.window.tags, self)
     if idx then
         table.remove(self.window.tags, idx)
