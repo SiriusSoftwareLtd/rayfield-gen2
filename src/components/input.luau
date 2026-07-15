@@ -83,7 +83,7 @@ function Input.new(tab, properties)
 
     if self.icon then
         self.iconLabel = self.window:Create("ImageLabel", {
-            Image = "rbxassetid://" .. tostring(self.icon),
+            Image = self.icon,
             Size = UDim2.fromOffset(16, 16),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
@@ -176,6 +176,15 @@ function Input.new(tab, properties)
     -- commit on focus loss (enter or click away)
     self.window:ConnectFor(self, self.input.FocusLost, function()
         variables.tweenService:Create(self.input, focusInfo, { TextTransparency = 0.6 }):Play()
+        -- clearOnFocus blanks the box on focus, so a click in and straight back out would
+        -- commit "" over a good value. nothing typed means nothing to commit.
+        if self.clearOnFocus and self.input.Text == "" and self.value ~= "" then
+            self.input.Text = self.value
+            return
+        end
+        if self.input.Text == self.value then
+            return -- unchanged: dont re-fire the devs callback for a stray click
+        end
         self:_commit(self.input.Text)
     end)
 

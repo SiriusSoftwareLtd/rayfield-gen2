@@ -70,7 +70,7 @@ function Tag.new(window, properties)
 
     self.iconLabel = self.window:Create("ImageLabel", {
         Name = "Icon",
-        Image = if self.icon then "rbxassetid://" .. tostring(self.icon) else "",
+        Image = self.icon or "",
         ImageColor3 = contrast,
         Size = UDim2.fromOffset(16, 16),
         BackgroundTransparency = 1,

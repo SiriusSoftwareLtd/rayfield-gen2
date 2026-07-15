@@ -145,16 +145,33 @@ return function()
             dropdown:Remove("Green")
             expect(dropdownValue).to.equal(nil)
 
+            -- a user icon may be a rbxassetid string, not just a bare number
+            local stringIcon = first:CreateToggle({
+                name = "StringIcon",
+                icon = "rbxassetid://4483345998",
+                forgetState = true,
+            })
+            expect(stringIcon.iconLabel.Image).to.equal("rbxassetid://4483345998")
+
+            local handedOut
             local multi = first:CreateDropdown({
                 name = "Multi",
                 options = { "A", "B", "C" },
                 multiSelect = true,
                 value = { "A", "B", "A" },
+                callback = function(selected)
+                    handedOut = selected
+                end,
             })
             expect(#multi.value).to.equal(2)
             multi:Set({ "B", "C", "Z" })
             expect(#multi.value).to.equal(2)
             expect(multi.selectedLabel.Text).to.equal("Various")
+
+            -- the callback gets a copy: a dev mutating it must not corrupt our selection
+            expect(handedOut).never.to.equal(multi.value)
+            table.insert(handedOut, "Z")
+            expect(#multi.value).to.equal(2)
 
             local input = first:CreateInput({
                 name = "Amount",

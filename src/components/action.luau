@@ -39,7 +39,7 @@ function Action.new(window, properties)
 
     self.iconLabel = self.window:Create("ImageLabel", {
         -- Configurables
-        Image = "rbxassetid://" .. tostring(self.icon),
+        Image = self.icon,
 
         Size = UDim2.fromOffset(20, 20),
         BorderSizePixel = 0,

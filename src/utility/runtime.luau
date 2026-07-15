@@ -9,8 +9,6 @@ local services = require(script.Parent.services)
 
 local runtime = {}
 
-runtime.rayfieldHidden = false -- flipped while the menu is hidden
-
 runtime.secureMode = (function()
     -- getgenv lives in the executor's script environment, not _G, same as gethui below
     if typeof(getgenv) ~= "function" then
@@ -33,9 +31,18 @@ runtime.httpService = services.getService("HttpService")
 runtime.textService = services.getService("TextService")
 runtime.replicatedStorage = services.getService("ReplicatedStorage")
 runtime.localizationService = services.getService("LocalizationService")
-runtime.guiContainer = if runtime.runService:IsStudio()
-    then runtime.localPlayer.PlayerGui
-    elseif gethui then gethui()
-    else runtime.coreGui
+-- a gethui stub that returns nil would parent every ScreenGui nowhere, so fall back to CoreGui
+runtime.guiContainer = (function()
+    if runtime.runService:IsStudio() then
+        return runtime.localPlayer.PlayerGui
+    end
+    if typeof(gethui) == "function" then
+        local ok, container = pcall(gethui)
+        if ok and container then
+            return container
+        end
+    end
+    return runtime.coreGui
+end)()
 
 return runtime

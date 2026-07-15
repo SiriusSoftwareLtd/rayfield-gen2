@@ -347,7 +347,7 @@ function ColorPicker:_buildHeader()
 
     if self.icon then
         self.iconLabel = self.window:Create("ImageLabel", {
-            Image = "rbxassetid://" .. tostring(self.icon),
+            Image = self.icon,
             Size = UDim2.fromOffset(16, 16),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,

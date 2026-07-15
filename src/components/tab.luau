@@ -165,7 +165,7 @@ function Tab.new(window, properties)
                 -- Configurables
                 -- raw value: Create routes Image through image.resolve, which already handles
                 -- numbers and rbxassetid strings (concat here would double the prefix)
-                Image = tonumber(self.icon) or self.icon,
+                Image = self.icon,
 
                 Size = UDim2.fromOffset(16, 16),
                 BorderSizePixel = 0,

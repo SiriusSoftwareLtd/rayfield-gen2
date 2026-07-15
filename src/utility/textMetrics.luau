@@ -19,7 +19,16 @@ local widthCacheCap = 1024 -- dynamic labels (a live stat) would otherwise grow 
 
 function textMetrics.textWidth(font, size, text)
     text = tostring(text)
-    local key = tostring(font.Family) .. "|" .. tostring(font.Weight) .. "|" .. tostring(size) .. "|" .. text
+    -- Style is part of the key: italic and normal measure differently
+    local key = tostring(font.Family)
+        .. "|"
+        .. tostring(font.Weight)
+        .. "|"
+        .. tostring(font.Style)
+        .. "|"
+        .. tostring(size)
+        .. "|"
+        .. text
     local cached = widthCache[key]
     if cached then
         return cached
@@ -34,8 +43,10 @@ function textMetrics.textWidth(font, size, text)
     local ok, bounds = pcall(textService.GetTextBoundsAsync, textService, params)
     if not ok then
         -- rough fallback for this call only. never cached, so a transient failure doesnt
-        -- lock in a wrong width for the string forever.
-        return math.ceil(size * 0.55 * #text)
+        -- lock in a wrong width for the string forever. count characters, not bytes, or
+        -- anything non-ascii measures far too wide. utf8.len is nil on malformed input.
+        local length = utf8.len(text) or #text
+        return math.ceil(size * 0.55 * length)
     end
 
     local width = math.ceil(bounds.X)

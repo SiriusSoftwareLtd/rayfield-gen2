@@ -115,9 +115,13 @@ function persistenceConfig.list(window)
 
     for _, filePath in files do
         local file = path.basename(filePath)
-        local base = path.stripExtension(file, ".rfld")
-        if base and not base:find(" %(Incorrect Format%)$") then
-            table.insert(names, base)
+        -- listfiles returns folders and anything else in the dir; only our own configs are
+        -- real names, so require the extension rather than listing whatever is lying around
+        if file:sub(-5) == ".rfld" then
+            local base = path.stripExtension(file, ".rfld")
+            if base and base ~= "" and not base:find(" %(Incorrect Format%)$") then
+                table.insert(names, base)
+            end
         end
     end
 

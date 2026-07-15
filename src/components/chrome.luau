@@ -27,7 +27,7 @@ function chrome.buildCollapsedFace(window)
         Size = UDim2.fromOffset(24, 24),
         BackgroundTransparency = 1,
         -- raw value: Create routes Image through image.resolve (concat would double the prefix)
-        Image = tonumber(window.showIcon) or window.showIcon,
+        Image = window.showIcon,
         ZIndex = constants.zIndex.restoreContent,
 
         ImageTransparency = 1, -- shown = 0, set by chrome.setCollapsedShown

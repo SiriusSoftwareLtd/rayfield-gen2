@@ -36,7 +36,8 @@ local function keyName(value)
     return mouseNames[value] or value.Name
 end
 
--- accept an EnumItem or a KeyCode name string, fall back to unbound
+-- accept an EnumItem, a KeyCode name, or a mouse button name, fall back to unbound.
+-- mouse buttons bind like any other key, so a string has to reach them too.
 local function coerceKey(value)
     if typeof(value) == "EnumItem" then
         return value
@@ -47,6 +48,12 @@ local function coerceKey(value)
         end)
         if ok and key then
             return key
+        end
+        local mouseOk, button = pcall(function()
+            return Enum.UserInputType[value]
+        end)
+        if mouseOk and button and mouseNames[button] then
+            return button
         end
     end
     return Enum.KeyCode.Unknown
@@ -123,7 +130,7 @@ function Keybind.new(tab, properties)
 
     if self.icon then
         self.iconLabel = self.window:Create("ImageLabel", {
-            Image = "rbxassetid://" .. tostring(self.icon),
+            Image = self.icon,
             Size = UDim2.fromOffset(16, 16),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,

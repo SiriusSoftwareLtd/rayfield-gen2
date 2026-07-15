@@ -597,27 +597,41 @@ function Window.new(properties)
     self:_bindMouseOverride()
     self:_buildSettingsUI()
 
-    if self.theme.LiveAnimation then
-        task.spawn(function()
-            local out = true
-            local tweenInfo = TweenInfo.new(10, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-
-            while not self.unloaded do
-                local tweenW = variables.tweenService:Create(self.windowGradient, tweenInfo, {
-                    Offset = Vector2.new(if out then 0.4 else -0.2, 0),
-                    Rotation = (if out then 220 else 280),
-                })
-
-                self._liveTween = tweenW
-                tweenW:Play()
-                tweenW.Completed:Wait()
-                out = not out
-            end
-            self._liveTween = nil
-        end)
-    end
+    self:_syncLiveAnimation()
 
     return self
+end
+
+-- start or stop the gradient drift to match the current theme. called on build and on every
+-- ChangeTheme, so switching into or out of an animated theme takes effect either way.
+function Window:_syncLiveAnimation()
+    if not self.theme.LiveAnimation then
+        self._liveAnimating = false -- the running loop sees this and stops after its current leg
+        return
+    end
+    if self._liveAnimating then
+        return -- already drifting
+    end
+
+    self._liveAnimating = true
+    task.spawn(function()
+        local out = true
+        local tweenInfo = TweenInfo.new(10, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
+        while self._liveAnimating and not self.unloaded do
+            local tweenW = variables.tweenService:Create(self.windowGradient, tweenInfo, {
+                Offset = Vector2.new(if out then 0.4 else -0.2, 0),
+                Rotation = (if out then 220 else 280),
+            })
+
+            self._liveTween = tweenW
+            tweenW:Play()
+            tweenW.Completed:Wait()
+            out = not out
+        end
+        self._liveAnimating = false
+        self._liveTween = nil
+    end)
 end
 
 function Window:ChangeTheme(theme)
@@ -654,12 +668,22 @@ function Window:ChangeTheme(theme)
     -- colours (the toggle knob, field fills, glows) aren't, so refresh the elements to reach
     -- them on a live swap. Every tab's elements stay shown (just page-clipped), settings
     -- included, so refresh them all; groups forward the call to their children.
-    if not self.hidden then
-        for _, tab in self.tabs do
-            for _, element in tab.elements do
-                if element._refreshTheme then
-                    element:_refreshTheme()
-                end
+    if self.hidden then
+        -- a hidden window has nothing to animate into, so defer the refresh to the next Show
+        -- rather than dropping it and reopening with the old themes state colours
+        self._themeRefreshPending = true
+    else
+        self:_refreshElementThemes()
+    end
+
+    self:_syncLiveAnimation()
+end
+
+function Window:_refreshElementThemes()
+    for _, tab in self.tabs do
+        for _, element in tab.elements do
+            if element._refreshTheme then
+                element:_refreshTheme()
             end
         end
     end
@@ -837,7 +861,6 @@ function Window:Hide()
 
     self.animating = true
     self.hidden = true
-    variables.rayfieldHidden = true
     self.collapsedInteract.Visible = false -- re-shown once the collapse settles, below
 
     -- closing while minimised closes properly rather than leaving a stale minimised state -
@@ -1348,7 +1371,13 @@ function Window:Show()
 
     self.hidden = false
     self.minimised = false
-    variables.rayfieldHidden = false
+
+    -- a ChangeTheme landed while we were collapsed; apply it before anything fades back in
+    if self._themeRefreshPending then
+        self._themeRefreshPending = false
+        self:_refreshElementThemes()
+    end
+
     self.collapsedInteract.Visible = false -- first thing on click: stop it eating any more input
 
     if self._freeMouse then

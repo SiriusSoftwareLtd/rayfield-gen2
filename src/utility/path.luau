@@ -15,8 +15,11 @@ function path.join(basePath, childPath)
     return basePath .. "/" .. childPath
 end
 
+-- strips drive letters and leading slashes too, so a folder name can never escape the
+-- executors workspace on its own
 function path.sanitizeFolder(value)
-    return (tostring(value):gsub("\\", "/"):gsub("%.%.", ""))
+    local text = tostring(value):gsub("\\", "/"):gsub("%.%.", ""):gsub(":", "")
+    return (text:gsub("^/+", ""))
 end
 
 function path.sanitizeFile(value)

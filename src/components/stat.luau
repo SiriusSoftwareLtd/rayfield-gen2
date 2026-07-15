@@ -215,7 +215,7 @@ function Statistic:_buildFull()
 
     if self.icon then
         self.iconLabel = window:Create("ImageLabel", {
-            Image = "rbxassetid://" .. tostring(self.icon),
+            Image = self.icon,
             Size = UDim2.fromOffset(32, 32),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
@@ -405,7 +405,7 @@ function Statistic:_buildCompact()
 
     if self.icon then
         self.iconLabel = window:Create("ImageLabel", {
-            Image = "rbxassetid://" .. tostring(self.icon),
+            Image = self.icon,
             Size = UDim2.fromOffset(20, 20), -- smaller than the full 32
             BorderSizePixel = 0,
             BackgroundTransparency = 1,

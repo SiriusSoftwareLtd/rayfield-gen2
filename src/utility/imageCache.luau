@@ -16,14 +16,16 @@ local cacheRoot = variables.fileSystemManager:getRootFolder()
 local cacheFolder = variables.fileSystemManager:getAssetsFolder()
 local assetResolver = variables.assetResolver
 
-local assetBase = "https://github.com/SiriusSoftwareLtd/rayfield-gen2/blob/main/assets/"
+-- raw host, not the /blob/ page: that 302s and executors that dont follow redirects
+-- would cache the redirect body instead of the png
+local assetBase = "https://raw.githubusercontent.com/SiriusSoftwareLtd/rayfield-gen2/main/assets/"
 local headshotPx = 48
 local thumbEndpoint =
     "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=%d&size=%dx%d&format=Png&isCircular=false"
 
 local manifest = {}
 for _, id in constants.icons do
-    manifest[id] = assetBase .. id .. ".png?raw=true"
+    manifest[id] = assetBase .. id .. ".png"
 end
 local manifestSize = 0
 for _ in manifest do

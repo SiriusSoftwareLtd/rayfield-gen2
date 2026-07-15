@@ -60,6 +60,15 @@ local function normalizeValue(value, multi)
     return {}
 end
 
+-- what the dev's callback receives. multiSelect hands out a copy: the live table is our
+-- selection state, and a dev who keeps or mutates it would corrupt the dropdown.
+function Dropdown:_callbackValue()
+    if self.multiSelect then
+        return table.clone(self.value)
+    end
+    return self.value[1]
+end
+
 function Dropdown.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
 
@@ -158,7 +167,7 @@ function Dropdown.new(tab, properties)
 
     if self.icon then
         self.iconLabel = self.window:Create("ImageLabel", {
-            Image = "rbxassetid://" .. tostring(self.icon),
+            Image = self.icon,
             Size = UDim2.fromOffset(16, 16),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
@@ -525,7 +534,7 @@ function Dropdown.new(tab, properties)
 
             updateSelectedLabel()
 
-            self.window:_runGuarded(self, self.callback, if self.multiSelect then self.value else self.value[1])
+            self.window:_runGuarded(self, self.callback, self:_callbackValue())
             self.window:_persist(self)
 
             if not self.multiSelect then
@@ -944,7 +953,7 @@ function Dropdown:Refresh(newOptions)
     -- pruning dropped part of the selection: the dev needs to hear it, and the saved
     -- config must not resurrect it
     if selectionChanged then
-        self.window:_runGuarded(self, self.callback, if self.multiSelect then self.value else self.value[1])
+        self.window:_runGuarded(self, self.callback, self:_callbackValue())
         self.window:_persist(self)
     end
 end
@@ -989,7 +998,7 @@ function Dropdown:Remove(option)
         table.remove(self.value, valueIdx)
         self._updateSelectedLabel()
         -- removing a selected option changes the selection; surface and save that
-        self.window:_runGuarded(self, self.callback, if self.multiSelect then self.value else self.value[1])
+        self.window:_runGuarded(self, self.callback, self:_callbackValue())
         self.window:_persist(self)
     end
 
@@ -1013,7 +1022,7 @@ function Dropdown:Set(value, skipCallback)
     self._updateSelectedLabel()
 
     if not skipCallback then
-        self.window:_runGuarded(self, self.callback, if self.multiSelect then self.value else self.value[1])
+        self.window:_runGuarded(self, self.callback, self:_callbackValue())
     end
     self.window:_persist(self)
 end
