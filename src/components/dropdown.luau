@@ -494,6 +494,10 @@ function Dropdown.new(tab, properties)
         end)
 
         self.window:ConnectFor(self, interact.MouseButton1Click, function()
+            -- options stay visible through the close tween; a click mid-fade must not land
+            if not self._isOpen then
+                return
+            end
             hapticEngine.click()
             local sel = isOptionSelected(optionName)
 
@@ -920,6 +924,7 @@ function Dropdown:Refresh(newOptions)
             table.insert(pruned, v)
         end
     end
+    local selectionChanged = #pruned ~= #self.value
     self.value = pruned
 
     for _, opt in self.options do
@@ -935,6 +940,13 @@ function Dropdown:Refresh(newOptions)
     self._updateSelectedLabel()
     -- reconcile with any active search (also refreshes corners); empty query shows all
     self:_applyFilter(if self._searchOpen then self.searchInput.Text else "")
+
+    -- pruning dropped part of the selection: the dev needs to hear it, and the saved
+    -- config must not resurrect it
+    if selectionChanged then
+        self.window:_runGuarded(self, self.callback, if self.multiSelect then self.value else self.value[1])
+        self.window:_persist(self)
+    end
 end
 
 function Dropdown:Add(option)
@@ -976,6 +988,9 @@ function Dropdown:Remove(option)
     if valueIdx then
         table.remove(self.value, valueIdx)
         self._updateSelectedLabel()
+        -- removing a selected option changes the selection; surface and save that
+        self.window:_runGuarded(self, self.callback, if self.multiSelect then self.value else self.value[1])
+        self.window:_persist(self)
     end
 
     self:_updateCorners()
@@ -1000,6 +1015,7 @@ function Dropdown:Set(value, skipCallback)
     if not skipCallback then
         self.window:_runGuarded(self, self.callback, if self.multiSelect then self.value else self.value[1])
     end
+    self.window:_persist(self)
 end
 
 function Dropdown:_setShown(shown, animate)

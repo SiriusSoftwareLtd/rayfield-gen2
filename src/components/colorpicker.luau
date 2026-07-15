@@ -309,7 +309,9 @@ function ColorPicker.new(tab, properties)
     -- column resolves a frame after we build, and the window can be resized). Ignore the
     -- transient widths swept while the window animates/hides, same as the slider.
     self.window:ConnectFor(self, self.main:GetPropertyChangedSignal("AbsoluteSize"), function()
-        if self.window.animating or self.window.hidden then
+        -- hasShownOnce: the initial layout pass happens while the window is still hidden,
+        -- and blocking it would freeze the width-0 layout mode (same fix as the slider)
+        if self.window.animating or (self.window.hidden and self.window.hasShownOnce) then
             return
         end
         self:_applyLayout()
@@ -945,7 +947,14 @@ function ColorPicker:_pump()
         return
     end
 
-    self.value = Color3.fromHSV(self.hue, self.sat, self.val)
+    -- held but stationary: nothing moved, so dont re-render and hammer the callback every frame
+    local newValue = Color3.fromHSV(self.hue, self.sat, self.val)
+    if newValue == self.value and self.alpha == self._pumpAlpha then
+        return
+    end
+    self._pumpAlpha = self.alpha
+
+    self.value = newValue
     self:_render("drag")
     self:_fireCallback()
 end

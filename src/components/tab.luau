@@ -163,7 +163,9 @@ function Tab.new(window, properties)
         if self.icon then
             self.topbarItemIcon = self.window:Create("ImageLabel", {
                 -- Configurables
-                Image = "rbxassetid://" .. tostring(self.icon),
+                -- raw value: Create routes Image through image.resolve, which already handles
+                -- numbers and rbxassetid strings (concat here would double the prefix)
+                Image = tonumber(self.icon) or self.icon,
 
                 Size = UDim2.fromOffset(16, 16),
                 BorderSizePixel = 0,
@@ -436,6 +438,12 @@ end
 
 function Tab:Remove()
     local window = self.window
+
+    -- search reparents elements into its results page; close it first so this tabs
+    -- units go home before their page is destroyed under them
+    if window._searching then
+        search.close(window, { showTabs = true, jumpTo = window.selectedTab and window.selectedTab.tabPage })
+    end
 
     local idx = table.find(window.tabs, self)
     if idx then

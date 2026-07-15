@@ -109,6 +109,19 @@ return function()
             expect(slider.value).to.equal(8.5)
             expect(sliderValue).to.equal(8.5)
 
+            -- the snap grid anchors at range[1]: both endpoints of a non-aligned range stay reachable
+            local offGrid = first:CreateSlider({
+                name = "OffGrid",
+                range = { 0.5, 2.5 },
+                increment = 1,
+                value = 0.5,
+            })
+            expect(offGrid.value).to.equal(0.5)
+            offGrid:Set(2.5)
+            expect(offGrid.value).to.equal(2.5)
+            offGrid:Set(100)
+            expect(offGrid.value).to.equal(2.5)
+
             local dropdown = first:CreateDropdown({
                 name = "Choice",
                 options = { "One", "Two", "Two" },
@@ -128,6 +141,9 @@ return function()
             dropdown:Refresh({ "Blue", "Green" })
             dropdown:Set("Green")
             expect(dropdown.selectedLabel.Text).to.equal("Green")
+            -- removing the selected option must tell the callback the selection changed
+            dropdown:Remove("Green")
+            expect(dropdownValue).to.equal(nil)
 
             local multi = first:CreateDropdown({
                 name = "Multi",

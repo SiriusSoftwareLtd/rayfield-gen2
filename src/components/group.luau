@@ -105,6 +105,12 @@ function Group:_add(componentName, properties)
         self:_wrapChild(element)
     end
 
+    -- same as Tab:_register: elements added after Window:Show must be revealed here
+    -- or they stay fully transparent
+    if not self.window.hidden then
+        element:_setShown(true, true)
+    end
+
     return element
 end
 

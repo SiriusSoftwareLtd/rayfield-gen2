@@ -29,6 +29,13 @@ local function decimalsOf(step)
     return decimals
 end
 
+-- snap onto the increment grid anchored at range[1], so both endpoints stay reachable
+-- (a zero-anchored grid cant express range = {0.5, 2.5} with increment 1)
+local function snapValue(self, value)
+    local snapped = self.range[1] + math.round((value - self.range[1]) / self.increment) * self.increment
+    return math.clamp(snapped, self.range[1], self.range[2])
+end
+
 local tweenInfo = TweenInfo.new(0.45, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 local heldInfo = TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 local followInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
@@ -78,7 +85,7 @@ function Slider.new(tab, properties)
 
     -- snap + clamp the starting value the same way Set does, so the stored value
     -- and the bar never disagree (and a bad initial value can't be saved)
-    self.value = math.clamp(math.round(self.value / self.increment) * self.increment, self.range[1], self.range[2])
+    self.value = snapValue(self, self.value)
 
     self._decimals = decimalsOf(self.increment)
 
@@ -483,11 +490,7 @@ function Slider:_updateFromMouse()
 
     local ratio =
         math.clamp((variables.userInputService:GetMouseLocation().X - self.track.AbsolutePosition.X) / width, 0, 1)
-    local value = math.clamp(
-        math.round((self.range[1] + ratio * (self.range[2] - self.range[1])) / self.increment) * self.increment,
-        self.range[1],
-        self.range[2]
-    )
+    local value = snapValue(self, self.range[1] + ratio * (self.range[2] - self.range[1]))
 
     if value ~= self.value then
         self.value = value
@@ -520,7 +523,7 @@ function Slider:_fireCallback(value)
 end
 
 function Slider:Set(value, skipCallback)
-    value = math.clamp(math.round(value / self.increment) * self.increment, self.range[1], self.range[2])
+    value = snapValue(self, value)
     self.value = value
     if self.valueOdo then
         self.valueOdo:to(self:_format(value), value >= (self._lastValue or value))

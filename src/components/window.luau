@@ -627,6 +627,10 @@ function Window:ChangeTheme(theme)
     for name, value in overrides do
         self.theme[name] = coerceThemeValue(name, value)
     end
+    -- match the constructor: a hand-written table gets derived strokes for the keys it changes
+    if typeof(theme) == "table" then
+        deriveStrokes(self.theme, overrides)
+    end
 
     for instance, properties in self.themeProperties do
         for property, value in properties do
@@ -819,7 +823,9 @@ function Window:Popup(properties)
 end
 
 function Window:Hide()
-    if self.animating then
+    -- idempotent: a second Hide while collapsed would capture the pill spot as the
+    -- restore position and teleport the window there on the next Show
+    if self.animating or self.hidden then
         return
     end
 
@@ -1327,7 +1333,8 @@ function Window:_revealElements(perElementDelay, budget)
 end
 
 function Window:Show()
-    if self.animating then
+    -- idempotent: replaying the restore on a visible window teleports it to a stale position
+    if self.animating or not self.hidden then
         return
     end
     self.animating = true
@@ -1847,7 +1854,10 @@ function Window:_runGuarded(element, fn, ...)
         local quickOut = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
         variables.tweenService:Create(flashFrame, quickOut, { BackgroundColor3 = self.theme.ErrorColor }):Play()
         variables.tweenService:Create(element.stroke, quickOut, { Color = self.theme.ErrorStrokeColor }):Play()
-        element.title.Text = locale.resolve("Error, log recorded in console.")
+        -- minimal elements build without a label, and the flash must survive that
+        if element.title then
+            element.title.Text = locale.resolve("Error, log recorded in console.")
+        end
 
         log.warn(
             `Rayfield encountered an error, with the callback for a {element.__type} component named '{element.name}':`
@@ -1856,7 +1866,9 @@ function Window:_runGuarded(element, fn, ...)
 
         task.wait(1)
 
-        element.title.Text = locale.resolve(element.name)
+        if element.title then
+            element.title.Text = locale.resolve(element.name)
+        end
         variables.tweenService
             :Create(
                 flashFrame,
