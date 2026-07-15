@@ -1,7 +1,4 @@
---!strict
-
-local helpers = ((_G :: any).__RAYFIELD_TEST_HELPERS or require(script.Parent.Parent.TestHelpers)) :: any
-local requireUtility = helpers.requireUtility
+local requireUtility = (_G :: any).__RAYFIELD_TEST_HELPERS.requireUtility
 
 return function()
     local persistenceConfig = requireUtility("persistenceConfig")
@@ -12,13 +9,13 @@ return function()
         local originalFileSystemManager
         local originalHttpService
         local originalFilesystem
-        local files: any
-        local listedFiles: any
-        local ensuredDir: any
-        local encodedData: any
-        local decodedData: any
+        local files
+        local listedFiles
+        local ensuredDir
+        local encodedData
+        local decodedData
 
-        local function makeWindow(): any
+        local function makeWindow()
             return {
                 name = "Main Window",
                 configuration = {

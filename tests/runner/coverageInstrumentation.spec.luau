@@ -1,6 +1,4 @@
---!strict
-
-local helpers = ((_G :: any).__RAYFIELD_TEST_HELPERS or require(script.Parent.Parent.TestHelpers)) :: any
+local helpers = (_G :: any).__RAYFIELD_TEST_HELPERS
 
 return function()
     describe("coverage instrumentation", function()

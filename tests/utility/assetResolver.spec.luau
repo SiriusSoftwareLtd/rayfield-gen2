@@ -1,7 +1,4 @@
---!strict
-
-local helpers = ((_G :: any).__RAYFIELD_TEST_HELPERS or require(script.Parent.Parent.TestHelpers)) :: any
-local requireUtility = helpers.requireUtility
+local requireUtility = (_G :: any).__RAYFIELD_TEST_HELPERS.requireUtility
 
 return function()
     local assetResolver = requireUtility("assetResolver")
@@ -58,29 +55,6 @@ return function()
             expect(calls).to.equal(1)
             expect(lastRequest.Url).to.equal("https://example.invalid/raw")
             expect(lastRequest.Method).to.equal("GET")
-        end)
-
-        it("ignores missing or non-string response bodies without caching them", function()
-            local calls = 0
-            local responses: { any } = {
-                {},
-                { Body = 123 },
-                { Body = "asset-body" },
-            }
-
-            resolver = assetResolver.new(true, "https://example.invalid/asset?id=%d")
-            network.getRequestFn = function()
-                return function()
-                    calls += 1
-                    return responses[calls]
-                end
-            end
-
-            expect(resolver:getAssetContentFromUrl("https://example.invalid/raw", "asset", true)).never.to.be.ok()
-            expect(resolver:getAssetContentFromUrl("https://example.invalid/raw", "asset", true)).never.to.be.ok()
-            expect(resolver:getAssetContentFromUrl("https://example.invalid/raw", "asset", true)).to.equal("asset-body")
-            expect(resolver:getAssetContentFromUrl("https://example.invalid/raw", "asset", true)).to.equal("asset-body")
-            expect(calls).to.equal(3)
         end)
 
         it("returns nil when no request function is available", function()

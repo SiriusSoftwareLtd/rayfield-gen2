@@ -1,7 +1,4 @@
---!strict
-
-local helpers = ((_G :: any).__RAYFIELD_TEST_HELPERS or require(script.Parent.Parent.TestHelpers)) :: any
-local requireUtility = helpers.requireUtility
+local requireUtility = (_G :: any).__RAYFIELD_TEST_HELPERS.requireUtility
 
 return function()
     local textMetrics = requireUtility("textMetrics")
@@ -20,7 +17,7 @@ return function()
 
         it("measures and caches text width", function()
             local calls = 0
-            variables.textService.GetTextBoundsAsync = function(_, params: any)
+            variables.textService.GetTextBoundsAsync = function(_, params)
                 calls += 1
                 return {
                     X = #params.Text * 7.25,

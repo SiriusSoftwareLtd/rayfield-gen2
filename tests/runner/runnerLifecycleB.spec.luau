@@ -1,5 +1,3 @@
---!strict
-
 return function()
     local globals = _G :: any
 

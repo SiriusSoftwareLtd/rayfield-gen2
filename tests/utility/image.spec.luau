@@ -1,7 +1,4 @@
---!strict
-
-local helpers = ((_G :: any).__RAYFIELD_TEST_HELPERS or require(script.Parent.Parent.TestHelpers)) :: any
-local requireUtility = helpers.requireUtility
+local requireUtility = (_G :: any).__RAYFIELD_TEST_HELPERS.requireUtility
 
 return function()
     local image = requireUtility("image")

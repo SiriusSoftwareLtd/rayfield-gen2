@@ -1,19 +1,16 @@
---!strict
-
-local helpers = ((_G :: any).__RAYFIELD_TEST_HELPERS or require(script.Parent.Parent.TestHelpers)) :: any
-local requireUtility = helpers.requireUtility
+local requireUtility = (_G :: any).__RAYFIELD_TEST_HELPERS.requireUtility
 
 return function()
     local moveable = requireUtility("moveable")
 
     describe("utility.moveable", function()
         it("adds movement methods that delegate to the owning tab", function()
-            local class: any = {}
+            local class = {}
             moveable(class)
 
             local calls = {}
-            local element: any = setmetatable({}, { __index = class })
-            local sibling: any = {}
+            local element = setmetatable({}, { __index = class })
+            local sibling = {}
             element.tab = {
                 elements = { sibling, element, {} },
                 _moveElement = function(_, moved, index)
@@ -32,11 +29,11 @@ return function()
         end)
 
         it("does not move up or down when the element is not registered", function()
-            local class: any = {}
+            local class = {}
             moveable(class)
 
             local calls = 0
-            local element: any = setmetatable({}, { __index = class })
+            local element = setmetatable({}, { __index = class })
             element.tab = {
                 elements = {},
                 _moveElement = function()
