@@ -82,7 +82,8 @@ function persistenceSettings.loadSettings(window: SettingsWindow): boolean
     end
 
     local decodeOk, parsed = pcall(variables.httpService.JSONDecode, variables.httpService, config)
-    if not decodeOk then
+    -- JSONDecode happily returns scalars; a corrupt file must not brick CreateWindow
+    if not decodeOk or type(parsed) ~= "table" then
         return false
     end
 

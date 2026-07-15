@@ -56,6 +56,17 @@ function persistenceConfig.save(window: ConfigWindow, name: unknown?): boolean
         end
     end
 
+    -- carry forward saved values whose elements aren't built yet; without this an early
+    -- autosave would permanently drop a late element's saved value
+    local loadedConfig = window._loadedConfig
+    if loadedConfig then
+        for flag, value in loadedConfig do
+            if window.controls[flag] == nil then
+                flags[flag] = value
+            end
+        end
+    end
+
     local encodeSuccess, encoded = pcall(variables.httpService.JSONEncode, variables.httpService, flags)
     if not encodeSuccess then
         log.warn("Rayfield: Failed to encode configuration - " .. tostring(encoded))
@@ -78,7 +89,8 @@ end
 function persistenceConfig.load(window: ConfigWindow, name: unknown?): boolean
     local dir, fullPath = persistenceConfig.getPath(window, name)
 
-    if not filesystem.isfile(fullPath) then
+    -- no file API on this executor: nothing to load, degrade quietly
+    if typeof(filesystem.isfile) ~= "function" or not filesystem.isfile(fullPath) then
         return false
     end
 
@@ -90,12 +102,11 @@ function persistenceConfig.load(window: ConfigWindow, name: unknown?): boolean
 
     local decodeOk, parsed = pcall(variables.httpService.JSONDecode, variables.httpService, config)
 
-    if not decodeOk then
+    -- a scalar root is valid JSON but not a config, so it resets like any other bad file
+    if not decodeOk or type(parsed) ~= "table" then
         log.warn("Rayfield: Configuration file has an invalid format, backing up and resetting")
-        local backupPath = path.join(
-            dir,
-            path.sanitizeFile(name or window.configuration.fileName or window.name) .. " (Incorrect Format).rfld"
-        )
+        -- same path logic as getConfigPath, so the backup lands next to the file it mirrors
+        local backupPath = path.stripExtension(fullPath, ".rfld") .. " (Incorrect Format).rfld"
         pcall(function()
             filesystem.ensureDir(dir)
             filesystem.writefile(backupPath, config)
@@ -106,10 +117,16 @@ function persistenceConfig.load(window: ConfigWindow, name: unknown?): boolean
 
     local parsedFlags = parsed :: { [string]: unknown }
     window._loading = true
-    for flag, control in window.controls do
-        persistenceConfig.applyTo(control, parsedFlags[flag])
-    end
+    -- the reset must survive a throwing restore, or autosave stays suppressed all session
+    local applyOk, applyErr = pcall(function()
+        for flag, control in window.controls do
+            persistenceConfig.applyTo(control, parsedFlags[flag])
+        end
+    end)
     window._loading = false
+    if not applyOk then
+        log.warn("Rayfield: Failed to apply configuration - " .. tostring(applyErr))
+    end
 
     -- kept so elements built after this load can still restore themselves (see
     -- Window:_restoreLate). without it a late element shows its default and the next
@@ -168,7 +185,7 @@ function persistenceConfig.delete(window: ConfigWindow, name: unknown): boolean
     end
 
     local _, fullPath = persistenceConfig.getPath(window, name)
-    if not filesystem.isfile(fullPath) then
+    if typeof(filesystem.isfile) ~= "function" or not filesystem.isfile(fullPath) then
         return false
     end
 

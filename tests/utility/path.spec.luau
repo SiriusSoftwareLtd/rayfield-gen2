@@ -18,6 +18,11 @@ return function()
             expect(path.sanitizeFile("../x"):find("%.%.")).never.to.be.ok()
         end)
 
+        it("strips Windows-illegal characters from file names", function()
+            expect(path.sanitizeFile('My<Hub>: "S3"|?*')).to.equal("MyHub S3")
+            expect(path.sanitizeFile("tab\tand\nnewline")).to.equal("tabandnewline")
+        end)
+
         it("sanitizes folder names", function()
             expect(path.sanitizeFolder("a/../b"):find("%.%.")).never.to.be.ok()
             expect(path.sanitizeFolder("a\\b")).to.equal("a/b")
