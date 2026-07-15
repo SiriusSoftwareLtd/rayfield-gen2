@@ -17,6 +17,7 @@ local moveable = require(utility.moveable)
 local locale = require(utility.locale)
 local constants = require(utility.constants)
 local hapticEngine = require(utility.HapticEngine)
+local enums = require(utility.enums)
 
 local resizeInfo = constants.pillResizeInfo
 local recordInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
@@ -49,30 +50,6 @@ local function coerceKey(value)
         end
     end
     return Enum.KeyCode.Unknown
-end
-
-local function enumItemFromValue(enumType, value)
-    local ok, item = pcall(function()
-        return enumType:FromValue(value)
-    end)
-    if ok and item then
-        return item
-    end
-
-    local itemsOk, items = pcall(function()
-        return enumType:GetEnumItems()
-    end)
-    if not itemsOk then
-        return nil
-    end
-
-    for _, enumItem in items do
-        if enumItem.Value == value then
-            return enumItem
-        end
-    end
-
-    return nil
 end
 
 function Keybind.new(tab, properties)
@@ -467,7 +444,7 @@ function Keybind:_deserialize(raw)
         return
     end
 
-    local item = enumItemFromValue(enumType, raw[2])
+    local item = enums.itemFromValue(enumType, raw[2])
     if item then
         self:Set(item)
     end

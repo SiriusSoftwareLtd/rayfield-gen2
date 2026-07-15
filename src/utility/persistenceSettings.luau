@@ -8,32 +8,9 @@
 local variables = require(script.Parent.variables)
 local filesystem = require(script.Parent.filesystem)
 local paths = require(script.Parent.persistencePaths)
+local enums = require(script.Parent.enums)
 
 local persistenceSettings = {}
-
-local function enumItemFromValue(enumType, value)
-    local ok, enumItem = pcall(function()
-        return enumType:FromValue(value)
-    end)
-    if ok and enumItem then
-        return enumItem
-    end
-
-    local itemsOk, items = pcall(function()
-        return enumType:GetEnumItems()
-    end)
-    if not itemsOk then
-        return nil
-    end
-
-    for _, item in items do
-        if item.Value == value then
-            return item
-        end
-    end
-
-    return nil
-end
 
 function persistenceSettings.getSettingsPath()
     return paths.getSettingsPath()
@@ -93,7 +70,7 @@ function persistenceSettings.loadSettings(window)
             local enumName = tostring(parsed.toggleKeybind[1]):gsub("^Enum%.", "")
             local enumType = Enum[enumName]
             if enumType then
-                local enumItem = enumItemFromValue(enumType, parsed.toggleKeybind[2])
+                local enumItem = enums.itemFromValue(enumType, parsed.toggleKeybind[2])
                 if enumItem then
                     window.settings.toggleKeybind = enumItem
                 end
