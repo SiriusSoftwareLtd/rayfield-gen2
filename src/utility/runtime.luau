@@ -8,7 +8,6 @@
 local services = require(script.Parent.services)
 
 export type RuntimeState = {
-    rayfieldHidden: boolean,
     secureMode: boolean,
     coreGui: CoreGui,
     workspace: Workspace,
@@ -26,15 +25,13 @@ export type RuntimeState = {
 
 local runtime = {} :: RuntimeState
 
-runtime.rayfieldHidden = false -- flipped while the menu is hidden
-
 runtime.secureMode = (function()
-    local _getgenv = rawget(_G, "getgenv")
-    if not _getgenv then
+    -- getgenv lives in the executor's script environment, not _G, same as gethui below
+    if typeof(getgenv) ~= "function" then
         return false
     end
     local ok, val = pcall(function()
-        return _getgenv().RAYFIELD_SECURE
+        return getgenv().RAYFIELD_SECURE
     end)
     return ok and val == true
 end)()
@@ -50,9 +47,18 @@ runtime.httpService = services.getService("HttpService") :: HttpService
 runtime.textService = services.getService("TextService") :: TextService
 runtime.replicatedStorage = services.getService("ReplicatedStorage") :: ReplicatedStorage
 runtime.localizationService = services.getService("LocalizationService") :: LocalizationService
-runtime.guiContainer = if runtime.runService:IsStudio() and runtime.localPlayer
-    then runtime.localPlayer.PlayerGui
-    elseif gethui then gethui()
-    else runtime.coreGui
+-- a gethui stub that returns nil would parent every ScreenGui nowhere, so fall back to CoreGui
+runtime.guiContainer = (function(): Instance
+    if runtime.runService:IsStudio() then
+        return (runtime.localPlayer :: Player).PlayerGui
+    end
+    if typeof(gethui) == "function" then
+        local ok, container = pcall(gethui)
+        if ok and container then
+            return container
+        end
+    end
+    return runtime.coreGui
+end)()
 
 return runtime

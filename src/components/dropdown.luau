@@ -160,7 +160,7 @@ function Dropdown.new(tab, properties)
 
     if self.icon then
         self.iconLabel = self.window:Create("ImageLabel", {
-            Image = "rbxassetid://" .. tostring(self.icon),
+            Image = self.icon,
             Size = UDim2.fromOffset(16, 16),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
@@ -496,6 +496,10 @@ function Dropdown.new(tab, properties)
         end)
 
         self.window:ConnectFor(self, interact.MouseButton1Click, function()
+            -- options stay visible through the close tween; a click mid-fade must not land
+            if not self._isOpen then
+                return
+            end
             hapticEngine.click()
             local sel = isOptionSelected(optionName)
 
@@ -523,7 +527,7 @@ function Dropdown.new(tab, properties)
 
             updateSelectedLabel()
 
-            self.window:_runGuarded(self, self.callback, if self.multiSelect then self.value else self.value[1])
+            self.window:_runGuarded(self, self.callback, self:_callbackValue())
             self.window:_persist(self)
 
             if not self.multiSelect then
@@ -604,6 +608,15 @@ end
 -- Search bar: collapsed it's just the icon (centred, no bar); tapping expands it into a
 -- full field. It's always in the card's layout - only its height/fills animate - so the
 -- list below just flexes down as it grows.
+-- what the dev's callback receives. multiSelect hands out a copy: the live table is our
+-- selection state, and a dev who keeps or mutates it would corrupt the dropdown.
+function Dropdown:_callbackValue()
+    if self.multiSelect then
+        return table.clone(self.value)
+    end
+    return self.value[1]
+end
+
 function Dropdown:_buildSearch()
     self._searchOpen = false
 
@@ -750,6 +763,15 @@ function Dropdown:_applyFilter(query)
         data.frame.Visible = query == "" or string.find(string.lower(data.name), query, 1, true) ~= nil
     end
     self:_updateCorners()
+    self:_resizeToOptions()
+end
+
+-- match the panel to whats visible. only while open: closed height is the header alone.
+function Dropdown:_resizeToOptions()
+    if not self._isOpen then
+        return
+    end
+    variables.tweenService:Create(self.main, searchTween, { Size = UDim2.new(1, -20, 0, self:_openHeight()) }):Play()
 end
 
 -- Per-corner rounding: an option's top corners round off only when nothing sits above it,
@@ -776,8 +798,15 @@ end
 
 -- Open height sized to the options (header + search + paddings + rows), capped so long lists
 -- scroll instead of running off the window. Short lists open just tall enough, no dead space.
+-- sized from the options actually on screen, so a search filter (or an Add/Remove while
+-- open) grows and shrinks the panel to fit rather than leaving dead space
 function Dropdown:_openHeight()
-    local n = #self.options
+    local n = 0
+    for _, data in self._optionFrames do
+        if data.frame.Visible then
+            n += 1
+        end
+    end
     local rows = n * 38 + math.max(0, n - 1) * 5 + 2
     return math.min(180, 95 + rows)
 end
@@ -922,6 +951,7 @@ function Dropdown:Refresh(newOptions)
             table.insert(pruned, v)
         end
     end
+    local selectionChanged = #pruned ~= #self.value
     self.value = pruned
 
     for _, opt in self.options do
@@ -937,6 +967,13 @@ function Dropdown:Refresh(newOptions)
     self._updateSelectedLabel()
     -- reconcile with any active search (also refreshes corners); empty query shows all
     self:_applyFilter(if self._searchOpen then self.searchInput.Text else "")
+
+    -- pruning dropped part of the selection: the dev needs to hear it, and the saved
+    -- config must not resurrect it
+    if selectionChanged then
+        self.window:_runGuarded(self, self.callback, self:_callbackValue())
+        self.window:_persist(self)
+    end
 end
 
 function Dropdown:Add(option)
@@ -951,11 +988,13 @@ function Dropdown:Add(option)
     local data = self._buildOption(option)
     table.insert(self._optionFrames, data)
 
-    self:_updateCorners()
-
     if self._isOpen then
         self._renderOptionState(data, true)
     end
+
+    -- reconcile with any active search rather than showing an option the query excludes,
+    -- and resize for the new row (also refreshes corners)
+    self:_applyFilter(if self._searchOpen then self.searchInput.Text else "")
 end
 
 function Dropdown:Remove(option)
@@ -978,9 +1017,13 @@ function Dropdown:Remove(option)
     if valueIdx then
         table.remove(self.value, valueIdx)
         self._updateSelectedLabel()
+        -- removing a selected option changes the selection; surface and save that
+        self.window:_runGuarded(self, self.callback, self:_callbackValue())
+        self.window:_persist(self)
     end
 
-    self:_updateCorners()
+    -- one row shorter; resize and re-corner around whats left
+    self:_applyFilter(if self._searchOpen then self.searchInput.Text else "")
 end
 
 function Dropdown:Set(value, skipCallback)
@@ -1000,8 +1043,9 @@ function Dropdown:Set(value, skipCallback)
     self._updateSelectedLabel()
 
     if not skipCallback then
-        self.window:_runGuarded(self, self.callback, if self.multiSelect then self.value else self.value[1])
+        self.window:_runGuarded(self, self.callback, self:_callbackValue())
     end
+    self.window:_persist(self)
 end
 
 function Dropdown:_setShown(shown, animate)

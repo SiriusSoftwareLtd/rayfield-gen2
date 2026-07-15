@@ -18,8 +18,9 @@
 /roblox.yml
 /globalTypes.d.luau
 
+# Private preview access map
+/preview-tokens.md
+
 # Claude and Artificial Intelligence
 CLAUDE.md
 .claude/
-docs.md
-AGENTS.md

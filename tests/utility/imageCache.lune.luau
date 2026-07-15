@@ -1,7 +1,4 @@
---!strict
-
-local helpers = ((_G :: any).__RAYFIELD_TEST_HELPERS or require(script.Parent.Parent.TestHelpers)) :: any
-local requireUtility = helpers.requireUtility
+local requireUtility = (_G :: any).__RAYFIELD_TEST_HELPERS.requireUtility
 
 return function()
     local imageCache = requireUtility("imageCache")
@@ -16,7 +13,7 @@ return function()
         local originalJsonDecode
         local originalWait
         local originalOnCached
-        local files: any
+        local files
 
         beforeEach(function()
             files = {}
@@ -46,7 +43,8 @@ return function()
                 files[path] = content
             end
             variables.assetResolver.getAssetContentFromUrl = function(_, url)
-                return "body:" .. tostring(url)
+                -- real icon/avatar bodies are pngs; cacheFile checks the magic before writing
+                return "\137PNG\r\n\26\nbody:" .. tostring(url)
             end
             variables.httpService.JSONDecode = function()
                 return {
@@ -58,9 +56,7 @@ return function()
                     },
                 }
             end
-            task.wait = function(): number
-                return 0
-            end
+            task.wait = function() end
         end)
 
         afterEach(function()
@@ -152,30 +148,35 @@ return function()
             expect(readyUri).to.be.ok()
         end)
 
-        it("ignores malformed thumbnail responses while polling avatars", function()
+        it("rejects non-png bodies instead of writing them to disk", function()
             getfenv().getcustomasset = function(path)
                 return "asset://" .. path
             end
-            local decodeCalls = 0
-            variables.httpService.JSONDecode = function(): any
-                decodeCalls += 1
-                if decodeCalls == 1 then
-                    error("malformed json")
-                elseif decodeCalls == 2 then
-                    return {
-                        data = "not-a-list",
-                    }
-                elseif decodeCalls == 3 then
-                    return {
-                        data = {
-                            "not-an-entry",
-                        },
-                    }
-                end
+            variables.assetResolver.getAssetContentFromUrl = function()
+                return "<html>error page</html>"
+            end
+            local settled
+
+            local ok, missing = imageCache.preload(function(failed)
+                settled = failed
+            end)
+
+            expect(ok).to.equal(false)
+            expect(settled).to.equal(missing)
+            expect(imageCache.rewrites[constants.icons.close]).never.to.be.ok()
+        end)
+
+        it("retries past a pending thumbnail response", function()
+            getfenv().getcustomasset = function(path)
+                return "asset://" .. path
+            end
+            local decodes = 0
+            variables.httpService.JSONDecode = function()
+                decodes += 1
                 return {
                     data = {
                         {
-                            state = "Completed",
+                            state = if decodes == 1 then "Pending" else "Completed",
                             imageUrl = "https://cdn.example/avatar.png",
                         },
                     },
@@ -183,12 +184,12 @@ return function()
             end
             local readyUri
 
-            expect(imageCache.avatar(101, function(uri)
+            expect(imageCache.avatar(77, function(uri)
                 readyUri = uri
             end)).to.equal("")
 
-            expect(decodeCalls).to.equal(4)
             expect(readyUri).to.be.ok()
+            expect(decodes).to.equal(2)
         end)
 
         it("leaves avatars unresolved when thumbnail polling never completes", function()

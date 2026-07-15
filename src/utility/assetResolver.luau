@@ -77,14 +77,36 @@ function assetResolver.resolve(_self: AssetResolver, value: unknown): ResolvedAs
     return nil
 end
 
+-- executors disagree on response shape, so trust the body only when whatever status
+-- info the executor does give us says the request actually succeeded
+local function isGoodResponse(response: unknown): boolean
+    if type(response) ~= "table" then
+        return false
+    end
+    local shaped = response :: { Body: unknown, StatusCode: unknown, Success: unknown }
+    local body = shaped.Body
+    if type(body) ~= "string" or #body == 0 then
+        return false
+    end
+    if type(shaped.StatusCode) == "number" then
+        local statusCode = shaped.StatusCode :: number
+        return statusCode >= 200 and statusCode < 300
+    end
+    if type(shaped.Success) == "boolean" then
+        return shaped.Success :: boolean
+    end
+    return true
+end
+
 function assetResolver.getAssetContentFromUrl(
     self: AssetResolver,
     url: string,
     cacheKey: CacheKey?,
     forced: boolean?
 ): string?
+    -- forced skips the session cache, so retry loops see fresh responses
     local contentCache = self.contentCache
-    if cacheKey ~= nil and contentCache then
+    if cacheKey ~= nil and contentCache and not forced then
         local cachedContent = contentCache[cacheKey]
         if cachedContent then
             return cachedContent
@@ -105,17 +127,11 @@ function assetResolver.getAssetContentFromUrl(
         } :: AssetRequestPayload
     )
     local content: string? = nil
-    if success and type(response) == "table" then
-        -- Executor request functions are untyped; only trust Body after checking the table shape.
-        local responseBody = (response :: { Body: unknown }).Body
-        if type(responseBody) == "string" then
-            content = responseBody
-        end
-    end
-
-    if content ~= nil then
+    if success and isGoodResponse(response) then
+        local body = (response :: { Body: string }).Body
+        content = body
         if cacheKey ~= nil and contentCache then
-            contentCache[cacheKey] = content
+            contentCache[cacheKey] = body
         end
     elseif not forced then
         log.warn("Failed to download asset content for url: " .. tostring(url))

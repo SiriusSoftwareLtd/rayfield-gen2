@@ -142,6 +142,18 @@ local function resolveTheme(value)
     if typeof(value) == "table" then
         deriveStrokes(resolved, overrides)
     end
+
+    -- theme modules call brandFont at first require and are cached from then on, so a
+    -- fallbackFont set afterwards would never reach them. recompute against the current
+    -- stand-in, unless the dev named a font themselves.
+    local userTable = if typeof(value) == "table" then value else nil
+    if not (userTable and (userTable.Font or userTable.font)) then
+        resolved.Font = variables.brandFont(Enum.FontWeight.Medium)
+    end
+    if not (userTable and (userTable.TitleFont or userTable.titleFont)) then
+        resolved.TitleFont = variables.brandFont(Enum.FontWeight.SemiBold)
+    end
+
     return resolved
 end
 
@@ -597,27 +609,41 @@ function Window.new(properties)
     self:_bindMouseOverride()
     self:_buildSettingsUI()
 
-    if self.theme.LiveAnimation then
-        task.spawn(function()
-            local out = true
-            local tweenInfo = TweenInfo.new(10, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-
-            while not self.unloaded do
-                local tweenW = variables.tweenService:Create(self.windowGradient, tweenInfo, {
-                    Offset = Vector2.new(if out then 0.4 else -0.2, 0),
-                    Rotation = (if out then 220 else 280),
-                })
-
-                self._liveTween = tweenW
-                tweenW:Play()
-                tweenW.Completed:Wait()
-                out = not out
-            end
-            self._liveTween = nil
-        end)
-    end
+    self:_syncLiveAnimation()
 
     return self
+end
+
+-- start or stop the gradient drift to match the current theme. called on build and on every
+-- ChangeTheme, so switching into or out of an animated theme takes effect either way.
+function Window:_syncLiveAnimation()
+    if not self.theme.LiveAnimation then
+        self._liveAnimating = false -- the running loop sees this and stops after its current leg
+        return
+    end
+    if self._liveAnimating then
+        return -- already drifting
+    end
+
+    self._liveAnimating = true
+    task.spawn(function()
+        local out = true
+        local tweenInfo = TweenInfo.new(10, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
+        while self._liveAnimating and not self.unloaded do
+            local tweenW = variables.tweenService:Create(self.windowGradient, tweenInfo, {
+                Offset = Vector2.new(if out then 0.4 else -0.2, 0),
+                Rotation = (if out then 220 else 280),
+            })
+
+            self._liveTween = tweenW
+            tweenW:Play()
+            tweenW.Completed:Wait()
+            out = not out
+        end
+        self._liveAnimating = false
+        self._liveTween = nil
+    end)
 end
 
 function Window:ChangeTheme(theme)
@@ -626,6 +652,10 @@ function Window:ChangeTheme(theme)
     local overrides = if typeof(theme) == "table" then theme else resolveTheme(theme)
     for name, value in overrides do
         self.theme[name] = coerceThemeValue(name, value)
+    end
+    -- match the constructor: a hand-written table gets derived strokes for the keys it changes
+    if typeof(theme) == "table" then
+        deriveStrokes(self.theme, overrides)
     end
 
     for instance, properties in self.themeProperties do
@@ -650,12 +680,22 @@ function Window:ChangeTheme(theme)
     -- colours (the toggle knob, field fills, glows) aren't, so refresh the elements to reach
     -- them on a live swap. Every tab's elements stay shown (just page-clipped), settings
     -- included, so refresh them all; groups forward the call to their children.
-    if not self.hidden then
-        for _, tab in self.tabs do
-            for _, element in tab.elements do
-                if element._refreshTheme then
-                    element:_refreshTheme()
-                end
+    if self.hidden then
+        -- a hidden window has nothing to animate into, so defer the refresh to the next Show
+        -- rather than dropping it and reopening with the old themes state colours
+        self._themeRefreshPending = true
+    else
+        self:_refreshElementThemes()
+    end
+
+    self:_syncLiveAnimation()
+end
+
+function Window:_refreshElementThemes()
+    for _, tab in self.tabs do
+        for _, element in tab.elements do
+            if element._refreshTheme then
+                element:_refreshTheme()
             end
         end
     end
@@ -715,6 +755,22 @@ function Window:_registerControl(control)
     control.flag = flag
     self.controls[flag] = control
     return flag
+end
+
+-- Restore an element built after the config was already loaded. autoLoad only fires once on
+-- first Show, so without this a late element (one built after a remote fetch, say) keeps its
+-- default and the next autosave writes that default over the saved value.
+-- Called from the CreateX tails once the element is fully built, since _registerControl runs
+-- mid-construction and :Set would touch instances that dont exist yet.
+function Window:_restoreLate(element)
+    if not self._loadedConfig or not element.flag or element.forgetState then
+        return
+    end
+
+    local wasLoading = self._loading
+    self._loading = true -- dont autosave the value we just read back
+    persistence.applyTo(element, self._loadedConfig[element.flag])
+    self._loading = wasLoading
 end
 
 -- Autosave a control's value after an interactive or programmatic change, when the window is
@@ -819,7 +875,9 @@ function Window:Popup(properties)
 end
 
 function Window:Hide()
-    if self.animating then
+    -- idempotent: a second Hide while collapsed would capture the pill spot as the
+    -- restore position and teleport the window there on the next Show
+    if self.animating or self.hidden then
         return
     end
 
@@ -831,7 +889,6 @@ function Window:Hide()
 
     self.animating = true
     self.hidden = true
-    variables.rayfieldHidden = true
     self.collapsedInteract.Visible = false -- re-shown once the collapse settles, below
 
     -- closing while minimised closes properly rather than leaving a stale minimised state -
@@ -1327,7 +1384,8 @@ function Window:_revealElements(perElementDelay, budget)
 end
 
 function Window:Show()
-    if self.animating then
+    -- idempotent: replaying the restore on a visible window teleports it to a stale position
+    if self.animating or not self.hidden then
         return
     end
     self.animating = true
@@ -1341,7 +1399,13 @@ function Window:Show()
 
     self.hidden = false
     self.minimised = false
-    variables.rayfieldHidden = false
+
+    -- a ChangeTheme landed while we were collapsed; apply it before anything fades back in
+    if self._themeRefreshPending then
+        self._themeRefreshPending = false
+        self:_refreshElementThemes()
+    end
+
     self.collapsedInteract.Visible = false -- first thing on click: stop it eating any more input
 
     if self._freeMouse then
@@ -1612,25 +1676,35 @@ end
 
 -- Jump to a tab by handle, name, or its page instance. No-ops on an unknown tab rather
 -- than handing JumpTo something it cant resolve.
+-- Move the page view only. Tab:Select owns the selection state and the pill, and calls this
+-- for the scroll; nothing else should jump pages without going through it.
+function Window:_jumpTo(page)
+    if page then
+        self.elementsLayout:JumpTo(page)
+    end
+end
+
+-- Go to a tab, by name or by the tab itself. Routes through Tab:Select so the selection,
+-- the pill and the page all agree; jumping the page alone would leave the wrong tab lit and
+-- the reveal animations pointed at the wrong elements.
 function Window:Navigate(tab)
-    local page
-    if typeof(tab) == "Instance" then
-        page = tab
-    elseif typeof(tab) == "table" then
-        page = tab.tabPage
-    elseif typeof(tab) == "string" then
-        for _, candidate in self.tabs do
-            if candidate.name == tab then
-                page = candidate.tabPage
-                break
-            end
+    if tab == nil then
+        return
+    end
+
+    local target
+    for _, candidate in self.tabs do
+        -- by name, by the tab itself, or by the page instance a caller held onto
+        if candidate == tab or candidate.name == tab or candidate.tabPage == tab then
+            target = candidate
+            break
         end
     end
 
-    if not page then
+    if not target then
         return
     end
-    self.elementsLayout:JumpTo(page)
+    target:Select()
 end
 
 function Window:Create(className, properties, themeProperties)
@@ -1848,7 +1922,10 @@ function Window:_runGuarded(element, fn, ...)
         local quickOut = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
         variables.tweenService:Create(flashFrame, quickOut, { BackgroundColor3 = self.theme.ErrorColor }):Play()
         variables.tweenService:Create(element.stroke, quickOut, { Color = self.theme.ErrorStrokeColor }):Play()
-        element.title.Text = locale.resolve("Error, log recorded in console.")
+        -- minimal elements build without a label, and the flash must survive that
+        if element.title then
+            element.title.Text = locale.resolve("Error, log recorded in console.")
+        end
 
         log.warn(
             `Rayfield encountered an error, with the callback for a {element.__type} component named '{element.name}':`
@@ -1857,7 +1934,9 @@ function Window:_runGuarded(element, fn, ...)
 
         task.wait(1)
 
-        element.title.Text = locale.resolve(element.name)
+        if element.title then
+            element.title.Text = locale.resolve(element.name)
+        end
         variables.tweenService
             :Create(
                 flashFrame,

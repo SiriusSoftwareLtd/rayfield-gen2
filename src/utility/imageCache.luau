@@ -35,15 +35,16 @@ local cacheRoot = variables.fileSystemManager:getRootFolder()
 local cacheFolder = variables.fileSystemManager:getAssetsFolder()
 local assetResolver = variables.assetResolver
 
-local assetBase = "https://github.com/SiriusSoftwareLtd/rayfield-gen2/blob/main/assets/"
+-- raw host, not the /blob/ page: that 302s and executors that dont follow redirects
+-- would cache the redirect body instead of the png
+local assetBase = "https://raw.githubusercontent.com/SiriusSoftwareLtd/rayfield-gen2/main/assets/"
 local headshotPx = 48
 local thumbEndpoint =
     "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=%d&size=%dx%d&format=Png&isCircular=false"
 
 local manifest: { [number]: string } = {}
 for _, id in constants.icons do
-    local iconId = id :: number
-    manifest[iconId] = assetBase .. tostring(iconId) .. ".png?raw=true"
+    manifest[id] = assetBase .. tostring(id) .. ".png"
 end
 local manifestSize = 0
 for _ in manifest do
@@ -53,6 +54,8 @@ end
 imageCache.rewrites = {} :: RewriteMap
 imageCache.onCached = nil :: OnCachedCallback? -- image sets this to rebind blank instances when a background download lands
 
+local pngMagic = "\137PNG\r\n\26\n"
+
 local function cacheFile(filePath: string, url: string): string?
     if type(getfenv().getcustomasset) ~= "function" then
         return nil
@@ -61,7 +64,12 @@ local function cacheFile(filePath: string, url: string): string?
         pcall(filesystem.ensureFolder, cacheRoot)
         pcall(filesystem.ensureFolder, cacheFolder)
         local body = assetResolver:getAssetContentFromUrl(url, filePath, false)
-        if not body or not pcall(filesystem.writefile, filePath, body) then
+        -- never write a non-png body (error page, redirect html) to disk; a poisoned
+        -- cache file would shadow the real asset on every later session
+        if not body or string.sub(body, 1, 8) ~= pngMagic then
+            return nil
+        end
+        if not pcall(filesystem.writefile, filePath, body) then
             return nil
         end
     end
@@ -101,11 +109,12 @@ end
 
 local function fetchAvatar(userId: number): string?
     local cdnUrl: string? = nil
-    for _ = 1, 4 do
+    for attempt = 1, 4 do
+        -- retries must bypass the session cache or a cached "Pending" response wins forever
         local body = assetResolver:getAssetContentFromUrl(
             string.format(thumbEndpoint, userId, headshotPx, headshotPx),
             "avatar:" .. tostring(userId),
-            false
+            attempt > 1
         )
         if body then
             local imageUrl = decodeThumbnailUrl(body)
@@ -129,7 +138,8 @@ function imageCache.preload(onSettled: PreloadCallback?): (boolean, number)
     local env = getfenv()
     if type(env.getcustomasset) ~= "function" then
         if onSettled then
-            onSettled(manifestSize)
+            -- defer so a caller that assigns state right after calling preload still sees this
+            task.defer(onSettled, manifestSize)
         end
         return false, manifestSize
     end

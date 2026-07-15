@@ -15,23 +15,30 @@ local log = {}
 
 type SuppressPredicate = () -> boolean
 
-local function defaultSuppressPredicate(): boolean
+local function defaultSecureModeSource(): boolean
     return runtime.secureMode
 end
 
-local suppressPredicate: SuppressPredicate = defaultSuppressPredicate
+local secureModeSource: SuppressPredicate = defaultSecureModeSource
+local suppressPredicate: SuppressPredicate? = nil
 
-local function shouldSuppress(): boolean
-    local testHelpers = _G.__RAYFIELD_TEST_HELPERS
-    local isTestEnvironment = type(testHelpers) == "table" and type(testHelpers.requireUtility) == "function"
-    if isTestEnvironment and _G.__RAYFIELD_TEST_VERBOSE_LOGS ~= true then
-        return true
-    end
-    return suppressPredicate()
+-- variables.luau points this at its mutable secureMode once it loads; until then the
+-- runtime snapshot answers. nil restores the default.
+function log.setSecureModeSource(source: SuppressPredicate?)
+    secureModeSource = if type(source) == "function" then source else defaultSecureModeSource
 end
 
+-- extra gag for embedders (the test runner uses this), layered over secure mode so
+-- loading variables never clobbers it. nil clears it.
 function log.setSuppressPredicate(predicate: SuppressPredicate?)
-    suppressPredicate = if type(predicate) == "function" then predicate else defaultSuppressPredicate
+    suppressPredicate = if type(predicate) == "function" then predicate else nil
+end
+
+local function shouldSuppress(): boolean
+    if suppressPredicate and suppressPredicate() then
+        return true
+    end
+    return secureModeSource()
 end
 
 function log.warn(...)

@@ -102,9 +102,16 @@ function Group:_add(componentName, properties)
     local element = require(script.Parent[componentName]).new(self, properties)
     table.insert(self.elements, element)
     assignOrder(element, #self.elements * 10)
+    self.window:_restoreLate(element)
 
     if self.compact then
         self:_wrapChild(element)
+    end
+
+    -- same as Tab:_register: elements added after Window:Show must be revealed here
+    -- or they stay fully transparent
+    if not self.window.hidden then
+        element:_setShown(true, true)
     end
 
     return element

@@ -114,7 +114,7 @@ function Drag.new(window, properties)
     end
 
     self.window:Connect(self.drag.MouseEnter, function()
-        if not dragging and not variables.rayfieldHidden then
+        if not dragging and not self.window.hidden then
             variables.tweenService
                 :Create(
                     self.dragCosmetic,
@@ -126,7 +126,7 @@ function Drag.new(window, properties)
     end)
 
     self.window:Connect(self.drag.MouseLeave, function()
-        if not dragging and not variables.rayfieldHidden then
+        if not dragging and not self.window.hidden then
             variables.tweenService
                 :Create(
                     self.dragCosmetic,
@@ -154,7 +154,7 @@ function Drag.new(window, properties)
             relative = self.window.main.AbsolutePosition
                 + self.window.main.AbsoluteSize * self.window.main.AnchorPoint
                 - variables.userInputService:GetMouseLocation()
-            if not variables.rayfieldHidden then
+            if not self.window.hidden then
                 variables.tweenService
                     :Create(
                         self.dragCosmetic,
@@ -175,7 +175,7 @@ function Drag.new(window, properties)
         if inputType == "MouseButton1" or inputType == "Touch" then
             dragging = false
 
-            if not variables.rayfieldHidden then
+            if not self.window.hidden then
                 variables.tweenService
                     :Create(
                         self.dragCosmetic,
@@ -199,7 +199,7 @@ function Drag.new(window, properties)
     local barRemaining = 1e-60
 
     self.window:Connect(variables.runService.RenderStepped, function(dt)
-        if dragging and not variables.rayfieldHidden then
+        if dragging and not self.window.hidden then
             local mainTarget, dragTarget = getTargets()
 
             self.window.main.Position = self.window.main.Position:Lerp(mainTarget, 1 - mainRemaining ^ dt)

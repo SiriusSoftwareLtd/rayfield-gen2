@@ -104,7 +104,11 @@ function rayfield:CreateWindow(properties: types.WindowProps): types.Window
         banner:Destroy()
 
         task.wait(0.5)
-        window:Show()
+        -- the window can be unloaded inside this delay; showing it then would fire
+        -- saved-config callbacks and build toasts on destroyed instances
+        if not window.unloaded then
+            window:Show()
+        end
     end)
 
     return window :: any

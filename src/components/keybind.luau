@@ -19,6 +19,7 @@ local moveable = require(utility.moveable)
 local locale = require(utility.locale)
 local constants = require(utility.constants)
 local hapticEngine = require(utility.HapticEngine)
+local enums = require(utility.enums)
 
 local resizeInfo = constants.pillResizeInfo
 local recordInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
@@ -37,7 +38,8 @@ local function keyName(value)
     return mouseNames[value] or value.Name
 end
 
--- accept an EnumItem or a KeyCode name string, fall back to unbound
+-- accept an EnumItem, a KeyCode name, or a mouse button name, fall back to unbound.
+-- mouse buttons bind like any other key, so a string has to reach them too.
 local function coerceKey(value)
     if typeof(value) == "EnumItem" then
         return value
@@ -49,32 +51,14 @@ local function coerceKey(value)
         if ok and key then
             return key
         end
-    end
-    return Enum.KeyCode.Unknown
-end
-
-local function enumItemFromValue(enumType, value)
-    local ok, item = pcall(function()
-        return enumType:FromValue(value)
-    end)
-    if ok and item then
-        return item
-    end
-
-    local itemsOk, items = pcall(function()
-        return enumType:GetEnumItems()
-    end)
-    if not itemsOk then
-        return nil
-    end
-
-    for _, enumItem in items do
-        if enumItem.Value == value then
-            return enumItem
+        local mouseOk, button = pcall(function()
+            return Enum.UserInputType[value]
+        end)
+        if mouseOk and button and mouseNames[button] then
+            return button
         end
     end
-
-    return nil
+    return Enum.KeyCode.Unknown
 end
 
 function Keybind.new(tab, properties)
@@ -148,7 +132,7 @@ function Keybind.new(tab, properties)
 
     if self.icon then
         self.iconLabel = self.window:Create("ImageLabel", {
-            Image = "rbxassetid://" .. tostring(self.icon),
+            Image = self.icon,
             Size = UDim2.fromOffset(16, 16),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
@@ -469,7 +453,7 @@ function Keybind:_deserialize(raw)
         return
     end
 
-    local item = enumItemFromValue(enumType, raw[2])
+    local item = enums.itemFromValue(enumType, raw[2])
     if item then
         self:Set(item)
     end

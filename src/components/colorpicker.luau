@@ -311,7 +311,9 @@ function ColorPicker.new(tab, properties)
     -- column resolves a frame after we build, and the window can be resized). Ignore the
     -- transient widths swept while the window animates/hides, same as the slider.
     self.window:ConnectFor(self, self.main:GetPropertyChangedSignal("AbsoluteSize"), function()
-        if self.window.animating or self.window.hidden then
+        -- hasShownOnce: the initial layout pass happens while the window is still hidden,
+        -- and blocking it would freeze the width-0 layout mode (same fix as the slider)
+        if self.window.animating or (self.window.hidden and self.window.hasShownOnce) then
             return
         end
         self:_applyLayout()
@@ -347,7 +349,7 @@ function ColorPicker:_buildHeader()
 
     if self.icon then
         self.iconLabel = self.window:Create("ImageLabel", {
-            Image = "rbxassetid://" .. tostring(self.icon),
+            Image = self.icon,
             Size = UDim2.fromOffset(16, 16),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
@@ -853,6 +855,11 @@ end
 -- RenderStepped loop that self-terminates if the window unloads mid-drag. For a mouse drag
 -- it also bails the moment the button is up, so a dropped InputEnded cant leave it running.
 function ColorPicker:_beginDrag(region, isMouse)
+    -- the interacts stay visible through the close fade, so a click landing in that window
+    -- would drag a picker thats already shut
+    if not self._isOpen then
+        return
+    end
     self._drag = region
     self._dragIsMouse = isMouse
     self:_setHeld(region)
@@ -920,6 +927,8 @@ end
 
 -- read the mouse for the active region, update the stored channels and repaint
 function ColorPicker:_pump()
+    local previousAlpha = self.alpha -- the branches below mutate it in place
+
     if self._drag == "sat" then
         local size = self.map.AbsoluteSize
         if size.X <= 0 or size.Y <= 0 then
@@ -947,7 +956,13 @@ function ColorPicker:_pump()
         return
     end
 
-    self.value = Color3.fromHSV(self.hue, self.sat, self.val)
+    -- held but stationary: nothing moved, so dont re-render and hammer the callback every frame
+    local newValue = Color3.fromHSV(self.hue, self.sat, self.val)
+    if newValue == self.value and self.alpha == previousAlpha then
+        return
+    end
+
+    self.value = newValue
     self:_render("drag")
     self:_fireCallback()
 end

@@ -682,7 +682,8 @@ end
 
 -- Height a paragraph needs at the content region's width.
 function Popup:_measureText()
-    return functions.textHeight(self.window.theme.Font, contentSize, self.content, contentWidth)
+    -- measure what actually renders: the label shows the translated string
+    return functions.textHeight(self.window.theme.Font, contentSize, locale.resolve(self.content), contentWidth)
 end
 
 -- Every measurement one box needs: its frame height (content + padding), its title and
@@ -693,12 +694,16 @@ function Popup:_measureBox(box)
     local hasIcon = box.icon ~= nil and box.icon ~= 0 and box.icon ~= ""
     local textWidth = contentWidth - boxWidthInset - boxSidePad * 2 - (if hasIcon then boxIconSize + boxIconGap else 0)
 
-    local titleH =
-        functions.textHeight(self.window.theme.TitleFont, boxTitleSize, box.title or box.Title or "", textWidth)
+    local titleH = functions.textHeight(
+        self.window.theme.TitleFont,
+        boxTitleSize,
+        locale.resolve(box.title or box.Title or ""),
+        textWidth
+    )
     local descH = 0
     local description = box.description or box.Description
     if description and description ~= "" then
-        descH = functions.textHeight(self.window.theme.Font, boxDescSize, description, textWidth)
+        descH = functions.textHeight(self.window.theme.Font, boxDescSize, locale.resolve(description), textWidth)
     end
 
     local columnH = titleH + (if descH > 0 then 3 + descH else 0)

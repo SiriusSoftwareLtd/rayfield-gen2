@@ -11,6 +11,7 @@ local runService = services.getService("RunService")
 local fileSystem = require(script.Parent.filesystem)
 local assetResolver = require(script.Parent.assetResolver)
 local log = require(script.Parent.log)
+local path = require(script.Parent.path)
 
 local function jsonEncode(data: unknown): string?
     local success, result = pcall(function()
@@ -90,6 +91,29 @@ export type FontManager = FontManagerState & {
 
 export type fontManager = FontManager
 
+-- the manifest comes off the network, so trust nothing about its shape. names feed straight
+-- into disk paths, so sanitize them here too. returns nil for anything we cant use.
+local function validateManifest(manifest: unknown): FontManifest?
+    local candidate = manifest :: any
+    if type(candidate) ~= "table" or type(candidate.name) ~= "string" or type(candidate.faces) ~= "table" then
+        return nil
+    end
+    candidate.name = path.sanitizeFile(candidate.name)
+    if #candidate.name == 0 or #candidate.faces == 0 then
+        return nil
+    end
+    for _, face in candidate.faces do
+        if type(face) ~= "table" or type(face.name) ~= "string" or type(face.assetId) ~= "string" then
+            return nil
+        end
+        face.name = path.sanitizeFile(face.name)
+        if #face.name == 0 then
+            return nil
+        end
+    end
+    return candidate :: FontManifest
+end
+
 local env = getfenv()
 
 local function variantKey(fontWeight: Enum.FontWeight, fontStyle: Enum.FontStyle): string
@@ -161,7 +185,8 @@ function fontManager.new(
         } :: FontManagerState,
         fontManager
     ) :: any
-    fileSystem.ensureFolder(rootFolder)
+    -- executors without filesystem support must degrade to the fallback font, not kill the require
+    pcall(fileSystem.ensureFolder, rootFolder)
     return self
 end
 
@@ -246,9 +271,9 @@ function fontManager.loadFont(
     end
     local fontManifest: FontManifest? = nil
     if possibleFontManifest then
-        local parsedManifest = jsonDecode(possibleFontManifest)
-        if type(parsedManifest) == "table" then
-            fontManifest = parsedManifest :: FontManifest
+        local ok, parsedManifest = pcall(jsonDecode, possibleFontManifest)
+        if ok and parsedManifest then
+            fontManifest = validateManifest(parsedManifest)
         else
             if self._debug then
                 log.warn(
@@ -271,7 +296,9 @@ function fontManager.loadFont(
     local fontDirectory = self.rootFolder .. "/" .. fontManifest.name
     local madeAllFontsLocal = true
     -- create folder for the font
-    fileSystem.ensureFolder(fontDirectory)
+    if not pcall(fileSystem.ensureFolder, fontDirectory) then
+        return self.defaultOptions.fallbackFont
+    end
 
     -- iterate over each face, caching each to disk like we do images: a face only downloads once,
     -- later sessions reuse the local file and just re-resolve it
@@ -283,7 +310,7 @@ function fontManager.loadFont(
                 then self.assetResolver:getAssetContentFromId(fontFaceId, false)
                 else nil
             if fontFaceContent then
-                fileSystem.writefile(fontFacePath, fontFaceContent)
+                pcall(fileSystem.writefile, fontFacePath, fontFaceContent)
             elseif self._debug then
                 log.warn("Font face content is nil for font id: " .. tostring(resolvedId) .. ", face: " .. face.name)
             end
@@ -301,23 +328,22 @@ function fontManager.loadFont(
             end
         end
     end
-    local fontManifestId: number | string = id or resolvedId
-    -- if all font faces were successfully loaded, write the font manifest to disk
-    if madeAllFontsLocal and fontManifest then
-        local encodedManifest = jsonEncode(fontManifest)
-        if not encodedManifest then
-            return self.defaultOptions.fallbackFont
+    -- every face must be local before we hand the font over; falling back to the remote id
+    -- here would fetch the asset this whole flow exists to keep off the wire
+    if not madeAllFontsLocal then
+        return self.defaultOptions.fallbackFont
+    end
+
+    local encodedManifest = jsonEncode(fontManifest)
+    if not encodedManifest or not pcall(fileSystem.writefile, fontDirectory .. "/manifest.json", encodedManifest) then
+        return self.defaultOptions.fallbackFont
+    end
+    local manifestOk, fontManifestId = pcall(env.getcustomasset, fontDirectory .. "/manifest.json")
+    if not manifestOk or not fontManifestId then
+        if self._debug then
+            log.warn("Failed to load font manifest for id: " .. tostring(resolvedId))
         end
-        fileSystem.writefile(fontDirectory .. "/manifest.json", encodedManifest)
-        local ok, uri = pcall(env.getcustomasset, fontDirectory .. "/manifest.json")
-        if ok and type(uri) == "string" then
-            fontManifestId = uri
-        else
-            if self._debug then
-                log.warn("Failed to load font manifest for id: " .. tostring(resolvedId))
-            end
-            return self.defaultOptions.fallbackFont
-        end
+        return self.defaultOptions.fallbackFont
     end
     -- load the font using the manifest
     local ok, loadedFont = pcall(Font.new, fontManifestId :: any, requestedFontWeight, requestedFontStyle)

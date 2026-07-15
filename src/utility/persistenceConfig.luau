@@ -15,6 +15,7 @@ local persistenceConfig = {}
 
 type PersistedControl = {
     value: unknown,
+    flag: string?,
     _canBeNil: boolean?,
     _serialize: ((PersistedControl) -> unknown)?,
     _deserialize: ((PersistedControl, unknown) -> ())?,
@@ -29,6 +30,7 @@ type ConfigWindow = {
     },
     name: string,
     _loading: boolean?,
+    _loadedConfig: { [string]: unknown }?,
 }
 
 function persistenceConfig.getPath(window: ConfigWindow, name: unknown?): (string, string)
@@ -105,24 +107,34 @@ function persistenceConfig.load(window: ConfigWindow, name: unknown?): boolean
     local parsedFlags = parsed :: { [string]: unknown }
     window._loading = true
     for flag, control in window.controls do
-        local value = parsedFlags[flag]
-        if value ~= nil or control._canBeNil then
-            local ok, err = pcall(function()
-                local deserialize = control._deserialize
-                if deserialize then
-                    deserialize(control, value)
-                else
-                    control:Set(value)
-                end
-            end)
-            if not ok then
-                log.warn("Rayfield: Failed to restore flag '" .. tostring(flag) .. "' - " .. tostring(err))
-            end
-        end
+        persistenceConfig.applyTo(control, parsedFlags[flag])
     end
     window._loading = false
 
+    -- kept so elements built after this load can still restore themselves (see
+    -- Window:_restoreLate). without it a late element shows its default and the next
+    -- autosave writes that default over the saved value.
+    window._loadedConfig = parsedFlags
+
     return true
+end
+
+-- restore one control from a decoded config. callers own the window._loading guard.
+function persistenceConfig.applyTo(control: PersistedControl, value: unknown)
+    if value == nil and not control._canBeNil then
+        return
+    end
+    local ok, err = pcall(function()
+        local deserialize = control._deserialize
+        if deserialize then
+            deserialize(control, value)
+        else
+            control:Set(value)
+        end
+    end)
+    if not ok then
+        log.warn("Rayfield: Failed to restore flag '" .. tostring(control.flag) .. "' - " .. tostring(err))
+    end
 end
 
 function persistenceConfig.list(window: ConfigWindow): { string }
@@ -136,9 +148,13 @@ function persistenceConfig.list(window: ConfigWindow): { string }
 
     for _, filePath in files do
         local file = path.basename(filePath)
-        local base = path.stripExtension(file, ".rfld")
-        if base and not base:find(" %(Incorrect Format%)$") then
-            table.insert(names, base)
+        -- listfiles returns folders and anything else in the dir; only our own configs are
+        -- real names, so require the extension rather than listing whatever is lying around
+        if file:sub(-5) == ".rfld" then
+            local base = path.stripExtension(file, ".rfld")
+            if base and base ~= "" and not base:find(" %(Incorrect Format%)$") then
+                table.insert(names, base)
+            end
         end
     end
 

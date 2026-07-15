@@ -193,7 +193,7 @@ function Toggle:_buildFull()
 
     if self.icon then
         self.iconLabel = window:Create("ImageLabel", {
-            Image = "rbxassetid://" .. tostring(self.icon),
+            Image = self.icon,
             Size = UDim2.fromOffset(16, 16),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
@@ -328,7 +328,7 @@ function Toggle:_buildCompact()
 
     if self.icon then
         self.iconLabel = window:Create("ImageLabel", {
-            Image = "rbxassetid://" .. tostring(self.icon),
+            Image = self.icon,
             Size = UDim2.fromOffset(16, 16),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
@@ -498,17 +498,18 @@ end
 moveable(Toggle)
 
 function Toggle:Set(value, skipCallback)
-    if self.value == value then
-        return
-    end
+    local changed = self.value ~= value
     self.value = value
 
-    self:_animateIndicator()
+    if changed then
+        self:_animateIndicator()
+    end
 
+    -- fire even when unchanged: config load calls Set and relies on the callback to apply
     if not skipCallback then
         self.window:_runGuarded(self, self.callback, self.value)
-        self.window:_persist(self) -- skipped on load (Load passes skipCallback)
     end
+    self.window:_persist(self) -- no-op during load (window._loading)
 end
 
 return Toggle

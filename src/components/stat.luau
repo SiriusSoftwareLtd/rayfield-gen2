@@ -183,7 +183,7 @@ function Statistic:_buildFull()
 
     -- Soft accent halo behind the card. UIShadow (no image) is our glow standard; its colour
     -- follows the stat direction and it reveals from hidden to 0.7 like the rest of the card.
-    self.glow = window:CreateGlow(self.main, glowColor(accents.neutral), 10, 1)
+    self.glow = window:CreateGlow(self.main, glowColor(accents.neutral), 13, 1)
 
     self.title = window:Create("TextLabel", {
         Text = locale.t(self.name),
@@ -217,7 +217,7 @@ function Statistic:_buildFull()
 
     if self.icon then
         self.iconLabel = window:Create("ImageLabel", {
-            Image = "rbxassetid://" .. tostring(self.icon),
+            Image = self.icon,
             Size = UDim2.fromOffset(32, 32),
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
@@ -407,7 +407,7 @@ function Statistic:_buildCompact()
 
     if self.icon then
         self.iconLabel = window:Create("ImageLabel", {
-            Image = "rbxassetid://" .. tostring(self.icon),
+            Image = self.icon,
             Size = UDim2.fromOffset(20, 20), -- smaller than the full 32
             BorderSizePixel = 0,
             BackgroundTransparency = 1,
@@ -629,7 +629,7 @@ function Statistic:_setShown(shown, animate)
     if shown then
         w:_revealCommon(self, animate)
         w:_reveal(self.gradientContainer, { BackgroundTransparency = 0 }, animate)
-        w:_reveal(self.glow, { Transparency = 0.7 }, animate)
+        w:_reveal(self.glow, { Transparency = 0.82 }, animate)
         self.valueOdo:reveal(0, animate)
         self.changeOdo:reveal(0, animate)
     else

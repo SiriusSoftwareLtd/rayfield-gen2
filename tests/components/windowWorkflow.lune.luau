@@ -111,6 +111,19 @@ return function()
             expect(slider.value).to.equal(8.5)
             expect(sliderValue).to.equal(8.5)
 
+            -- the snap grid anchors at range[1]: both endpoints of a non-aligned range stay reachable
+            local offGrid = first:CreateSlider({
+                name = "OffGrid",
+                range = { 0.5, 2.5 },
+                increment = 1,
+                value = 0.5,
+            })
+            expect(offGrid.value).to.equal(0.5)
+            offGrid:Set(2.5)
+            expect(offGrid.value).to.equal(2.5)
+            offGrid:Set(100)
+            expect(offGrid.value).to.equal(2.5)
+
             local dropdown = first:CreateDropdown({
                 name = "Choice",
                 options = { "One", "Two", "Two" },
@@ -130,17 +143,72 @@ return function()
             dropdown:Refresh({ "Blue", "Green" })
             dropdown:Set("Green")
             expect(dropdown.selectedLabel.Text).to.equal("Green")
+            -- removing the selected option must tell the callback the selection changed
+            dropdown:Remove("Green")
+            expect(dropdownValue).to.equal(nil)
 
+            -- a user icon may be a rbxassetid string, not just a bare number
+            local stringIcon = first:CreateToggle({
+                name = "StringIcon",
+                icon = "rbxassetid://4483345998",
+                forgetState = true,
+            })
+            expect(stringIcon.iconLabel.Image).to.equal("rbxassetid://4483345998")
+
+            -- an open dropdown sizes itself to the options actually on screen, so a search
+            -- filter (and Add/Remove while open) resizes rather than leaving dead space
+            local sized = first:CreateDropdown({
+                name = "Sized",
+                options = { "Alpha", "Beta", "Gamma" },
+                forgetState = true,
+            })
+            sized.interact.MouseButton1Click:Fire()
+            expect(sized._isOpen).to.equal(true)
+            local allHeight = sized:_openHeight()
+
+            -- filtering leaves fewer rows on screen, so the panel must shrink to fit
+            sized._searchOpen = true
+            sized.searchInput.Text = "alp"
+            sized:_applyFilter("alp")
+            expect(sized:_openHeight() < allHeight).to.equal(true)
+
+            -- Add while a query is active must respect it, not show an excluded option
+            sized:Add("Delta")
+            local delta
+            for _, data in sized._optionFrames do
+                if data.name == "Delta" then
+                    delta = data
+                end
+            end
+            expect(delta).to.be.ok()
+            expect(delta.frame.Visible).to.equal(false)
+
+            -- clearing the query brings every row back, including the one added while filtered
+            sized._searchOpen = false
+            sized:_applyFilter("")
+            expect(delta.frame.Visible).to.equal(true)
+            expect(sized:_openHeight() > allHeight or allHeight == 180).to.equal(true)
+            sized:_close()
+
+            local handedOut
             local multi = first:CreateDropdown({
                 name = "Multi",
                 options = { "A", "B", "C" },
                 multiSelect = true,
                 value = { "A", "B", "A" },
+                callback = function(selected)
+                    handedOut = selected
+                end,
             })
             expect(#multi.value).to.equal(2)
             multi:Set({ "B", "C", "Z" })
             expect(#multi.value).to.equal(2)
             expect(multi.selectedLabel.Text).to.equal("Various")
+
+            -- the callback gets a copy: a dev mutating it must not corrupt our selection
+            expect(handedOut).never.to.equal(multi.value)
+            table.insert(handedOut, "Z")
+            expect(#multi.value).to.equal(2)
 
             local input = first:CreateInput({
                 name = "Amount",
@@ -266,6 +334,63 @@ return function()
 
             tag:Remove()
             expect(#w.tags).to.equal(0)
+        end)
+
+        it("restores elements built after the config was loaded", function()
+            local w = makeWindow({
+                name = "Late Window",
+                showName = "Late",
+                configuration = { autoSave = false, autoLoad = false },
+            })
+            local tab = w:CreateTab({ name = "Main" })
+
+            -- stand in for a load having already happened, as autoLoad does on first Show
+            w._loadedConfig = { LateToggle = true, LateSlider = 42 }
+
+            local seen
+            local late = tab:CreateToggle({
+                name = "LateToggle",
+                value = false,
+                callback = function(value)
+                    seen = value
+                end,
+            })
+            expect(late.value).to.equal(true) -- would be the default without _restoreLate
+            expect(seen).to.equal(true) -- the callback has to fire so the dev applies it
+
+            -- groups take the same tail
+            local row = tab:CreateGroup()
+            local lateSlider = row:CreateSlider({ name = "LateSlider", range = { 0, 100 }, increment = 1, value = 0 })
+            expect(lateSlider.value).to.equal(42)
+
+            -- forgetState opts out of config entirely, so it must keep its default
+            local ignored = tab:CreateToggle({ name = "LateToggle", value = false, forgetState = true })
+            expect(ignored.value).to.equal(false)
+        end)
+
+        it("navigates to a tab by name and keeps the selection in step", function()
+            local w = makeWindow({
+                name = "Nav Window",
+                showName = "Nav",
+                configuration = { autoSave = false, autoLoad = false },
+            })
+            local home = w:CreateTab({ name = "Home" })
+            local settings = w:CreateTab({ name = "Settings" })
+            expect(w.selectedTab).to.equal(home)
+
+            w:Navigate("Settings")
+            expect(w.selectedTab).to.equal(settings)
+
+            w:Navigate(home)
+            expect(w.selectedTab).to.equal(home)
+
+            -- a page instance still works for callers holding tabPage
+            w:Navigate(settings.tabPage)
+            expect(w.selectedTab).to.equal(settings)
+
+            -- an unknown tab is a no-op, not a crash or a silent desync
+            w:Navigate("Nope")
+            expect(w.selectedTab).to.equal(settings)
         end)
 
         it("shows, hides, searches, and creates transient surfaces", function()

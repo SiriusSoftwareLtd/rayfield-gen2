@@ -97,4 +97,5 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
-        run: gh release upload "$RELEASE_TAG" build/bundled.luau build/bundled.luau.sha256 build/bundled.txt
+        # clobber so a re-run of a published release replaces its assets instead of failing
+        run: gh release upload "$RELEASE_TAG" --clobber build/bundled.luau build/bundled.luau.sha256 build/bundled.txt

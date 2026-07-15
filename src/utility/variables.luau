@@ -27,7 +27,7 @@ export type VariablesState = RuntimeState & {
 }
 
 local variables = table.clone(runtime) :: VariablesState
-log.setSuppressPredicate(function()
+log.setSecureModeSource(function()
     return variables.secureMode
 end)
 

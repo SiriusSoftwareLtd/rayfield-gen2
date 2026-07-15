@@ -1076,6 +1076,13 @@ _G.__RAYFIELD_TEST_HELPERS = {
 }
 _G.__RAYFIELD_TEST_VERBOSE_LOGS = verboseTestLogs
 
+-- gag Rayfield's console output during test runs unless --verbose-logs is set. this is the
+-- runner's job, not the library's: src must not know about test environments.
+local logModule = _G.__RAYFIELD_TEST_REQUIRE_UTILITY("log")
+logModule.setSuppressPredicate(function()
+    return _G.__RAYFIELD_TEST_VERBOSE_LOGS ~= true
+end)
+
 local results = {
     testsRan = 0,
     successCount = 0,
@@ -1298,8 +1305,9 @@ local function runTest(suite, test)
         runAfterEach(suite)
     end, debug.traceback)
     if not afterOk then
+        -- keep the tests own failure in front; the afterEach error alone usually hides the cause
+        err = if ok then afterErr else tostring(err) .. "\n\nafterEach also failed:\n" .. tostring(afterErr)
         ok = false
-        err = afterErr
     end
 
     if ok then
@@ -1523,38 +1531,57 @@ local function writeCoverageBaseline(summary)
         "executor-specific globals and public UI APIs still require manual compatibility validation when touched.",
     }
 
-    local jsonLines = {
-        "{",
-        string.format('  "scope": "%s",', jsonEscape(coverageScope)),
-        string.format('  "measuredDate": "%s",', os.date("!%Y-%m-%d")),
-        '  "command": "make coverage-baseline",',
-        string.format('  "threshold": %.2f,', coverageThreshold),
-        string.format('  "lineCoverage": %.2f,', summary.lineCoverage),
-        string.format('  "coveredLines": %d,', summary.coveredLines),
-        string.format('  "coverableLines": %d,', summary.coverableLines),
-    }
+    local function renderBaseline(measuredDate)
+        local jsonLines = {
+            "{",
+            string.format('  "scope": "%s",', jsonEscape(coverageScope)),
+            string.format('  "measuredDate": "%s",', measuredDate),
+            '  "command": "make coverage-baseline",',
+            string.format('  "threshold": %.2f,', coverageThreshold),
+            string.format('  "lineCoverage": %.2f,', summary.lineCoverage),
+            string.format('  "coveredLines": %d,', summary.coveredLines),
+            string.format('  "coverableLines": %d,', summary.coverableLines),
+        }
 
-    appendJsonStringArray(jsonLines, "notes", baselineNotes, true)
-    table.insert(jsonLines, '  "files": [')
+        appendJsonStringArray(jsonLines, "notes", baselineNotes, true)
+        table.insert(jsonLines, '  "files": [')
 
-    for index, row in summary.rows do
-        table.insert(jsonLines, "    {")
-        table.insert(jsonLines, string.format('      "path": "%s",', jsonEscape(row.path)))
-        table.insert(jsonLines, string.format('      "lineCoverage": %.2f,', row.lineCoverage))
-        table.insert(jsonLines, string.format('      "coveredLines": %d,', row.coveredLines))
-        table.insert(jsonLines, string.format('      "coverableLines": %d', row.coverableLines))
-        table.insert(jsonLines, "    }" .. if index == #summary.rows then "" else ",")
+        for index, row in summary.rows do
+            table.insert(jsonLines, "    {")
+            table.insert(jsonLines, string.format('      "path": "%s",', jsonEscape(row.path)))
+            table.insert(jsonLines, string.format('      "lineCoverage": %.2f,', row.lineCoverage))
+            table.insert(jsonLines, string.format('      "coveredLines": %d,', row.coveredLines))
+            table.insert(jsonLines, string.format('      "coverableLines": %d', row.coverableLines))
+            table.insert(jsonLines, "    }" .. if index == #summary.rows then "" else ",")
+        end
+
+        table.insert(jsonLines, "  ],")
+        appendJsonStringArray(jsonLines, "auditGaps", baselineAuditGaps, false)
+        table.insert(jsonLines, "}")
+
+        return table.concat(jsonLines, "\n") .. "\n"
     end
 
-    table.insert(jsonLines, "  ],")
-    appendJsonStringArray(jsonLines, "auditGaps", baselineAuditGaps, false)
-    table.insert(jsonLines, "}")
+    -- keep the existing date when the numbers didnt move, so regenerating the baseline
+    -- daily (the pre-commit hook does) never churns the file
+    local baselinePath = root .. "/coverage-baseline.json"
+    local existing = if fs.isFile(baselinePath) then fs.readFile(baselinePath) else nil
+    local existingDate = if existing then string.match(existing, '"measuredDate":%s*"([^"]+)"') else nil
+    local content = renderBaseline(existingDate or os.date("!%Y-%m-%d"))
+    if content ~= existing then
+        content = renderBaseline(os.date("!%Y-%m-%d") :: string)
+    end
 
-    fs.writeFile(root .. "/coverage-baseline.json", table.concat(jsonLines, "\n") .. "\n")
+    fs.writeFile(baselinePath, content)
     print("coverage baseline updated: coverage-baseline.json")
 end
 
 print(string.format("%d/%d tests passed", results.successCount, results.testsRan))
+
+if results.testsRan == 0 then
+    warn("Spec files were found but registered zero tests; refusing to pass an empty run.")
+    process.exit(1)
+end
 
 local coverageSummary = writeCoverageReports()
 
