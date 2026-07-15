@@ -67,8 +67,24 @@ function assetResolver:resolve(value)
     return nil
 end
 
+-- executors disagree on response shape, so trust the body only when whatever status
+-- info the executor does give us says the request actually succeeded
+local function isGoodResponse(response)
+    if type(response) ~= "table" or type(response.Body) ~= "string" or #response.Body == 0 then
+        return false
+    end
+    if type(response.StatusCode) == "number" then
+        return response.StatusCode >= 200 and response.StatusCode < 300
+    end
+    if type(response.Success) == "boolean" then
+        return response.Success
+    end
+    return true
+end
+
 function assetResolver:getAssetContentFromUrl(url: string, cacheKey: number | string?, forced: boolean?): string?
-    if cacheKey ~= nil and self.contentCache then
+    -- forced skips the session cache, so retry loops see fresh responses
+    if cacheKey ~= nil and self.contentCache and not forced then
         local cachedContent = self.contentCache[cacheKey :: any]
         if cachedContent then
             return cachedContent
@@ -86,7 +102,7 @@ function assetResolver:getAssetContentFromUrl(url: string, cacheKey: number | st
         Method = "GET",
     })
     local content = nil
-    if success and response and response.Body then
+    if success and isGoodResponse(response) then
         content = response.Body
         if cacheKey ~= nil and self.contentCache then
             self.contentCache[cacheKey :: any] = content

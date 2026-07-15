@@ -33,6 +33,8 @@ end
 imageCache.rewrites = {}
 imageCache.onCached = nil -- image sets this to rebind blank instances when a background download lands
 
+local pngMagic = "\137PNG\r\n\26\n"
+
 local function cacheFile(filePath, url)
     if type(getfenv().getcustomasset) ~= "function" then
         return nil
@@ -41,7 +43,12 @@ local function cacheFile(filePath, url)
         pcall(filesystem.ensureFolder, cacheRoot)
         pcall(filesystem.ensureFolder, cacheFolder)
         local body = assetResolver:getAssetContentFromUrl(url, filePath, false)
-        if not body or not pcall(filesystem.writefile, filePath, body) then
+        -- never write a non-png body (error page, redirect html) to disk; a poisoned
+        -- cache file would shadow the real asset on every later session
+        if not body or string.sub(body, 1, 8) ~= pngMagic then
+            return nil
+        end
+        if not pcall(filesystem.writefile, filePath, body) then
             return nil
         end
     end
@@ -55,11 +62,12 @@ end
 
 local function fetchAvatar(userId)
     local cdnUrl
-    for _ = 1, 4 do
+    for attempt = 1, 4 do
+        -- retries must bypass the session cache or a cached "Pending" response wins forever
         local body = assetResolver:getAssetContentFromUrl(
             string.format(thumbEndpoint, userId, headshotPx, headshotPx),
             "avatar:" .. tostring(userId),
-            false
+            attempt > 1
         )
         if body then
             local decodeOk, parsed = pcall(function()
@@ -86,7 +94,8 @@ function imageCache.preload(onSettled)
     local env = getfenv()
     if type(env.getcustomasset) ~= "function" then
         if onSettled then
-            onSettled(manifestSize)
+            -- defer so a caller that assigns state right after calling preload still sees this
+            task.defer(onSettled, manifestSize)
         end
         return false, manifestSize
     end

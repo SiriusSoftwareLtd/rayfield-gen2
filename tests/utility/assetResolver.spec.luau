@@ -91,5 +91,55 @@ return function()
             expect(resolver:getAssetContentFromId("not-an-asset")).never.to.be.ok()
             expect(calls).to.equal(0)
         end)
+
+        it("rejects failed responses instead of caching their bodies", function()
+            local responses = {
+                { StatusCode = 404, Body = "<html>not found</html>" },
+                { Success = false, Body = "rate limited" },
+                { Body = "" },
+                "not-a-table",
+            }
+            local call = 0
+
+            resolver = assetResolver.new(true, "https://example.invalid/asset?id=%d")
+            network.getRequestFn = function()
+                return function()
+                    call += 1
+                    return responses[call]
+                end
+            end
+
+            for index = 1, #responses do
+                expect(resolver:getAssetContentFromUrl("https://example.invalid/raw", "key")).never.to.be.ok()
+                expect(call).to.equal(index) -- a failure must not be cached, so every call refetches
+            end
+        end)
+
+        it("accepts responses that report success", function()
+            resolver = assetResolver.new(true, "https://example.invalid/asset?id=%d")
+            network.getRequestFn = function()
+                return function()
+                    return { StatusCode = 200, Body = "good-body" }
+                end
+            end
+
+            expect(resolver:getAssetContentFromUrl("https://example.invalid/raw", "ok")).to.equal("good-body")
+        end)
+
+        it("bypasses the session cache when forced", function()
+            local calls = 0
+            resolver = assetResolver.new(true, "https://example.invalid/asset?id=%d")
+            network.getRequestFn = function()
+                return function()
+                    calls += 1
+                    return { StatusCode = 200, Body = "body-" .. calls }
+                end
+            end
+
+            expect(resolver:getAssetContentFromUrl("https://example.invalid/raw", "key")).to.equal("body-1")
+            expect(resolver:getAssetContentFromUrl("https://example.invalid/raw", "key")).to.equal("body-1")
+            expect(resolver:getAssetContentFromUrl("https://example.invalid/raw", "key", true)).to.equal("body-2")
+            expect(calls).to.equal(2)
+        end)
     end)
 end

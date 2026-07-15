@@ -12,12 +12,12 @@ local runtime = {}
 runtime.rayfieldHidden = false -- flipped while the menu is hidden
 
 runtime.secureMode = (function()
-    local _getgenv = rawget(_G, "getgenv")
-    if not _getgenv then
+    -- getgenv lives in the executor's script environment, not _G, same as gethui below
+    if typeof(getgenv) ~= "function" then
         return false
     end
     local ok, val = pcall(function()
-        return _getgenv().RAYFIELD_SECURE
+        return getgenv().RAYFIELD_SECURE
     end)
     return ok and val == true
 end)()

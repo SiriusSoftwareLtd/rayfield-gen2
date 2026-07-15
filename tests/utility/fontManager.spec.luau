@@ -174,5 +174,69 @@ return function()
                 )]
             ).to.equal(loaded)
         end)
+
+        it("returns the fallback when the manifest shape is invalid", function()
+            local manager = makeManager(true)
+            manager._debug = false
+            files["Fonts/123.json"] = "stored-manifest"
+            game:GetService("HttpService").JSONDecode = function()
+                return { name = "NoFaces" }
+            end
+
+            expect(manager:loadFont(123)).to.equal(fallback)
+        end)
+
+        it("sanitizes hostile manifest names before touching disk", function()
+            local manager = makeManager(true)
+            manager._debug = false
+            files["Fonts/123.json"] = "stored-manifest"
+            game:GetService("HttpService").JSONDecode = function()
+                return {
+                    name = "../../escape",
+                    faces = {
+                        { name = "../Regular", weight = 400, style = "normal", assetId = "rbxassetid://456" },
+                    },
+                }
+            end
+            game:GetService("HttpService").JSONEncode = function()
+                return "encoded-manifest"
+            end
+            manager.assetResolver.resolve = function(_, id)
+                return tonumber(id) or 456
+            end
+            manager.assetResolver.getAssetContentFromId = function()
+                return "font-binary"
+            end
+
+            manager:loadFont(123)
+
+            expect(files["Fonts/escape/Regular.ttf"]).to.equal("font-binary")
+            for storedPath in files do
+                expect(storedPath:find("%.%.")).never.to.be.ok()
+            end
+        end)
+
+        it("returns the fallback when a face cannot be made local", function()
+            local manager = makeManager(true)
+            manager._debug = false
+            files["Fonts/123.json"] = "stored-manifest"
+            manager.assetResolver.resolve = function(_, id)
+                return tonumber(id) or 456
+            end
+            manager.assetResolver.getAssetContentFromId = function()
+                return "font-binary"
+            end
+            getfenv().getcustomasset = function(assetPath)
+                if assetPath:find("%.ttf$") then
+                    error("no capability")
+                end
+                return "asset://" .. assetPath
+            end
+
+            -- a partial failure must not fall back to the remote asset id: that fetch is
+            -- exactly what secure mode exists to prevent
+            expect(manager:loadFont(123)).to.equal(fallback)
+            expect(files["Fonts/SpecFont/manifest.json"]).never.to.be.ok()
+        end)
     end)
 end
