@@ -30,7 +30,6 @@ return {
         ColorSequenceKeypoint.new(0.9999, Color3.fromRGB(58, 58, 58)),
         ColorSequenceKeypoint.new(1, Color3.fromRGB(48, 48, 48)),
     }),
-    DividerColor = Color3.fromRGB(255, 255, 255),
     TabColor = Color3.fromRGB(255, 255, 255),
     TabBackground = ColorSequence.new(Color3.fromRGB(50, 50, 50), Color3.fromRGB(35, 35, 35)),
     TabStroke = ColorSequence.new(Color3.fromRGB(95, 95, 95), Color3.fromRGB(50, 50, 50)),

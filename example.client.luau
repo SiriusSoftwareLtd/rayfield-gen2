@@ -37,6 +37,9 @@ local window = Rayfield:CreateWindow({
     },
 })
 
+-- Topbar tag, next to the window title.
+window:CreateTag({ text = "Beta", color = Color3.fromRGB(255, 175, 15) })
+
 -- Home ----------------------------------------------------------------------
 local home = window:CreateTab({ name = "Home", icon = 93364949241311 })
 
@@ -154,6 +157,16 @@ fields:CreateInput({
 
 fields:CreateKeybind({ name = "Sprint", value = Enum.KeyCode.LeftShift })
 
+fields:CreateKeybind({
+    name = "Zoom",
+    description = "Hold mode: fires true once held, false on release.",
+    value = Enum.KeyCode.C,
+    hold = true,
+    callback = function(holding)
+        print("Zoom:", holding)
+    end,
+})
+
 fields:CreateColorPicker({ name = "Highlight", color = Color3.fromRGB(96, 205, 255) })
 
 -- Stats ---------------------------------------------------------------------
@@ -180,7 +193,8 @@ layout:CreateSection({ name = "Loadout" })
 local grid = layout:CreateGroup()
 
 local leftColumn = grid:CreateGroup({ direction = "column" })
-leftColumn:CreateToggle({ name = "Aimbot", value = true })
+-- own flag: "Aimbot" is taken by the Combat toggle and derived flags must stay unique
+leftColumn:CreateToggle({ name = "Aimbot", flag = "LoadoutAimbot", value = true })
 leftColumn:CreateToggle({ name = "Triggerbot" })
 
 local rightColumn = grid:CreateGroup({ direction = "column" })
