@@ -48,7 +48,18 @@ local function blocked(value: unknown): string
 end
 
 function image.preload(onSettled: PreloadCallback?): (boolean, number)
-    return imageCache.preload(onSettled)
+    return imageCache.preload(function(failed)
+        -- ids that never cached will never fire onCached; drop their pending lists so they
+        -- dont grow all session and pin destroyed instances
+        for id in image.pending do
+            if not image.rewrites[id] then
+                image.pending[id] = nil
+            end
+        end
+        if onSettled then
+            onSettled(failed)
+        end
+    end)
 end
 
 function image.avatar(userId: number, onReady: AvatarCallback?): string

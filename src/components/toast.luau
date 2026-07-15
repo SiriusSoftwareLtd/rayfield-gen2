@@ -24,10 +24,6 @@ local fadeLong = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDir
 local fadeShort = TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out) -- content + shadow
 local shrinkInfo = TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out) -- exit scale
 
--- title weight is fixed (semibold) rather than themed, and the measure below uses the same
--- font so the hug-width always matches what actually renders
-local titleFont = variables.brandFont(Enum.FontWeight.SemiBold)
-
 local iconSize = 24 -- a glyph icon
 local avatarSize = 32 -- a user headshot (matches the old "signed in as" card)
 local leftPadding = 18 -- inside the pill, before the icon/text
@@ -218,12 +214,13 @@ function Toast.new(window, properties)
         Parent = self.container,
     })
 
+    -- the semibold title rides the theme so it tracks secure mode's brand swap and a dev's
+    -- fallbackFont; the measure below reads the same key so the hug-width always matches
     self.titleLabel = self.window:Create("TextLabel", {
         Text = self.title,
         AutomaticSize = Enum.AutomaticSize.X,
         Size = UDim2.fromOffset(0, 16),
         BackgroundTransparency = 1,
-        FontFace = titleFont,
         TextSize = 16,
         TextXAlignment = Enum.TextXAlignment.Left,
         LayoutOrder = if self.subtitleAbove then 2 else 1,
@@ -232,7 +229,7 @@ function Toast.new(window, properties)
         TextTransparency = 1, -- In = 0
 
         Parent = self.container,
-    }, { TextColor3 = "ContentColor" })
+    }, { TextColor3 = "ContentColor", FontFace = "TitleFont" })
 
     if hasSubtitle then
         self.subtitleLabel = self.window:Create("TextLabel", {
@@ -282,7 +279,7 @@ end
 -- Width the pill needs to hug its content, measured without rendering so it grows into place
 -- rather than snapping wide first. Height is fixed by line count (icon dictates the minimum).
 function Toast:_measure()
-    local titleWidth = functions.textWidth(titleFont, 16, self.title)
+    local titleWidth = functions.textWidth(self.window.theme.TitleFont, 16, self.title)
     local subtitleWidth = if self.subtitleLabel
         then functions.textWidth(self.window.theme.Font, 14, self.subtitle)
         else 0

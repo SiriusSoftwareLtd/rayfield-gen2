@@ -123,6 +123,12 @@ return function()
             expect(imageCache.rewrites[constants.icons.close]).to.be.ok()
         end)
 
+        it("returns nothing for avatars when no file API exists", function()
+            filesystem.isfile = nil
+
+            expect(imageCache.avatar(42)).to.equal("")
+        end)
+
         it("returns cached avatars from disk", function()
             getfenv().getcustomasset = function(path)
                 return "asset://" .. path

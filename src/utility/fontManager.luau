@@ -255,7 +255,12 @@ function fontManager.loadFont(
 
     -- if the font is not cached, we need to load it from the asset resolver
     local manifestPath = self.rootFolder .. "/" .. resolvedId .. ".json"
+    -- fonts only load through the disk cache; without a file API there is just the fallback
+    if typeof(fileSystem.isfile) ~= "function" then
+        return self.defaultOptions.fallbackFont
+    end
     local possibleFontManifest: string? = nil
+    local downloadedManifest = false
     if runService:IsStudio() and self._debug then
         log.warn("Font manifest loading is not supported in Studio. Using default font manifest for testing.")
         possibleFontManifest =
@@ -264,10 +269,9 @@ function fontManager.loadFont(
         local ok, contents = pcall(fileSystem.readfile, manifestPath)
         possibleFontManifest = ok and contents or nil
     else
+        -- written below only once it validates, so a bad body never poisons the cache
         possibleFontManifest = self.assetResolver:getAssetContentFromId(resolvedId, false)
-        if possibleFontManifest then
-            pcall(fileSystem.writefile, manifestPath, possibleFontManifest)
-        end
+        downloadedManifest = possibleFontManifest ~= nil
     end
     local fontManifest: FontManifest? = nil
     if possibleFontManifest then
@@ -291,7 +295,12 @@ function fontManager.loadFont(
         if self._debug then
             log.warn("Font manifest is nil for font id: " .. tostring(resolvedId))
         end
+        -- a cached manifest that fails validation would fail forever; drop it
+        pcall(fileSystem.delfile, manifestPath)
         return self.defaultOptions.fallbackFont
+    end
+    if downloadedManifest and possibleFontManifest then
+        pcall(fileSystem.writefile, manifestPath, possibleFontManifest)
     end
     local fontDirectory = self.rootFolder .. "/" .. fontManifest.name
     local madeAllFontsLocal = true
