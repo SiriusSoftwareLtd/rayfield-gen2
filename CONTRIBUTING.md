@@ -77,7 +77,6 @@ Then open Roblox Studio, connect the Rojo plugin to the server, and use Play mod
 | `example.client.luau` | Example client and manual validation surface. |
 | `Makefile` | Local development and CI command entry points. |
 | `rokit.toml` | Pinned contributor and CI toolchain. |
-| `aftman.toml` | Legacy/minimal Rojo metadata; use Rokit for contributor setup. |
 | `default.project.json` | Rojo project used for Studio development. |
 | `test.project.json` | Rojo project used for Roblox Studio test runs. |
 | `wax.project.json` | Project definition used for release bundling. |

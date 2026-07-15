@@ -23,6 +23,7 @@ return function()
                 isfile = filesystem.isfile,
                 readfile = filesystem.readfile,
                 writefile = filesystem.writefile,
+                delfile = filesystem.delfile,
             }
             originalHttpService = {
                 JSONDecode = game:GetService("HttpService").JSONDecode,
@@ -42,6 +43,9 @@ return function()
             end
             filesystem.writefile = function(path, content)
                 files[path] = content
+            end
+            filesystem.delfile = function(path)
+                files[path] = nil
             end
 
             game:GetService("HttpService").JSONDecode = function()
@@ -71,6 +75,7 @@ return function()
             filesystem.isfile = originalFilesystem.isfile
             filesystem.readfile = originalFilesystem.readfile
             filesystem.writefile = originalFilesystem.writefile
+            filesystem.delfile = originalFilesystem.delfile
             game:GetService("HttpService").JSONDecode = originalHttpService.JSONDecode
             game:GetService("HttpService").JSONEncode = originalHttpService.JSONEncode
             getfenv().getcustomasset = originalGetCustomAsset
@@ -175,13 +180,56 @@ return function()
             ).to.equal(loaded)
         end)
 
-        it("returns the fallback when the manifest shape is invalid", function()
+        it("returns the fallback when the manifest shape is invalid and drops the cached file", function()
             local manager = makeManager(true)
             manager._debug = false
             files["Fonts/123.json"] = "stored-manifest"
             game:GetService("HttpService").JSONDecode = function()
                 return { name = "NoFaces" }
             end
+
+            expect(manager:loadFont(123)).to.equal(fallback)
+            -- a poisoned cached manifest would otherwise be re-read (and fail) forever
+            expect(files["Fonts/123.json"]).never.to.be.ok()
+        end)
+
+        it("only writes a downloaded manifest to disk once it validates", function()
+            local manager = makeManager(true)
+            manager._debug = false
+            manager.assetResolver.resolve = function(_, id)
+                return tonumber(id) or 456
+            end
+            manager.assetResolver.getAssetContentFromId = function(_, id)
+                return if id == 123 then "downloaded-manifest" else "font-binary"
+            end
+
+            -- invalid body: nothing may land on disk
+            game:GetService("HttpService").JSONDecode = function()
+                return { name = "NoFaces" }
+            end
+            expect(manager:loadFont(123)).to.equal(fallback)
+            expect(files["Fonts/123.json"]).never.to.be.ok()
+
+            -- valid body: cached for the next session
+            game:GetService("HttpService").JSONDecode = function()
+                return {
+                    name = "SpecFont",
+                    faces = {
+                        { name = "Regular", weight = 400, style = "normal", assetId = "rbxassetid://456" },
+                    },
+                }
+            end
+            expect(manager:loadFont(123, nil, nil, nil, true)).never.to.equal(fallback)
+            expect(files["Fonts/123.json"]).to.equal("downloaded-manifest")
+        end)
+
+        it("returns the fallback when no file API exists", function()
+            local manager = makeManager(true)
+            manager._debug = false
+            manager.assetResolver.resolve = function(_, id)
+                return tonumber(id) or 456
+            end
+            filesystem.isfile = nil
 
             expect(manager:loadFont(123)).to.equal(fallback)
         end)

@@ -626,11 +626,15 @@ function Window:_syncLiveAnimation()
     end
 
     self._liveAnimating = true
+    -- generation stamp: an old loop parked in Completed:Wait() through a static->animated
+    -- swap wakes up stale and exits, instead of drifting alongside the new loop
+    self._liveGeneration = (self._liveGeneration or 0) + 1
+    local generation = self._liveGeneration
     task.spawn(function()
         local out = true
         local tweenInfo = TweenInfo.new(10, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
-        while self._liveAnimating and not self.unloaded do
+        while self._liveGeneration == generation and self._liveAnimating and not self.unloaded do
             local tweenW = variables.tweenService:Create(self.windowGradient, tweenInfo, {
                 Offset = Vector2.new(if out then 0.4 else -0.2, 0),
                 Rotation = (if out then 220 else 280),
@@ -641,8 +645,10 @@ function Window:_syncLiveAnimation()
             tweenW.Completed:Wait()
             out = not out
         end
-        self._liveAnimating = false
-        self._liveTween = nil
+        if self._liveGeneration == generation then
+            self._liveAnimating = false
+            self._liveTween = nil
+        end
     end)
 end
 
@@ -716,6 +722,16 @@ function Window:CreateTab(properties)
         end
         if isFirstVisible then
             newTab:Select(true)
+        end
+
+        -- a tab built after the window is already open reveals its pill right away, the
+        -- same way _register shows late elements. hidden/minimised windows reveal on restore.
+        if not self.hidden and not self.minimised then
+            newTab.topbarItem.Visible = true
+            newTab:_applyVisual(
+                if self.selectedTab == newTab then "selected" else "unselected",
+                TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+            )
         end
     end
 
@@ -810,6 +826,9 @@ function Window:_keybindUsing(key, exclude)
 end
 
 function Window:Notify(properties)
+    if self.unloaded then
+        return -- nothing to parent into once the ScreenGui is gone
+    end
     if not self.notifications then
         self.notifications = self:Create("Frame", {
             Name = "Notifications",
@@ -840,6 +859,9 @@ end
 -- Top-centre toast stack. Like Notify but for brief, centred messages that drop in from the
 -- top of the screen (newest on top). Each toast takes { title, subtitle?, icon?, duration? }.
 function Window:Toast(properties)
+    if self.unloaded then
+        return
+    end
     if not self.toasts then
         self.toasts = self:Create("Frame", {
             Name = "Toasts",
@@ -871,6 +893,9 @@ end
 -- options?, dismissable? } - give it options for a choice dialog, or boxes for a changelog.
 -- Returns the popup handle (call :Close() to dismiss it yourself).
 function Window:Popup(properties)
+    if self.unloaded then
+        return
+    end
     return require(script.Parent.popup).new(self, properties)
 end
 
@@ -1391,10 +1416,14 @@ function Window:Show()
     self.animating = true
 
     -- autoLoad reflects the saved config once, on first open. Re-loading on every show would
-    -- wipe any changes the user made and closed without saving.
+    -- wipe any changes the user made and closed without saving. a load that throws must not
+    -- strand animating=true, or the window could never open again.
     if self.configuration.autoLoad and not self._autoLoaded then
         self._autoLoaded = true
-        self:Load()
+        local ok, err = pcall(self.Load, self)
+        if not ok then
+            log.warn("Rayfield: Failed to load configuration - " .. tostring(err))
+        end
     end
 
     self.hidden = false
@@ -1813,7 +1842,6 @@ function Window:_flashResult(element, ok)
     end
     local glow = element.glow
     local stroke = element.boxStroke
-    local white = Color3.fromRGB(255, 255, 255)
     local fill = ok and constants.accent.on or self.theme.ErrorColor
     local edge = ok and constants.accent.onStroke or self.theme.ErrorStrokeColor
     local inInfo = TweenInfo.new(0.1, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
@@ -1837,7 +1865,9 @@ function Window:_flashResult(element, ok)
         end
         variables.tweenService:Create(box, outInfo, { BackgroundColor3 = self.theme.FieldBackground }):Play()
         if stroke then
-            variables.tweenService:Create(stroke, outInfo, { Color = white, Transparency = 0.85 }):Play()
+            variables.tweenService
+                :Create(stroke, outInfo, { Color = self.theme.SurfaceStroke, Transparency = 0.85 })
+                :Play()
         end
         if glow then
             variables.tweenService
@@ -2176,6 +2206,7 @@ end
 
 function Window:Unload()
     self.unloaded = true
+    hapticEngine.setEnabled(false) -- tears the pooled effects out of the workspace
     if self._liveTween then
         self._liveTween:Cancel() -- unparks the LiveAnimation loop before we destroy the gradient
         self._liveTween = nil

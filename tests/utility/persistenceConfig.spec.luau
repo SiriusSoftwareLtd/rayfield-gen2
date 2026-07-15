@@ -235,6 +235,73 @@ return function()
             expect(files["Root/Configurations/Main.rfld"]).never.to.be.ok()
         end)
 
+        it("treats a scalar JSON root as an invalid file", function()
+            local window = makeWindow()
+            local applied = "not-called"
+            files["Root/Configurations/Main.rfld"] = "5"
+            decodedData = 5
+            window.controls = {
+                Alpha = {
+                    Set = function(_, value)
+                        applied = value
+                    end,
+                },
+            }
+
+            expect(persistenceConfig.load(window)).to.equal(false)
+            expect(applied).to.equal("not-called")
+            expect(files["Root/Configurations/Main (Incorrect Format).rfld"]).to.equal("5")
+            expect(files["Root/Configurations/Main.rfld"]).never.to.be.ok()
+        end)
+
+        it("derives the backup name from the real config path", function()
+            local window = makeWindow()
+            -- getConfigPath sanitizes this to "My Hub.rfld"; the backup must match it
+            window.configuration.fileName = "My: Hub"
+            files["Root/Configurations/My Hub.rfld"] = "not-json"
+            variables.httpService.JSONDecode = function()
+                error("decode failed")
+            end
+
+            expect(persistenceConfig.load(window)).to.equal(false)
+            expect(files["Root/Configurations/My Hub (Incorrect Format).rfld"]).to.equal("not-json")
+        end)
+
+        it("resets the loading flag even when applying the config throws", function()
+            local window = makeWindow()
+            files["Root/Configurations/Main.rfld"] = "stored-json"
+            decodedData = { Alpha = 1 }
+            -- iterating the controls throws; the flag must still come back down
+            window.controls = setmetatable({}, {
+                __iter = function()
+                    error("iteration failed")
+                end,
+            })
+
+            expect(persistenceConfig.load(window)).to.equal(true)
+            expect(window._loading).to.equal(false)
+        end)
+
+        it("returns false from load and delete when no file API exists", function()
+            filesystem.isfile = nil
+
+            expect(persistenceConfig.load(makeWindow())).to.equal(false)
+            expect(persistenceConfig.delete(makeWindow(), "Main")).to.equal(false)
+        end)
+
+        it("carries forward loaded flags no current control owns", function()
+            local window = makeWindow()
+            window.controls = {
+                Alpha = { value = 1 },
+            }
+            -- Late's element isn't built yet; Alpha's control must still win over its old value
+            window._loadedConfig = { Late = "saved", Alpha = "stale" }
+
+            expect(persistenceConfig.save(window)).to.equal(true)
+            expect(encodedData.Late).to.equal("saved")
+            expect(encodedData.Alpha).to.equal(1)
+        end)
+
         it("returns false when the configuration file is missing or unreadable", function()
             expect(persistenceConfig.load(makeWindow())).to.equal(false)
 

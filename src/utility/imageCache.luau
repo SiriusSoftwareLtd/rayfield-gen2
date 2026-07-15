@@ -199,6 +199,11 @@ function imageCache.avatar(userId: unknown, onReady: AvatarCallback?): string
         return ""
     end
 
+    -- no file API means no local avatar cache; secure mode just goes without the headshot
+    if typeof(filesystem.isfile) ~= "function" then
+        return ""
+    end
+
     local filePath = avatarPath(userId)
     if filesystem.isfile(filePath) then
         local ok, uri = pcall(getfenv().getcustomasset, filePath)

@@ -164,5 +164,15 @@ return function()
             end
             expect(persistenceSettings.loadSettings(makeWindow())).to.equal(false)
         end)
+
+        it("rejects valid JSON whose root is not a table", function()
+            local window = makeWindow()
+            files["Root/Settings/rayfield.rfld"] = "settings-json"
+            -- JSONDecode returns scalars for e.g. "5"; a corrupt file must not throw
+            decodedData = 5
+
+            expect(persistenceSettings.loadSettings(window)).to.equal(false)
+            expect(window.settings.toggleKeybind).to.equal(Enum.KeyCode.RightShift)
+        end)
     end)
 end

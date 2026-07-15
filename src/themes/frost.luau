@@ -27,7 +27,6 @@ return {
     ElementStrokeHoverTransparency = 0,
     ElementStrokeHover = Color3.fromRGB(0, 176, 208), -- cyan edge on hover
     DarkToggleOverlay = false, -- no dark veil; the track colour carries the switch instead
-    DividerColor = Color3.fromRGB(204, 210, 214),
 
     -- Dark label so it reads unselected on white and stays legible on the cyan selected pill.
     TabColor = Color3.fromRGB(38, 42, 46),

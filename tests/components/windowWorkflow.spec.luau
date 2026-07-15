@@ -242,21 +242,25 @@ return function()
             }, false)
             expect(keyPressed).to.equal(Enum.KeyCode.J)
             expect(keybind:_serialize()[1]).to.equal("Enum.KeyCode")
-            keybind:_deserialize({ "Enum.KeyCode", Enum.KeyCode.K.Value })
-            expect(keybind.value).to.equal(Enum.KeyCode.K)
-            expect(keyChanged).to.equal(Enum.KeyCode.K)
+            keybind:_deserialize({ "Enum.KeyCode", Enum.KeyCode.M.Value })
+            expect(keybind.value).to.equal(Enum.KeyCode.M)
+            expect(keyChanged).to.equal(Enum.KeyCode.M)
+
+            -- a set (or restored bind) that clashes with the menu toggle key is refused
+            keybind:Set(w.settings.toggleKeybind)
+            expect(keybind.value).to.equal(Enum.KeyCode.M)
 
             local invalidEnumOk = pcall(function()
                 keybind:_deserialize({ "Enum.NotARealEnum", Enum.KeyCode.L.Value })
             end)
             expect(invalidEnumOk).to.equal(true)
-            expect(keybind.value).to.equal(Enum.KeyCode.K)
+            expect(keybind.value).to.equal(Enum.KeyCode.M)
 
             local invalidValueOk = pcall(function()
                 keybind:_deserialize({ "Enum.KeyCode", -1 })
             end)
             expect(invalidValueOk).to.equal(true)
-            expect(keybind.value).to.equal(Enum.KeyCode.K)
+            expect(keybind.value).to.equal(Enum.KeyCode.M)
 
             local colorPicker = first:CreateColorPicker({
                 name = "Accent",
@@ -475,6 +479,50 @@ return function()
 
             tab:Remove()
             expect(table.find(w.tabs, tab)).never.to.be.ok()
+        end)
+
+        it("reveals late tabs, rebuilds dropdowns without leaking, and guards unloaded surfaces", function()
+            local w = makeWindow({
+                name = "Tidy Window",
+                showName = "Tidy",
+                configuration = { autoSave = false, autoLoad = false },
+            })
+            local tab = w:CreateTab({ name = "Main" })
+            local dropdown = tab:CreateDropdown({ name = "Rebuild", options = { "A", "B", "C" }, value = "A" })
+
+            w:Show()
+
+            -- a tab created after the window is open shows its pill right away
+            local late = w:CreateTab({ name = "Late" })
+            expect(late.topbarItem.Visible).to.equal(true)
+
+            -- rebuilding options must not grow the tracked instance/connection registries
+            local instancesBefore = #w.instances
+            local connectionsBefore = #w.connections
+            dropdown:Refresh({ "A", "B", "C" })
+            dropdown:Refresh({ "A", "B", "C" })
+            expect(#w.instances).to.equal(instancesBefore)
+            expect(#w.connections).to.equal(connectionsBefore)
+
+            -- search stays closed while minimised: it would render outside the collapsed bar
+            w:ToggleMinimise()
+            w.animating = false
+            w.searchAction.interact.MouseButton1Click:Fire()
+            expect(w._searching).to.equal(false)
+            w:ToggleMinimise()
+            w.animating = false
+
+            -- a removed tag takes its tracked instances with it
+            local tag = w:CreateTag({ text = "Gone" })
+            local trackedBefore = #w.instances
+            tag:Remove()
+            expect(#w.instances < trackedBefore).to.equal(true)
+
+            -- transient surfaces no-op after Unload instead of erroring on a dead ScreenGui
+            w:Unload()
+            expect(w:Notify({ title = "Late" })).never.to.be.ok()
+            expect(w:Toast({ title = "Late" })).never.to.be.ok()
+            expect(w:Popup({ title = "Late" })).never.to.be.ok()
         end)
     end)
 end

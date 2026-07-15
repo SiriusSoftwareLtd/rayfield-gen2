@@ -1,1 +1,21 @@
+# Normalise everything Git can detect as text.
+* text=auto
+
+# Source and config check out with LF everywhere - stylua requires Unix endings,
+# so a Windows autocrlf checkout must not turn these into CRLF.
+*.luau text eol=lf
+*.lua text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.txt text eol=lf
+Makefile text eol=lf
 .githooks/* text eol=lf
+
+# Binary assets and built places.
+*.png binary
+*.rbxm binary
+*.rbxl binary
+*.rbxlx text eol=lf

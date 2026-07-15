@@ -61,13 +61,21 @@ function rayfield:CreateWindow(properties: types.WindowProps): types.Window
     local banner = createBanner()
 
     local window -- forward declared so the settle callback below can reach it
+    -- preload can settle before the window is built; hold the notify until it is
+    local queuedNotify: (() -> ())?
 
     if variables.secureMode then
         -- cache icons locally so secureMode doesnt leak asset ids. non-blocking: whats already on
         -- disk applies now, the rest download in the background and rebind once ready. if any never
         -- cache, tell the dev once - on screen only, secure mode stays off the console
         image.preload(function(failed)
-            if failed > 0 and window and not window.unloaded then
+            if failed <= 0 then
+                return
+            end
+            local function notify()
+                if window.unloaded then
+                    return
+                end
                 window:Notify({
                     title = locale.resolve("Secure mode"),
                     content = if failed == 1
@@ -75,10 +83,20 @@ function rayfield:CreateWindow(properties: types.WindowProps): types.Window
                         else locale.resolve("Some assets couldn't be cached and won't appear."),
                 })
             end
+            if window then
+                notify()
+            else
+                queuedNotify = notify
+            end
         end)
     end
 
     window = require(script.components.window).new(properties)
+
+    if queuedNotify then
+        task.spawn(queuedNotify)
+        queuedNotify = nil
+    end
 
     if variables.secureMode then
         -- secure mode renders the fallback up front (variables.brandFont), then downloads the real

@@ -97,6 +97,34 @@ return function()
             expect(image.pending[321]).never.to.be.ok()
         end)
 
+        it("clears pending lists for ids that never cached once preload settles", function()
+            variables.secureMode = true
+            local instance: any = {
+                Parent = {},
+            }
+            image.assign(instance, "Image", 654) -- never caches
+            image.assign(instance, "Image", 321) -- caches during preload below
+            expect(image.pending[654]).to.be.ok()
+
+            local originalPreload = imageCache.preload
+            imageCache.preload = function(onSettled)
+                image.rewrites[321] = "rbxasset://cached/icon.png"
+                onSettled(1)
+                return false, 1
+            end
+
+            local settledFailed
+            image.preload(function(failed)
+                settledFailed = failed
+            end)
+            imageCache.preload = originalPreload
+
+            expect(settledFailed).to.equal(1)
+            -- the failed id's list is gone; the cached id still waits for onCached
+            expect(image.pending[654]).never.to.be.ok()
+            expect(image.pending[321]).to.be.ok()
+        end)
+
         it("blocks secure-mode thumbnails and reports the blocked value", function()
             local blocked
             variables.secureMode = true

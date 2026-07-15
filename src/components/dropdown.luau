@@ -447,94 +447,105 @@ function Dropdown.new(tab, properties)
             container = container,
             stroke = optionStroke,
             corner = corner,
+            -- tracked per option so a rebuild tears them down with the frame
+            connections = {},
         }
 
-        self.window:ConnectFor(self, frame.MouseEnter, function()
-            if not self._isOpen or not self.window:_interactive() then
-                return
-            end
-            if isOptionSelected(optionName) then
-                return
-            end
-            variables.tweenService
-                :Create(
-                    frame,
-                    TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-                    { BackgroundTransparency = 0.9 }
-                )
-                :Play()
-            variables.tweenService
-                :Create(
-                    title,
-                    TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-                    { TextTransparency = 0.15 }
-                )
-                :Play()
-        end)
-
-        self.window:ConnectFor(self, frame.MouseLeave, function()
-            if not self._isOpen then
-                return
-            end
-            if isOptionSelected(optionName) then
-                return
-            end
-            variables.tweenService
-                :Create(
-                    frame,
-                    TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-                    { BackgroundTransparency = 0.95 }
-                )
-                :Play()
-            variables.tweenService
-                :Create(
-                    title,
-                    TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-                    { TextTransparency = 0.3 }
-                )
-                :Play()
-        end)
-
-        self.window:ConnectFor(self, interact.MouseButton1Click, function()
-            -- options stay visible through the close tween; a click mid-fade must not land
-            if not self._isOpen then
-                return
-            end
-            hapticEngine.click()
-            local sel = isOptionSelected(optionName)
-
-            if not self.multiSelect then
-                if sel then
-                    self:_close()
+        table.insert(
+            data.connections,
+            self.window:ConnectFor(self, frame.MouseEnter, function()
+                if not self._isOpen or not self.window:_interactive() then
                     return
                 end
-                table.clear(self.value)
-                table.insert(self.value, optionName)
-            else
-                if sel then
-                    local idx = table.find(self.value, optionName)
-                    if idx then
-                        table.remove(self.value, idx)
-                    end
-                else
-                    table.insert(self.value, optionName)
+                if isOptionSelected(optionName) then
+                    return
                 end
-            end
+                variables.tweenService
+                    :Create(
+                        frame,
+                        TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+                        { BackgroundTransparency = 0.9 }
+                    )
+                    :Play()
+                variables.tweenService
+                    :Create(
+                        title,
+                        TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+                        { TextTransparency = 0.15 }
+                    )
+                    :Play()
+            end)
+        )
 
-            for _, d in self._optionFrames do
-                renderOptionState(d, true)
-            end
+        table.insert(
+            data.connections,
+            self.window:ConnectFor(self, frame.MouseLeave, function()
+                if not self._isOpen then
+                    return
+                end
+                if isOptionSelected(optionName) then
+                    return
+                end
+                variables.tweenService
+                    :Create(
+                        frame,
+                        TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+                        { BackgroundTransparency = 0.95 }
+                    )
+                    :Play()
+                variables.tweenService
+                    :Create(
+                        title,
+                        TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+                        { TextTransparency = 0.3 }
+                    )
+                    :Play()
+            end)
+        )
 
-            updateSelectedLabel()
+        table.insert(
+            data.connections,
+            self.window:ConnectFor(self, interact.MouseButton1Click, function()
+                -- options stay visible through the close tween; a click mid-fade must not land
+                if not self._isOpen then
+                    return
+                end
+                hapticEngine.click()
+                local sel = isOptionSelected(optionName)
 
-            self.window:_runGuarded(self, self.callback, self:_callbackValue())
-            self.window:_persist(self)
+                if not self.multiSelect then
+                    if sel then
+                        self:_close()
+                        return
+                    end
+                    table.clear(self.value)
+                    table.insert(self.value, optionName)
+                else
+                    if sel then
+                        local idx = table.find(self.value, optionName)
+                        if idx then
+                            table.remove(self.value, idx)
+                        end
+                    else
+                        table.insert(self.value, optionName)
+                    end
+                end
 
-            if not self.multiSelect then
-                task.wait(0.1)
-                self:_close()
-            end
-        end)
+                for _, d in self._optionFrames do
+                    renderOptionState(d, true)
+                end
+
+                updateSelectedLabel()
+
+                self.window:_runGuarded(self, self.callback, self:_callbackValue())
+                self.window:_persist(self)
+
+                if not self.multiSelect then
+                    task.wait(0.1)
+                    self:_close()
+                end
+            end)
+        )
 
         return data
     end
@@ -937,11 +948,27 @@ function Dropdown:_close()
         :Play()
 end
 
+-- tear an option down through the window registries, so rebuild churn doesnt leak tracked
+-- instances (which would slow ChangeTheme forever) or dead connections
+function Dropdown:_destroyOption(data)
+    if data.connections then
+        for _, connection in data.connections do
+            local idx = table.find(self.connections, connection)
+            if idx then
+                table.remove(self.connections, idx)
+            end
+            self.window:Disconnect(connection)
+        end
+        data.connections = nil
+    end
+    self.window:DestroySubtree(data.frame)
+end
+
 function Dropdown:Refresh(newOptions)
     self.options = dedupStrings(newOptions or {})
 
     for _, data in self._optionFrames do
-        data.frame:Destroy()
+        self:_destroyOption(data)
     end
     table.clear(self._optionFrames)
 
@@ -1007,7 +1034,7 @@ function Dropdown:Remove(option)
 
     for i, data in self._optionFrames do
         if data.name == option then
-            data.frame:Destroy()
+            self:_destroyOption(data)
             table.remove(self._optionFrames, i)
             break
         end
@@ -1063,6 +1090,11 @@ function Dropdown:_setShown(shown, animate)
     end
     w:_reveal(self.selectedLabel, { TextTransparency = if shown then 0.5 else 1 }, animate)
     w:_reveal(self.chevron, { ImageTransparency = if shown then 0.5 else 1 }, animate)
+
+    -- if the window hides while we're open, collapse so we dont reopen mid-air
+    if not shown and self._isOpen then
+        self:_close()
+    end
 end
 
 function Dropdown:MoveTo(index)

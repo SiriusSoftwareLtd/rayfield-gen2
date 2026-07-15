@@ -22,8 +22,10 @@ function path.sanitizeFolder(value: unknown): string
     return (text:gsub("^/+", ""))
 end
 
+-- also drops the characters Windows refuses in filenames, so a window named
+-- "MyHub: S3" still writes instead of failing on every save
 function path.sanitizeFile(value: unknown): string
-    return (tostring(value):gsub("[/\\]", ""):gsub("%.%.", ""))
+    return (tostring(value):gsub("[/\\]", ""):gsub("%.%.", ""):gsub('[:<>"|?*%c]', ""))
 end
 
 function path.basename(value: unknown): string

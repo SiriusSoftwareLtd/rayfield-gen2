@@ -9,7 +9,6 @@ LUNE ?= lune
 STYLUA ?= stylua
 SELENE ?= selene
 LUAU_LSP ?= luau-lsp
-TESTEZ ?= testez
 CURL ?= curl
 GIT ?= git
 ifeq ($(OS),Windows_NT)
@@ -67,7 +66,6 @@ install:
 	$(ROKIT) trust JohnnyMorganz/StyLua
 	$(ROKIT) trust Kampfkarren/selene
 	$(ROKIT) trust JohnnyMorganz/luau-lsp
-	$(ROKIT) trust Roblox/testez
 	$(ROKIT) install
 
 hooks:
