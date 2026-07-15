@@ -218,7 +218,7 @@ export type Slider = Moveable & {
 }
 
 export type Dropdown = Moveable & {
-    value: string | { string },
+    value: { string }, -- always stored pruned to the current options, even single-select
     Set: (self: Dropdown, value: string | { string }, skipCallback: boolean?) -> (),
 }
 
@@ -242,7 +242,7 @@ export type ColorPicker = Moveable & {
 export type Stat = Moveable & {
     value: number,
     Set: (self: Stat, value: number) -> (),
-    ResetBaseline: (self: Stat) -> (),
+    ResetBaseline: (self: Stat, value: number?) -> (),
 }
 
 export type Section = Moveable & {}
