@@ -70,6 +70,9 @@ function Action.new(window, properties)
     -- currently selected (the settings cog stays lit while its page is open), or it reports
     -- itself lit some other way (the search action while the field is open)
     local function settleIcon()
+        if not self.window:_interactive() then
+            return -- window still revealing/hiding: dont settle mid-animation, same as MouseEnter
+        end
         if self.linkedTab and self.window.selectedTab == self.linkedTab then
             return
         end

@@ -481,6 +481,19 @@ return function()
             expect(table.find(w.tabs, tab)).never.to.be.ok()
         end)
 
+        it("keeps action icons hidden until the window is actually interactive", function()
+            local w = makeWindow({ name = "Icon Window", showName = "Icons" })
+
+            -- a stray MouseLeave while the window is still hidden/revealing shouldnt settle
+            -- the icon early - it should stay exactly as Action.new left it
+            w.settingsAction.interact.MouseLeave:Fire()
+            expect(w.settingsAction.iconLabel.ImageTransparency).to.equal(1)
+
+            w:Show()
+            w.settingsAction.interact.MouseLeave:Fire()
+            expect(w.settingsAction.iconLabel.ImageTransparency).to.equal(0.6)
+        end)
+
         it("reveals late tabs, rebuilds dropdowns without leaking, and guards unloaded surfaces", function()
             local w = makeWindow({
                 name = "Tidy Window",
