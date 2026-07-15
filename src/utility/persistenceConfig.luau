@@ -85,23 +85,33 @@ function persistenceConfig.load(window, name)
 
     window._loading = true
     for flag, control in window.controls do
-        local value = parsed[flag]
-        if value ~= nil or control._canBeNil then
-            local ok, err = pcall(function()
-                if control._deserialize then
-                    control:_deserialize(value)
-                else
-                    control:Set(value)
-                end
-            end)
-            if not ok then
-                log.warn("Rayfield: Failed to restore flag '" .. tostring(flag) .. "' - " .. tostring(err))
-            end
-        end
+        persistenceConfig.applyTo(control, parsed[flag])
     end
     window._loading = false
 
+    -- kept so elements built after this load can still restore themselves (see
+    -- Window:_restoreLate). without it a late element shows its default and the next
+    -- autosave writes that default over the saved value.
+    window._loadedConfig = parsed
+
     return true
+end
+
+-- restore one control from a decoded config. callers own the window._loading guard.
+function persistenceConfig.applyTo(control, value)
+    if value == nil and not control._canBeNil then
+        return
+    end
+    local ok, err = pcall(function()
+        if control._deserialize then
+            control:_deserialize(value)
+        else
+            control:Set(value)
+        end
+    end)
+    if not ok then
+        log.warn("Rayfield: Failed to restore flag '" .. tostring(control.flag) .. "' - " .. tostring(err))
+    end
 end
 
 function persistenceConfig.list(window)

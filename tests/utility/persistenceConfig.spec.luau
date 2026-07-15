@@ -179,6 +179,48 @@ return function()
             expect(setValue).to.equal(7)
             expect(deserialized).to.equal("stored")
             expect(nilSet).never.to.be.ok()
+            -- kept so elements built after the load can still restore themselves
+            expect(window._loadedConfig.Alpha).to.equal(7)
+        end)
+
+        it("applies a single control from a decoded config", function()
+            local applied
+            local deserialized
+            persistenceConfig.applyTo({
+                flag = "Alpha",
+                Set = function(_, value)
+                    applied = value
+                end,
+            }, 12)
+            expect(applied).to.equal(12)
+
+            -- a deserializer wins over Set when the control has one
+            persistenceConfig.applyTo({
+                flag = "Beta",
+                _deserialize = function(_, value)
+                    deserialized = value
+                end,
+                Set = function()
+                    error("should not be called")
+                end,
+            }, "raw")
+            expect(deserialized).to.equal("raw")
+
+            -- nil is skipped unless the control opts in
+            persistenceConfig.applyTo({
+                flag = "Gamma",
+                Set = function()
+                    error("should not be called")
+                end,
+            }, nil)
+
+            -- a throwing control is warned about, not propagated
+            persistenceConfig.applyTo({
+                flag = "Delta",
+                Set = function()
+                    error("boom")
+                end,
+            }, 1)
         end)
 
         it("backs up and deletes invalid configuration files", function()

@@ -155,7 +155,7 @@ function search.open(window)
 
     gatherUnits(window)
     applyFilter(window, "")
-    window.elementsLayout:JumpTo(window.searchPage)
+    window:_jumpTo(window.searchPage)
 
     -- strip swaps for the field
     setTabsShown(window, false, swapInfo)
@@ -188,7 +188,7 @@ function search.close(window, config)
     restoreUnits(window)
     local target = if config.jumpTo == nil then window.selectedTab and window.selectedTab.tabPage else config.jumpTo
     if target then
-        window.elementsLayout:JumpTo(target)
+        window:_jumpTo(target)
     end
 
     setPillShown(window, false, swapInfo)

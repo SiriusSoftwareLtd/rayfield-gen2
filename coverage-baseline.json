@@ -3,9 +3,9 @@
   "measuredDate": "2026-07-15",
   "command": "make coverage-baseline",
   "threshold": 70.00,
-  "lineCoverage": 85.17,
-  "coveredLines": 3629,
-  "coverableLines": 4261,
+  "lineCoverage": 85.38,
+  "coveredLines": 3651,
+  "coverableLines": 4276,
   "notes": [
     "Generated reports are written to coverage/coverage.txt and coverage/coverage-summary.json.",
     "The enforced Lune coverage scope is discovered dynamically from src by default.",
@@ -57,9 +57,9 @@
     },
     {
       "path": "src/components/group.luau",
-      "lineCoverage": 73.56,
-      "coveredLines": 64,
-      "coverableLines": 87
+      "lineCoverage": 73.86,
+      "coveredLines": 65,
+      "coverableLines": 88
     },
     {
       "path": "src/components/input.luau",
@@ -99,8 +99,8 @@
     },
     {
       "path": "src/components/slider.luau",
-      "lineCoverage": 78.31,
-      "coveredLines": 148,
+      "lineCoverage": 81.48,
+      "coveredLines": 154,
       "coverableLines": 189
     },
     {
@@ -111,9 +111,9 @@
     },
     {
       "path": "src/components/tab.luau",
-      "lineCoverage": 82.17,
-      "coveredLines": 129,
-      "coverableLines": 157
+      "lineCoverage": 82.28,
+      "coveredLines": 130,
+      "coverableLines": 158
     },
     {
       "path": "src/components/tag.luau",
@@ -135,9 +135,9 @@
     },
     {
       "path": "src/components/window.luau",
-      "lineCoverage": 85.44,
-      "coveredLines": 528,
-      "coverableLines": 618
+      "lineCoverage": 85.65,
+      "coveredLines": 537,
+      "coverableLines": 627
     },
     {
       "path": "src/init.luau",
@@ -304,14 +304,14 @@
     {
       "path": "src/utility/persistence.luau",
       "lineCoverage": 100.00,
-      "coveredLines": 12,
-      "coverableLines": 12
+      "coveredLines": 13,
+      "coverableLines": 13
     },
     {
       "path": "src/utility/persistenceConfig.luau",
-      "lineCoverage": 98.57,
-      "coveredLines": 69,
-      "coverableLines": 70
+      "lineCoverage": 100.00,
+      "coveredLines": 73,
+      "coverableLines": 73
     },
     {
       "path": "src/utility/persistencePaths.luau",

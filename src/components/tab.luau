@@ -325,7 +325,7 @@ function Tab:Select(noAnimation)
     end
 
     self.window.selectedTab = self
-    self.window:Navigate(self.tabPage)
+    self.window:_jumpTo(self.tabPage)
 
     -- noAnimation = initial selection; the pill is still hidden and the window reveal shows it.
     if not self.neglectSelector and not noAnimation then
@@ -360,6 +360,7 @@ end
 function Tab:_register(element)
     table.insert(self.elements, element)
     assignOrder(element, #self.elements * 10)
+    self.window:_restoreLate(element)
 
     if not self.window.hidden then
         element:_setShown(true, true)

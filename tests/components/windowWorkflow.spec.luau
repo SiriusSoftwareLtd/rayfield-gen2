@@ -334,6 +334,63 @@ return function()
             expect(#w.tags).to.equal(0)
         end)
 
+        it("restores elements built after the config was loaded", function()
+            local w = makeWindow({
+                name = "Late Window",
+                showName = "Late",
+                configuration = { autoSave = false, autoLoad = false },
+            })
+            local tab = w:CreateTab({ name = "Main" })
+
+            -- stand in for a load having already happened, as autoLoad does on first Show
+            w._loadedConfig = { LateToggle = true, LateSlider = 42 }
+
+            local seen
+            local late = tab:CreateToggle({
+                name = "LateToggle",
+                value = false,
+                callback = function(value)
+                    seen = value
+                end,
+            })
+            expect(late.value).to.equal(true) -- would be the default without _restoreLate
+            expect(seen).to.equal(true) -- the callback has to fire so the dev applies it
+
+            -- groups take the same tail
+            local row = tab:CreateGroup()
+            local lateSlider = row:CreateSlider({ name = "LateSlider", range = { 0, 100 }, increment = 1, value = 0 })
+            expect(lateSlider.value).to.equal(42)
+
+            -- forgetState opts out of config entirely, so it must keep its default
+            local ignored = tab:CreateToggle({ name = "LateToggle", value = false, forgetState = true })
+            expect(ignored.value).to.equal(false)
+        end)
+
+        it("navigates to a tab by name and keeps the selection in step", function()
+            local w = makeWindow({
+                name = "Nav Window",
+                showName = "Nav",
+                configuration = { autoSave = false, autoLoad = false },
+            })
+            local home = w:CreateTab({ name = "Home" })
+            local settings = w:CreateTab({ name = "Settings" })
+            expect(w.selectedTab).to.equal(home)
+
+            w:Navigate("Settings")
+            expect(w.selectedTab).to.equal(settings)
+
+            w:Navigate(home)
+            expect(w.selectedTab).to.equal(home)
+
+            -- a page instance still works for callers holding tabPage
+            w:Navigate(settings.tabPage)
+            expect(w.selectedTab).to.equal(settings)
+
+            -- an unknown tab is a no-op, not a crash or a silent desync
+            w:Navigate("Nope")
+            expect(w.selectedTab).to.equal(settings)
+        end)
+
         it("shows, hides, searches, and creates transient surfaces", function()
             local w = makeWindow({
                 name = "Surface Window",

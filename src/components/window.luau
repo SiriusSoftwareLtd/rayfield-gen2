@@ -757,6 +757,22 @@ function Window:_registerControl(control)
     return flag
 end
 
+-- Restore an element built after the config was already loaded. autoLoad only fires once on
+-- first Show, so without this a late element (one built after a remote fetch, say) keeps its
+-- default and the next autosave writes that default over the saved value.
+-- Called from the CreateX tails once the element is fully built, since _registerControl runs
+-- mid-construction and :Set would touch instances that dont exist yet.
+function Window:_restoreLate(element)
+    if not self._loadedConfig or not element.flag or element.forgetState then
+        return
+    end
+
+    local wasLoading = self._loading
+    self._loading = true -- dont autosave the value we just read back
+    persistence.applyTo(element, self._loadedConfig[element.flag])
+    self._loading = wasLoading
+end
+
 -- Autosave a control's value after an interactive or programmatic change, when the window is
 -- set to autoSave and the control opts into persistence. Every Set/commit path funnels here so
 -- persistence stays uniform across elements.
@@ -1659,25 +1675,35 @@ end
 
 -- Jump to a tab by handle, name, or its page instance. No-ops on an unknown tab rather
 -- than handing JumpTo something it cant resolve.
+-- Move the page view only. Tab:Select owns the selection state and the pill, and calls this
+-- for the scroll; nothing else should jump pages without going through it.
+function Window:_jumpTo(page)
+    if page then
+        self.elementsLayout:JumpTo(page)
+    end
+end
+
+-- Go to a tab, by name or by the tab itself. Routes through Tab:Select so the selection,
+-- the pill and the page all agree; jumping the page alone would leave the wrong tab lit and
+-- the reveal animations pointed at the wrong elements.
 function Window:Navigate(tab)
-    local page
-    if typeof(tab) == "Instance" then
-        page = tab
-    elseif typeof(tab) == "table" then
-        page = tab.tabPage
-    elseif typeof(tab) == "string" then
-        for _, candidate in self.tabs do
-            if candidate.name == tab then
-                page = candidate.tabPage
-                break
-            end
+    if tab == nil then
+        return
+    end
+
+    local target
+    for _, candidate in self.tabs do
+        -- by name, by the tab itself, or by the page instance a caller held onto
+        if candidate == tab or candidate.name == tab or candidate.tabPage == tab then
+            target = candidate
+            break
         end
     end
 
-    if not page then
+    if not target then
         return
     end
-    self.elementsLayout:JumpTo(page)
+    target:Select()
 end
 
 function Window:Create(className, properties, themeProperties)

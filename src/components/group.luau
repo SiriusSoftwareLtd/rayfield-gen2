@@ -100,6 +100,7 @@ function Group:_add(componentName, properties)
     local element = require(script.Parent[componentName]).new(self, properties)
     table.insert(self.elements, element)
     assignOrder(element, #self.elements * 10)
+    self.window:_restoreLate(element)
 
     if self.compact then
         self:_wrapChild(element)
