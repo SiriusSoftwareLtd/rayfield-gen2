@@ -3,9 +3,9 @@
   "measuredDate": "2026-07-15",
   "command": "make coverage-baseline",
   "threshold": 70.00,
-  "lineCoverage": 85.49,
-  "coveredLines": 3700,
-  "coverableLines": 4328,
+  "lineCoverage": 85.66,
+  "coveredLines": 3750,
+  "coverableLines": 4378,
   "notes": [
     "Generated reports are written to coverage/coverage.txt and coverage/coverage-summary.json.",
     "The enforced Lune coverage scope is discovered dynamically from src by default.",
@@ -51,9 +51,9 @@
     },
     {
       "path": "src/components/dropdown.luau",
-      "lineCoverage": 84.54,
-      "coveredLines": 257,
-      "coverableLines": 304
+      "lineCoverage": 85.08,
+      "coveredLines": 268,
+      "coverableLines": 315
     },
     {
       "path": "src/components/group.luau",
@@ -69,9 +69,9 @@
     },
     {
       "path": "src/components/keybind.luau",
-      "lineCoverage": 57.58,
-      "coveredLines": 95,
-      "coverableLines": 165
+      "lineCoverage": 57.71,
+      "coveredLines": 101,
+      "coverableLines": 175
     },
     {
       "path": "src/components/notification.luau",
@@ -87,8 +87,8 @@
     },
     {
       "path": "src/components/search.luau",
-      "lineCoverage": 86.18,
-      "coveredLines": 106,
+      "lineCoverage": 86.99,
+      "coveredLines": 107,
       "coverableLines": 123
     },
     {
@@ -117,15 +117,15 @@
     },
     {
       "path": "src/components/tag.luau",
-      "lineCoverage": 85.25,
-      "coveredLines": 52,
+      "lineCoverage": 93.44,
+      "coveredLines": 57,
       "coverableLines": 61
     },
     {
       "path": "src/components/toast.luau",
-      "lineCoverage": 94.31,
-      "coveredLines": 116,
-      "coverableLines": 123
+      "lineCoverage": 94.26,
+      "coveredLines": 115,
+      "coverableLines": 122
     },
     {
       "path": "src/components/toggle.luau",
@@ -135,15 +135,15 @@
     },
     {
       "path": "src/components/window.luau",
-      "lineCoverage": 85.67,
-      "coveredLines": 538,
-      "coverableLines": 628
+      "lineCoverage": 85.34,
+      "coveredLines": 547,
+      "coverableLines": 641
     },
     {
       "path": "src/init.luau",
-      "lineCoverage": 100.00,
-      "coveredLines": 41,
-      "coverableLines": 41
+      "lineCoverage": 95.56,
+      "coveredLines": 43,
+      "coverableLines": 45
     },
     {
       "path": "src/themes/amethyst.luau",
@@ -237,9 +237,9 @@
     },
     {
       "path": "src/utility/fontManager.luau",
-      "lineCoverage": 80.33,
-      "coveredLines": 147,
-      "coverableLines": 183
+      "lineCoverage": 82.45,
+      "coveredLines": 155,
+      "coverableLines": 188
     },
     {
       "path": "src/utility/functions.luau",
@@ -249,15 +249,15 @@
     },
     {
       "path": "src/utility/image.luau",
-      "lineCoverage": 95.59,
-      "coveredLines": 65,
+      "lineCoverage": 97.06,
+      "coveredLines": 66,
       "coverableLines": 68
     },
     {
       "path": "src/utility/imageCache.luau",
-      "lineCoverage": 94.44,
-      "coveredLines": 102,
-      "coverableLines": 108
+      "lineCoverage": 94.55,
+      "coveredLines": 104,
+      "coverableLines": 110
     },
     {
       "path": "src/utility/locale.luau",
@@ -310,8 +310,8 @@
     {
       "path": "src/utility/persistenceConfig.luau",
       "lineCoverage": 100.00,
-      "coveredLines": 74,
-      "coverableLines": 74
+      "coveredLines": 80,
+      "coverableLines": 80
     },
     {
       "path": "src/utility/persistencePaths.luau",
