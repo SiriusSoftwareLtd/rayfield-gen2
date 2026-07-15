@@ -60,15 +60,6 @@ local function normalizeValue(value, multi)
     return {}
 end
 
--- what the dev's callback receives. multiSelect hands out a copy: the live table is our
--- selection state, and a dev who keeps or mutates it would corrupt the dropdown.
-function Dropdown:_callbackValue()
-    if self.multiSelect then
-        return table.clone(self.value)
-    end
-    return self.value[1]
-end
-
 function Dropdown.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
 
@@ -615,6 +606,15 @@ end
 -- Search bar: collapsed it's just the icon (centred, no bar); tapping expands it into a
 -- full field. It's always in the card's layout - only its height/fills animate - so the
 -- list below just flexes down as it grows.
+-- what the dev's callback receives. multiSelect hands out a copy: the live table is our
+-- selection state, and a dev who keeps or mutates it would corrupt the dropdown.
+function Dropdown:_callbackValue()
+    if self.multiSelect then
+        return table.clone(self.value)
+    end
+    return self.value[1]
+end
+
 function Dropdown:_buildSearch()
     self._searchOpen = false
 

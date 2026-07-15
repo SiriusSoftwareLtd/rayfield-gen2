@@ -25,6 +25,28 @@ local function jsonEncode(data)
     end
 end
 
+-- the manifest comes off the network, so trust nothing about its shape. names feed straight
+-- into disk paths, so sanitize them here too. returns nil for anything we cant use.
+local function validateManifest(manifest)
+    if type(manifest) ~= "table" or type(manifest.name) ~= "string" or type(manifest.faces) ~= "table" then
+        return nil
+    end
+    manifest.name = path.sanitizeFile(manifest.name)
+    if #manifest.name == 0 or #manifest.faces == 0 then
+        return nil
+    end
+    for _, face in manifest.faces do
+        if type(face) ~= "table" or type(face.name) ~= "string" or type(face.assetId) ~= "string" then
+            return nil
+        end
+        face.name = path.sanitizeFile(face.name)
+        if #face.name == 0 then
+            return nil
+        end
+    end
+    return manifest
+end
+
 local function jsonDecode(jsonString)
     local success, result = pcall(function()
         return httpService:JSONDecode(jsonString)
@@ -238,28 +260,6 @@ function fontManager:loadFont(
             pcall(fileSystem.writefile, manifestPath, possibleFontManifest)
         end
     end
-    -- the manifest comes off the network, so trust nothing about its shape. names feed
-    -- directly into disk paths, so sanitize them too
-    local function validateManifest(manifest)
-        if type(manifest) ~= "table" or type(manifest.name) ~= "string" or type(manifest.faces) ~= "table" then
-            return nil
-        end
-        manifest.name = path.sanitizeFile(manifest.name)
-        if #manifest.name == 0 or #manifest.faces == 0 then
-            return nil
-        end
-        for _, face in manifest.faces do
-            if type(face) ~= "table" or type(face.name) ~= "string" or type(face.assetId) ~= "string" then
-                return nil
-            end
-            face.name = path.sanitizeFile(face.name)
-            if #face.name == 0 then
-                return nil
-            end
-        end
-        return manifest
-    end
-
     local fontManifest: FontManifest? = nil
     if possibleFontManifest then
         local ok, parsedManifest = pcall(jsonDecode, possibleFontManifest)

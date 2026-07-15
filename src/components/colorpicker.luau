@@ -925,6 +925,8 @@ end
 
 -- read the mouse for the active region, update the stored channels and repaint
 function ColorPicker:_pump()
+    local previousAlpha = self.alpha -- the branches below mutate it in place
+
     if self._drag == "sat" then
         local size = self.map.AbsoluteSize
         if size.X <= 0 or size.Y <= 0 then
@@ -954,10 +956,9 @@ function ColorPicker:_pump()
 
     -- held but stationary: nothing moved, so dont re-render and hammer the callback every frame
     local newValue = Color3.fromHSV(self.hue, self.sat, self.val)
-    if newValue == self.value and self.alpha == self._pumpAlpha then
+    if newValue == self.value and self.alpha == previousAlpha then
         return
     end
-    self._pumpAlpha = self.alpha
 
     self.value = newValue
     self:_render("drag")
