@@ -1,6 +1,7 @@
 --!strict
 
-local requireUtility = (_G :: any).__RAYFIELD_TEST_HELPERS.requireUtility
+local helpers = ((_G :: any).__RAYFIELD_TEST_HELPERS or require(script.Parent.Parent.TestHelpers)) :: any
+local requireUtility = helpers.requireUtility
 
 return function()
     local persistence = requireUtility("persistence")

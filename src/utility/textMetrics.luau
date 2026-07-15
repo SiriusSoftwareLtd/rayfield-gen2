@@ -17,6 +17,13 @@ local widthCache: { [string]: number } = {}
 local widthCacheCount = 0
 local widthCacheCap = 1024 -- dynamic labels (a live stat) would otherwise grow this forever
 
+local function getTextBounds(params: GetTextBoundsParams): unknown
+    local ok, bounds = pcall(function()
+        return textService:GetTextBoundsAsync(params)
+    end)
+    return if ok then bounds else nil
+end
+
 local function boundAxis(bounds: unknown, axis: "X" | "Y"): number?
     if typeof(bounds) == "Vector2" then
         return if axis == "X" then bounds.X else bounds.Y
@@ -41,8 +48,7 @@ function textMetrics.textWidth(font: Font, size: number, text: any): number
     params.Size = size
     params.Width = math.huge
 
-    local ok, bounds = pcall(textService.GetTextBoundsAsync, textService, params)
-    local measuredWidth = if ok then boundAxis(bounds, "X") else nil
+    local measuredWidth = boundAxis(getTextBounds(params), "X")
     if not measuredWidth then
         -- rough fallback for this call only. never cached, so a transient failure doesnt
         -- lock in a wrong width for the string forever.
@@ -68,8 +74,7 @@ function textMetrics.textHeight(font: Font, size: number, text: any, width: numb
     params.Size = size
     params.Width = width
 
-    local ok, bounds = pcall(textService.GetTextBoundsAsync, textService, params)
-    local measuredHeight = if ok then boundAxis(bounds, "Y") else nil
+    local measuredHeight = boundAxis(getTextBounds(params), "Y")
     return if measuredHeight then math.ceil(measuredHeight) else size
 end
 

@@ -116,13 +116,18 @@ function chrome.buildCollapsedFace(window)
 end
 
 function chrome.isNewUser()
+    local localPlayer = variables.localPlayer
+    if not localPlayer then
+        return false
+    end
+
     -- No filesystem available - just show the banner every launch.
     if typeof(filesystem.isfile) ~= "function" or typeof(filesystem.writefile) ~= "function" then
         return true
     end
 
     local path = variables.fileSystemManager:getPath("lastuser.txt")
-    local currentId = tostring(variables.localPlayer.UserId)
+    local currentId = tostring(localPlayer.UserId)
     local isNew = true
 
     pcall(function()

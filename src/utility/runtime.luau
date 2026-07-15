@@ -15,7 +15,7 @@ export type RuntimeState = {
     runService: RunService,
     userInputService: UserInputService,
     guiService: GuiService,
-    localPlayer: Player,
+    localPlayer: Player?,
     tweenService: TweenService,
     httpService: HttpService,
     textService: TextService,
@@ -50,7 +50,7 @@ runtime.httpService = services.getService("HttpService") :: HttpService
 runtime.textService = services.getService("TextService") :: TextService
 runtime.replicatedStorage = services.getService("ReplicatedStorage") :: ReplicatedStorage
 runtime.localizationService = services.getService("LocalizationService") :: LocalizationService
-runtime.guiContainer = if runtime.runService:IsStudio()
+runtime.guiContainer = if runtime.runService:IsStudio() and runtime.localPlayer
     then runtime.localPlayer.PlayerGui
     elseif gethui then gethui()
     else runtime.coreGui

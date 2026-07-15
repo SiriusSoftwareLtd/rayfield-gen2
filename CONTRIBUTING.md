@@ -71,6 +71,7 @@ Then open Roblox Studio, connect the Rojo plugin to the server, and use Play mod
 | `tests/integration/` | Integration specs for Rayfield workflows. |
 | `tests/runner/` | Specs for the local runner and coverage instrumentation. |
 | `tests/utility/` | TestEZ specs for shared utility modules. |
+| `tests/TestHelpers.luau` | Shared Roblox-side helpers used by Studio-compatible specs. |
 | `tests/run.server.luau` | Roblox Studio TestEZ runner for the test project. |
 | `scripts/run-tests.luau` | CI/local runner for the TestEZ-style spec files and coverage gate. |
 | `coverage-baseline.json` | Current measured coverage baseline and known automation gaps. |
@@ -116,7 +117,9 @@ make format
 
 ### Tests
 
-Tests live under `tests/components/`, `tests/integration/`, `tests/runner/`, and `tests/utility/` as TestEZ-style `.spec.luau` ModuleScripts. Each spec returns a function and uses TestEZ's `describe`, `it`, `expect`, and lifecycle hooks. Keep spec names ending in `.spec` after Rojo maps them into Studio; the Avant Plugin discovers tests by that suffix.
+Tests live under `tests/components/`, `tests/integration/`, `tests/runner/`, and `tests/utility/` as TestEZ-style ModuleScripts. Studio-compatible tests use `.spec.luau`; each spec returns a function and uses TestEZ's `describe`, `it`, `expect`, and lifecycle hooks. Keep Studio-compatible spec names ending in `.spec` after Rojo maps them into Studio because the Avant Plugin discovers tests by that suffix.
+
+Use `.lune.luau` only for tests that require the Lune runner shim or local-runner behavior, such as executor filesystem APIs, mutable Roblox service methods, fake services, fake signals, fake tweens/text measurement, runner lifecycle ordering, console capture, or coverage instrumentation helpers. These files are ignored by Avant direct discovery but are still collected by `scripts/run-tests.luau` for CI/local coverage.
 
 Run the CI/local unit test path with:
 
@@ -124,7 +127,7 @@ Run the CI/local unit test path with:
 make test
 ```
 
-This uses Lune to execute the same spec modules with a small Roblox datatype/service shim, so it can run in CI without opening Roblox Studio.
+This uses Lune to execute the `.spec.luau` and `.lune.luau` modules with a small Roblox datatype/service shim, so it can run in CI without opening Roblox Studio.
 
 To run the same path with Rayfield logs enabled:
 
@@ -165,9 +168,9 @@ To run tests in Roblox Studio without Avant, build the test place:
 make test-place
 ```
 
-Open `Rayfield Gen2 Tests.rbxlx` in Roblox Studio. The `ServerScriptService.RunTests` script requires `ReplicatedStorage.TestEZ`, runs `ReplicatedStorage.Tests`, and errors if any TestEZ test fails.
+Open `Rayfield Gen2 Tests.rbxlx` in Roblox Studio. The `ServerScriptService.RunTests` script requires `ReplicatedStorage.TestEZ`, seeds `ReplicatedStorage.Tests.TestHelpers`, runs `ReplicatedStorage.Tests`, and errors if any TestEZ test fails.
 
-To run tests with the Avant Plugin, either open the place from `make test-place` or run `make testez-model` before serving `test.project.json` with Rojo. In Studio, use Avant's `Unit Tests` window. Avant currently supports TestEZ and lists every `ModuleScript` whose name ends with `.spec`.
+To run tests with the Avant Plugin, either open the place from `make test-place` or run `make testez-model` before serving `test.project.json` with Rojo. In Studio, use Avant's `Unit Tests` window. Avant currently supports TestEZ and lists every `ModuleScript` whose name ends with `.spec`; `.lune` modules require `make test`.
 
 The Studio test project downloads `build/TestEZ.rbxm` from the pinned TestEZ release when `make test-place` is run. The model is generated local output and must not be committed.
 

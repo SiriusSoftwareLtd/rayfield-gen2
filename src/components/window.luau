@@ -1553,12 +1553,13 @@ function Window:_firstShow()
 
     -- Welcome the user once if this is a new/changed account on this device (unless they've
     -- turned it off in settings). Just a toast now - the profile chip is a toast like any other.
-    if self.settings.welcomeToast and chrome.isNewUser() then
+    local localPlayer = variables.localPlayer
+    if localPlayer and self.settings.welcomeToast and chrome.isNewUser() then
         self:Toast({
-            title = variables.localPlayer.DisplayName,
+            title = localPlayer.DisplayName,
             subtitle = locale.resolve("Signed in as"),
             subtitleAbove = true, -- reads "Signed in as" / name, label over value
-            avatar = variables.localPlayer.UserId,
+            avatar = localPlayer.UserId,
             minWidth = 220, -- match the old license card's width for that roomy right-hand space
         })
     end

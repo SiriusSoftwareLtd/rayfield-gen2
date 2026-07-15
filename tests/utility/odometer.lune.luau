@@ -1,6 +1,6 @@
 --!strict
 
-local helpers = (_G :: any).__RAYFIELD_TEST_HELPERS
+local helpers = ((_G :: any).__RAYFIELD_TEST_HELPERS or require(script.Parent.Parent.TestHelpers)) :: any
 
 return function()
     local odometer = helpers.requireUtility("odometer")

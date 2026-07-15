@@ -1,6 +1,7 @@
 --!strict
 
-local requireUtility = (_G :: any).__RAYFIELD_TEST_HELPERS.requireUtility
+local helpers = ((_G :: any).__RAYFIELD_TEST_HELPERS or require(script.Parent.Parent.TestHelpers)) :: any
+local requireUtility = helpers.requireUtility
 
 return function()
     local fontManager = requireUtility("fontManager")
@@ -46,7 +47,7 @@ return function()
                 files[path] = content
             end
 
-            game:GetService("HttpService").JSONDecode = function()
+            game:GetService("HttpService").JSONDecode = function(_: string)
                 return {
                     name = "SpecFont",
                     faces = {
@@ -59,10 +60,13 @@ return function()
                     },
                 }
             end
-            game:GetService("HttpService").JSONEncode = function(_, data)
-                expect(data.name).to.equal("SpecFont")
-                return "encoded-manifest"
-            end
+            game:GetService("HttpService").JSONEncode = (
+                function(_, data)
+                    expect(data.name).to.equal("SpecFont")
+                    return "encoded-manifest"
+                    -- this cast is to satisfy the type checker, which doesn't know that the first argument is actually the HttpService instance
+                end
+            ) :: (input: any) -> string
             getfenv().getcustomasset = function(path)
                 return "asset://" .. path
             end

@@ -387,6 +387,8 @@ end
 local function isTestFile(path)
     return path:match("%.spec%.lua$") ~= nil
         or path:match("%.spec%.luau$") ~= nil
+        or path:match("%.lune%.lua$") ~= nil
+        or path:match("%.lune%.luau$") ~= nil
         or path:match("%.test%.lua$") ~= nil
         or path:match("%.test%.luau$") ~= nil
 end
@@ -1332,7 +1334,12 @@ local function collectSpecs(directory, specs)
         local path = directory .. "/" .. entry
         if fs.isDir(path) then
             collectSpecs(path, specs)
-        elseif entry:match("%.spec%.lua$") or entry:match("%.spec%.luau$") then
+        elseif
+            entry:match("%.spec%.lua$")
+            or entry:match("%.spec%.luau$")
+            or entry:match("%.lune%.lua$")
+            or entry:match("%.lune%.luau$")
+        then
             table.insert(specs, path)
         end
     end
