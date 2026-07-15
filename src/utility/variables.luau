@@ -13,7 +13,7 @@ local assetResolver = require(script.Parent.assetResolver)
 local fontManager = require(script.Parent.fontManager)
 
 local variables = table.clone(runtime)
-log.setSuppressPredicate(function()
+log.setSecureModeSource(function()
     return variables.secureMode
 end)
 

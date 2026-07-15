@@ -1074,6 +1074,13 @@ _G.__RAYFIELD_TEST_HELPERS = {
 }
 _G.__RAYFIELD_TEST_VERBOSE_LOGS = verboseTestLogs
 
+-- gag Rayfield's console output during test runs unless --verbose-logs is set. this is the
+-- runner's job, not the library's: src must not know about test environments.
+local logModule = _G.__RAYFIELD_TEST_REQUIRE_UTILITY("log")
+logModule.setSuppressPredicate(function()
+    return _G.__RAYFIELD_TEST_VERBOSE_LOGS ~= true
+end)
+
 local results = {
     testsRan = 0,
     successCount = 0,

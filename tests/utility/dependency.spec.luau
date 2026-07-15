@@ -8,7 +8,6 @@ return function()
         local log
         local variables
         local runtime
-        local originalHelpers
         local originalWarn
         local originalPrint
         local originalVariablesSecureMode
@@ -16,6 +15,11 @@ return function()
         local originalVerboseLogs
         local warnings
         local prints
+
+        -- same predicate both runners install; afterEach restores it so other specs stay quiet
+        local function runnerSuppress()
+            return _G.__RAYFIELD_TEST_VERBOSE_LOGS ~= true
+        end
 
         local function captureConsole()
             warnings = {}
@@ -32,7 +36,6 @@ return function()
 
         beforeEach(function()
             runtime = runtime or requireUtility("runtime")
-            originalHelpers = (_G :: any).__RAYFIELD_TEST_HELPERS
             originalWarn = warn
             originalPrint = print
             originalVariablesSecureMode = if variables then variables.secureMode else nil
@@ -49,14 +52,16 @@ return function()
             if runtime then
                 runtime.secureMode = originalRuntimeSecureMode
             end
-            if log and variables then
-                log.setSuppressPredicate(function()
-                    return variables.secureMode
-                end)
-            elseif log then
-                log.setSuppressPredicate(nil)
+            if log then
+                if variables then
+                    log.setSecureModeSource(function()
+                        return variables.secureMode
+                    end)
+                else
+                    log.setSecureModeSource(nil)
+                end
+                log.setSuppressPredicate(runnerSuppress)
             end
-            _G.__RAYFIELD_TEST_HELPERS = originalHelpers
             _G.__RAYFIELD_TEST_VERBOSE_LOGS = originalVerboseLogs
             warn = originalWarn
             print = originalPrint
@@ -75,10 +80,9 @@ return function()
 
         it("uses runtime secure mode by default", function()
             log = log or requireUtility("log")
+            log.setSecureModeSource(nil)
             log.setSuppressPredicate(nil)
             captureConsole()
-            _G.__RAYFIELD_TEST_HELPERS = nil
-            _G.__RAYFIELD_TEST_VERBOSE_LOGS = nil
 
             runtime.secureMode = false
             log.warn("visible")
@@ -95,9 +99,8 @@ return function()
         it("uses mutable variables secure mode after variables configures it", function()
             log = log or requireUtility("log")
             variables = variables or requireUtility("variables")
+            log.setSuppressPredicate(nil)
             captureConsole()
-            _G.__RAYFIELD_TEST_HELPERS = nil
-            _G.__RAYFIELD_TEST_VERBOSE_LOGS = nil
 
             variables.secureMode = false
             log.warn("visible")
@@ -111,12 +114,14 @@ return function()
             expect(#prints).to.equal(1)
         end)
 
-        it("suppresses test output unless verbose logs are enabled", function()
+        it("suppresses test output unless the runner enables verbose logs", function()
             log = log or requireUtility("log")
+            log.setSecureModeSource(nil)
+            log.setSuppressPredicate(runnerSuppress)
             captureConsole()
-            _G.__RAYFIELD_TEST_HELPERS = originalHelpers
-            _G.__RAYFIELD_TEST_VERBOSE_LOGS = false
+            runtime.secureMode = false
 
+            _G.__RAYFIELD_TEST_VERBOSE_LOGS = false
             log.warn("hidden")
             log.print("hidden")
 
@@ -131,11 +136,11 @@ return function()
             expect(#prints).to.equal(1)
         end)
 
-        it("ignores verbose test logs outside the test environment", function()
+        it("ignores test globals when no suppress predicate is set", function()
             log = log or requireUtility("log")
+            log.setSecureModeSource(nil)
             log.setSuppressPredicate(nil)
             captureConsole()
-            _G.__RAYFIELD_TEST_HELPERS = nil
 
             runtime.secureMode = false
             _G.__RAYFIELD_TEST_VERBOSE_LOGS = false
@@ -162,8 +167,7 @@ return function()
                 fallbackFont = fallback,
             })
             captureConsole()
-            _G.__RAYFIELD_TEST_HELPERS = originalHelpers
-            _G.__RAYFIELD_TEST_VERBOSE_LOGS = true
+            log.setSuppressPredicate(nil)
 
             variables.secureMode = false
             expect(manager:loadFont(nil)).to.equal(fallback)
