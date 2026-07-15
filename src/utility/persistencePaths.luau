@@ -1,4 +1,4 @@
---!nocheck
+--!strict
 
 -- Copyright (c) 2026 Corridon Capital
 -- This Source Code Form is subject to the terms of the Mozilla Public
@@ -10,7 +10,15 @@ local path = require(script.Parent.path)
 
 local paths = {}
 
-function paths.getConfigPath(window, name)
+type ConfigWindow = {
+    configuration: {
+        fileName: string?,
+        customFolder: string?,
+    },
+    name: string,
+}
+
+function paths.getConfigPath(window: ConfigWindow, name: unknown?): (string, string)
     local dir = variables.fileSystemManager:getPath("Configurations")
     if window.configuration.customFolder then
         dir = path.join(dir, path.sanitizeFolder(window.configuration.customFolder))
@@ -26,7 +34,7 @@ function paths.getConfigPath(window, name)
     return dir, path.join(dir, safe .. ".rfld")
 end
 
-function paths.getSettingsPath()
+function paths.getSettingsPath(): (string, string)
     local dir = variables.fileSystemManager:getPath("Settings")
     return dir, path.join(dir, "rayfield.rfld")
 end

@@ -1,4 +1,4 @@
---!nocheck
+--!strict
 
 -- Copyright (c) 2026 Corridon Capital
 -- This Source Code Form is subject to the terms of the Mozilla Public
@@ -19,39 +19,39 @@ local hasNativeFS = not isStudio and typeof(writefile) == "function"
 if hasNativeFS then
     -- Native executor environment - wrap globals directly
 
-    function filesystem.writefile(path, content)
+    function filesystem.writefile(path: string, content: string)
         writefile(path, content)
     end
 
-    function filesystem.readfile(path)
+    function filesystem.readfile(path: string): string
         return readfile(path)
     end
 
-    function filesystem.appendfile(path, content)
+    function filesystem.appendfile(path: string, content: string)
         appendfile(path, content)
     end
 
-    function filesystem.isfile(path)
+    function filesystem.isfile(path: string): boolean
         return isfile(path)
     end
 
-    function filesystem.delfile(path)
+    function filesystem.delfile(path: string)
         delfile(path)
     end
 
-    function filesystem.listfiles(folder)
+    function filesystem.listfiles(folder: string): { string }
         return listfiles(folder)
     end
 
-    function filesystem.makefolder(path)
+    function filesystem.makefolder(path: string)
         makefolder(path)
     end
 
-    function filesystem.isfolder(path)
+    function filesystem.isfolder(path: string): boolean
         return isfolder(path)
     end
 
-    function filesystem.delfolder(path)
+    function filesystem.delfolder(path: string)
         delfolder(path)
     end
 elseif isStudio then
@@ -62,7 +62,7 @@ elseif isStudio then
     root.Name = "Filesystem"
     root.Parent = services.getService("ReplicatedStorage")
 
-    local function splitPath(path)
+    local function splitPath(path: string): { string }
         local parts = {}
         for part in string.gmatch(path, "[^/]+") do
             table.insert(parts, part)
@@ -70,37 +70,43 @@ elseif isStudio then
         return parts
     end
 
-    local function resolveParent(parts, createMissing)
-        local current = root
+    local function resolveParent(parts: { string }, createMissing: boolean): Instance?
+        local current: Instance = root
         for i = 1, #parts - 1 do
             local child = current:FindFirstChild(parts[i])
             if not child then
                 if not createMissing then
                     return nil
                 end
-                child = Instance.new("Folder")
-                child.Name = parts[i]
-                child.Parent = current
+                local folder = Instance.new("Folder")
+                folder.Name = parts[i]
+                folder.Parent = current
+                child = folder
             end
-            current = child
+            current = child :: Instance
         end
         return current
     end
 
-    local function isFileInstance(instance)
-        return instance and instance:IsA("StringValue")
+    local function fileFromInstance(instance: Instance?): StringValue?
+        if instance and instance:IsA("StringValue") then
+            return instance
+        end
+        return nil
     end
 
-    function filesystem.writefile(path, content)
+    function filesystem.writefile(path: string, content: string)
         local parts = splitPath(path)
         assert(#parts > 0, "Invalid path")
 
         local parent = resolveParent(parts, true)
+        assert(parent, "Invalid path")
         local fileName = parts[#parts]
 
         local existing = parent:FindFirstChild(fileName)
-        if existing and isFileInstance(existing) then
-            existing.Value = content
+        local existingFile = fileFromInstance(existing)
+        if existingFile then
+            existingFile.Value = content
         else
             if existing then
                 existing:Destroy()
@@ -112,7 +118,7 @@ elseif isStudio then
         end
     end
 
-    function filesystem.readfile(path)
+    function filesystem.readfile(path: string): string
         local parts = splitPath(path)
         assert(#parts > 0, "Invalid path")
 
@@ -120,12 +126,13 @@ elseif isStudio then
         assert(parent, "File not found: " .. path)
 
         local file = parent:FindFirstChild(parts[#parts])
-        assert(isFileInstance(file), "File not found: " .. path)
+        local stringFile = fileFromInstance(file)
+        assert(stringFile, "File not found: " .. path)
 
-        return file.Value
+        return stringFile.Value
     end
 
-    function filesystem.appendfile(path, content)
+    function filesystem.appendfile(path: string, content: string)
         local parts = splitPath(path)
         assert(#parts > 0, "Invalid path")
 
@@ -133,12 +140,13 @@ elseif isStudio then
         assert(parent, "File not found: " .. path)
 
         local file = parent:FindFirstChild(parts[#parts])
-        assert(isFileInstance(file), "File not found: " .. path)
+        local stringFile = fileFromInstance(file)
+        assert(stringFile, "File not found: " .. path)
 
-        file.Value = file.Value .. content
+        stringFile.Value = stringFile.Value .. content
     end
 
-    function filesystem.isfile(path)
+    function filesystem.isfile(path: string): boolean
         local parts = splitPath(path)
         if #parts == 0 then
             return false
@@ -149,12 +157,12 @@ elseif isStudio then
             return false
         end
 
-        return isFileInstance(parent:FindFirstChild(parts[#parts]))
+        return fileFromInstance(parent:FindFirstChild(parts[#parts])) ~= nil
     end
 
-    function filesystem.listfiles(folder)
+    function filesystem.listfiles(folder: string): { string }
         local parts = splitPath(folder)
-        local current = root
+        local current: Instance = root
 
         for _, part in parts do
             local child = current:FindFirstChild(part)
@@ -164,14 +172,14 @@ elseif isStudio then
             current = child
         end
 
-        local results = {}
+        local results: { string } = {}
         for _, child in current:GetChildren() do
             table.insert(results, folder .. "/" .. child.Name)
         end
         return results
     end
 
-    function filesystem.delfile(path)
+    function filesystem.delfile(path: string)
         local parts = splitPath(path)
         assert(#parts > 0, "Invalid path")
 
@@ -179,36 +187,38 @@ elseif isStudio then
         assert(parent, "File not found: " .. path)
 
         local file = parent:FindFirstChild(parts[#parts])
-        assert(isFileInstance(file), "File not found: " .. path)
+        local stringFile = fileFromInstance(file)
+        assert(stringFile, "File not found: " .. path)
 
-        file:Destroy()
+        stringFile:Destroy()
     end
 
-    function filesystem.makefolder(path)
+    function filesystem.makefolder(path: string)
         local parts = splitPath(path)
         if #parts == 0 then
             return
         end
 
-        local current = root
+        local current: Instance = root
         for _, part in parts do
             local child = current:FindFirstChild(part)
             if not child then
-                child = Instance.new("Folder")
-                child.Name = part
-                child.Parent = current
+                local folder = Instance.new("Folder")
+                folder.Name = part
+                folder.Parent = current
+                child = folder
             end
-            current = child
+            current = child :: Instance
         end
     end
 
-    function filesystem.isfolder(path)
+    function filesystem.isfolder(path: string): boolean
         local parts = splitPath(path)
         if #parts == 0 then
             return false
         end
 
-        local current = root
+        local current: Instance = root
         for _, part in parts do
             local child = current:FindFirstChild(part)
             if not child or not child:IsA("Folder") then
@@ -219,7 +229,7 @@ elseif isStudio then
         return true
     end
 
-    function filesystem.delfolder(path)
+    function filesystem.delfolder(path: string)
         local parts = splitPath(path)
         assert(#parts > 0, "Invalid path")
 
@@ -233,13 +243,13 @@ elseif isStudio then
     end
 end
 
-function filesystem.ensureFolder(path)
+function filesystem.ensureFolder(path: string)
     if not filesystem.isfolder(path) then
         filesystem.makefolder(path)
     end
 end
 
-function filesystem.ensureDir(dir)
+function filesystem.ensureDir(dir: string)
     local built = ""
     for part in string.gmatch(dir, "[^/]+") do
         built = if built == "" then part else built .. "/" .. part

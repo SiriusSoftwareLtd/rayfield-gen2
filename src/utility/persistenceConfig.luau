@@ -1,4 +1,4 @@
---!nocheck
+--!strict
 
 -- Copyright (c) 2026 Corridon Capital
 -- This Source Code Form is subject to the terms of the Mozilla Public
@@ -13,18 +13,39 @@ local paths = require(script.Parent.persistencePaths)
 
 local persistenceConfig = {}
 
-function persistenceConfig.getPath(window, name)
+type PersistedControl = {
+    value: unknown,
+    flag: string?,
+    _canBeNil: boolean?,
+    _serialize: ((PersistedControl) -> unknown)?,
+    _deserialize: ((PersistedControl, unknown) -> ())?,
+    Set: (PersistedControl, unknown) -> (),
+}
+
+type ConfigWindow = {
+    controls: { [string]: PersistedControl },
+    configuration: {
+        fileName: string?,
+        customFolder: string?,
+    },
+    name: string,
+    _loading: boolean?,
+    _loadedConfig: { [string]: unknown }?,
+}
+
+function persistenceConfig.getPath(window: ConfigWindow, name: unknown?): (string, string)
     return paths.getConfigPath(window, name)
 end
 
-function persistenceConfig.save(window, name)
+function persistenceConfig.save(window: ConfigWindow, name: unknown?): boolean
     local dir, fullPath = persistenceConfig.getPath(window, name)
 
-    local flags = {}
+    local flags: { [string]: unknown } = {}
     for flag, control in window.controls do
         local ok, value = pcall(function()
-            if control._serialize then
-                return control:_serialize()
+            local serialize = control._serialize
+            if serialize then
+                return serialize(control)
             end
             return control.value
         end)
@@ -54,7 +75,7 @@ function persistenceConfig.save(window, name)
     return true
 end
 
-function persistenceConfig.load(window, name)
+function persistenceConfig.load(window: ConfigWindow, name: unknown?): boolean
     local dir, fullPath = persistenceConfig.getPath(window, name)
 
     if not filesystem.isfile(fullPath) then
@@ -83,28 +104,30 @@ function persistenceConfig.load(window, name)
         return false
     end
 
+    local parsedFlags = parsed :: { [string]: unknown }
     window._loading = true
     for flag, control in window.controls do
-        persistenceConfig.applyTo(control, parsed[flag])
+        persistenceConfig.applyTo(control, parsedFlags[flag])
     end
     window._loading = false
 
     -- kept so elements built after this load can still restore themselves (see
     -- Window:_restoreLate). without it a late element shows its default and the next
     -- autosave writes that default over the saved value.
-    window._loadedConfig = parsed
+    window._loadedConfig = parsedFlags
 
     return true
 end
 
 -- restore one control from a decoded config. callers own the window._loading guard.
-function persistenceConfig.applyTo(control, value)
+function persistenceConfig.applyTo(control: PersistedControl, value: unknown)
     if value == nil and not control._canBeNil then
         return
     end
     local ok, err = pcall(function()
-        if control._deserialize then
-            control:_deserialize(value)
+        local deserialize = control._deserialize
+        if deserialize then
+            deserialize(control, value)
         else
             control:Set(value)
         end
@@ -114,10 +137,10 @@ function persistenceConfig.applyTo(control, value)
     end
 end
 
-function persistenceConfig.list(window)
+function persistenceConfig.list(window: ConfigWindow): { string }
     local dir = persistenceConfig.getPath(window)
 
-    local names = {}
+    local names: { string } = {}
     local ok, files = pcall(filesystem.listfiles, dir)
     if not ok or type(files) ~= "table" then
         return names
@@ -139,7 +162,7 @@ function persistenceConfig.list(window)
     return names
 end
 
-function persistenceConfig.delete(window, name)
+function persistenceConfig.delete(window: ConfigWindow, name: unknown): boolean
     if type(name) ~= "string" or name == "" then
         return false
     end

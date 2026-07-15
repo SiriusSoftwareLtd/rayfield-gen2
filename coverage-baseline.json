@@ -3,9 +3,9 @@
   "measuredDate": "2026-07-15",
   "command": "make coverage-baseline",
   "threshold": 70.00,
-  "lineCoverage": 85.38,
-  "coveredLines": 3651,
-  "coverableLines": 4276,
+  "lineCoverage": 85.49,
+  "coveredLines": 3700,
+  "coverableLines": 4328,
   "notes": [
     "Generated reports are written to coverage/coverage.txt and coverage/coverage-summary.json.",
     "The enforced Lune coverage scope is discovered dynamically from src by default.",
@@ -27,9 +27,9 @@
     },
     {
       "path": "src/components/chrome.luau",
-      "lineCoverage": 90.91,
-      "coveredLines": 30,
-      "coverableLines": 33
+      "lineCoverage": 88.89,
+      "coveredLines": 32,
+      "coverableLines": 36
     },
     {
       "path": "src/components/colorpicker.luau",
@@ -135,9 +135,9 @@
     },
     {
       "path": "src/components/window.luau",
-      "lineCoverage": 85.65,
-      "coveredLines": 537,
-      "coverableLines": 627
+      "lineCoverage": 85.67,
+      "coveredLines": 538,
+      "coverableLines": 628
     },
     {
       "path": "src/init.luau",
@@ -189,15 +189,15 @@
     },
     {
       "path": "src/utility/HapticEngine.luau",
-      "lineCoverage": 91.43,
-      "coveredLines": 32,
-      "coverableLines": 35
+      "lineCoverage": 94.74,
+      "coveredLines": 36,
+      "coverableLines": 38
     },
     {
       "path": "src/utility/assetResolver.luau",
       "lineCoverage": 100.00,
-      "coveredLines": 51,
-      "coverableLines": 51
+      "coveredLines": 59,
+      "coverableLines": 59
     },
     {
       "path": "src/utility/colors.luau",
@@ -219,15 +219,15 @@
     },
     {
       "path": "src/utility/filesystem.luau",
-      "lineCoverage": 86.01,
-      "coveredLines": 123,
-      "coverableLines": 143
+      "lineCoverage": 86.84,
+      "coveredLines": 132,
+      "coverableLines": 152
     },
     {
       "path": "src/utility/filesystemManager.luau",
       "lineCoverage": 100.00,
-      "coveredLines": 23,
-      "coverableLines": 23
+      "coveredLines": 22,
+      "coverableLines": 22
     },
     {
       "path": "src/utility/flagNames.luau",
@@ -237,9 +237,9 @@
     },
     {
       "path": "src/utility/fontManager.luau",
-      "lineCoverage": 80.22,
-      "coveredLines": 146,
-      "coverableLines": 182
+      "lineCoverage": 80.33,
+      "coveredLines": 147,
+      "coverableLines": 183
     },
     {
       "path": "src/utility/functions.luau",
@@ -249,15 +249,15 @@
     },
     {
       "path": "src/utility/image.luau",
-      "lineCoverage": 95.45,
-      "coveredLines": 63,
-      "coverableLines": 66
+      "lineCoverage": 95.59,
+      "coveredLines": 65,
+      "coverableLines": 68
     },
     {
       "path": "src/utility/imageCache.luau",
-      "lineCoverage": 96.81,
-      "coveredLines": 91,
-      "coverableLines": 94
+      "lineCoverage": 94.44,
+      "coveredLines": 102,
+      "coverableLines": 108
     },
     {
       "path": "src/utility/locale.luau",
@@ -274,8 +274,8 @@
     {
       "path": "src/utility/moveable.luau",
       "lineCoverage": 100.00,
-      "coveredLines": 17,
-      "coverableLines": 17
+      "coveredLines": 18,
+      "coverableLines": 18
     },
     {
       "path": "src/utility/network.luau",
@@ -310,8 +310,8 @@
     {
       "path": "src/utility/persistenceConfig.luau",
       "lineCoverage": 100.00,
-      "coveredLines": 73,
-      "coverableLines": 73
+      "coveredLines": 74,
+      "coverableLines": 74
     },
     {
       "path": "src/utility/persistencePaths.luau",
@@ -322,8 +322,8 @@
     {
       "path": "src/utility/persistenceSettings.luau",
       "lineCoverage": 100.00,
-      "coveredLines": 41,
-      "coverableLines": 41
+      "coveredLines": 42,
+      "coverableLines": 42
     },
     {
       "path": "src/utility/runtime.luau",
@@ -339,9 +339,9 @@
     },
     {
       "path": "src/utility/textMetrics.luau",
-      "lineCoverage": 94.59,
-      "coveredLines": 35,
-      "coverableLines": 37
+      "lineCoverage": 95.65,
+      "coveredLines": 44,
+      "coverableLines": 46
     },
     {
       "path": "src/utility/variables.luau",

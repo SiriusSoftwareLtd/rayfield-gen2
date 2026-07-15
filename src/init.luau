@@ -1,9 +1,10 @@
+--!strict
+
 -- Copyright (c) 2026 Corridon Capital
 -- This Source Code Form is subject to the terms of the Mozilla Public
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-local rayfield = {}
 local variables = require(script.utility.variables)
 local image = require(script.utility.image)
 local locale = require(script.utility.locale)
@@ -24,6 +25,9 @@ export type Keybind = types.Keybind
 export type Stat = types.Stat
 export type Section = types.Section
 export type Popup = types.Popup
+export type Rayfield = types.Rayfield
+
+local rayfield = {} :: Rayfield
 
 local function createBanner()
     local ui = Instance.new("ScreenGui")
@@ -111,4 +115,4 @@ function rayfield:CreateWindow(properties: types.WindowProps): types.Window
     return window :: any
 end
 
-return rayfield :: types.Rayfield
+return rayfield

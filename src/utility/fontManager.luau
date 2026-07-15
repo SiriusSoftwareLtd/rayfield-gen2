@@ -1,4 +1,4 @@
---!nocheck
+--!strict
 
 -- Copyright (c) 2026 Corridon Capital
 -- This Source Code Form is subject to the terms of the Mozilla Public
@@ -13,11 +13,11 @@ local assetResolver = require(script.Parent.assetResolver)
 local log = require(script.Parent.log)
 local path = require(script.Parent.path)
 
-local function jsonEncode(data)
+local function jsonEncode(data: unknown): string?
     local success, result = pcall(function()
         return httpService:JSONEncode(data)
     end)
-    if success then
+    if success and type(result) == "string" then
         return result
     else
         log.warn("Failed to encode JSON:", result)
@@ -25,29 +25,7 @@ local function jsonEncode(data)
     end
 end
 
--- the manifest comes off the network, so trust nothing about its shape. names feed straight
--- into disk paths, so sanitize them here too. returns nil for anything we cant use.
-local function validateManifest(manifest)
-    if type(manifest) ~= "table" or type(manifest.name) ~= "string" or type(manifest.faces) ~= "table" then
-        return nil
-    end
-    manifest.name = path.sanitizeFile(manifest.name)
-    if #manifest.name == 0 or #manifest.faces == 0 then
-        return nil
-    end
-    for _, face in manifest.faces do
-        if type(face) ~= "table" or type(face.name) ~= "string" or type(face.assetId) ~= "string" then
-            return nil
-        end
-        face.name = path.sanitizeFile(face.name)
-        if #face.name == 0 then
-            return nil
-        end
-    end
-    return manifest
-end
-
-local function jsonDecode(jsonString)
+local function jsonDecode(jsonString: string): unknown?
     local success, result = pcall(function()
         return httpService:JSONDecode(jsonString)
     end)
@@ -62,7 +40,7 @@ end
 local fontManager = {}
 fontManager.__type = "fontManager"
 
-type FontFace = {
+export type FontFace = {
     name: string,
     family: string,
     weight: number,
@@ -70,48 +48,71 @@ type FontFace = {
     assetId: string,
 }
 
-type FontManifest = {
+export type FontManifest = {
     name: string,
     faces: { FontFace },
 }
 
-type CachedFont = {
-    customId: string,
+export type CachedFont = {
+    customId: number | string,
     manifest: FontManifest,
     loadedFromDisk: boolean,
     variants: { [string]: Font },
 }
+
+export type FontCache = { [number]: CachedFont }
 
 export type FontResolverOptions = {
     fallbackFont: Font?,
     saveToDisk: boolean?,
     skipCache: boolean?,
 }
-export type fontManager = {
+
+type FontManagerState = {
     _debug: boolean,
     rootFolder: string,
-    assetResolver: assetResolver,
+    assetResolver: assetResolver.AssetResolver,
     defaultOptions: FontResolverOptions,
-    fontCache: { [number]: CachedFont }?,
-    new: (
-        rootFolder: string,
-        useDebug: boolean?,
-        useCache: boolean?,
-        assetContentDownloadUrl: assetContentDownloadUrl?,
-        defaultOptions: FontResolverOptions?
-    ) -> fontManager,
-    resolve: (self: fontManager, id: number | string) -> Font?,
+    fontCache: FontCache?,
+}
+
+export type FontManager = FontManagerState & {
+    resolve: (self: FontManager, id: number | string) -> Font?,
     loadFont: (
+        self: FontManager,
         id: (number | string)?,
         fontWeight: Enum.FontWeight?,
         fontStyle: Enum.FontStyle?,
         saveToDisk: boolean?,
         skipCache: boolean?
     ) -> Font?,
-    getFontFromId: (self: fontManager, id: number | string) -> Font?,
+    getFontFromId: (self: FontManager, id: number | string) -> Font?,
 }
 
---local DEFAULT_FALLBACK_FONT = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium)
+export type fontManager = FontManager
+
+-- the manifest comes off the network, so trust nothing about its shape. names feed straight
+-- into disk paths, so sanitize them here too. returns nil for anything we cant use.
+local function validateManifest(manifest: unknown): FontManifest?
+    local candidate = manifest :: any
+    if type(candidate) ~= "table" or type(candidate.name) ~= "string" or type(candidate.faces) ~= "table" then
+        return nil
+    end
+    candidate.name = path.sanitizeFile(candidate.name)
+    if #candidate.name == 0 or #candidate.faces == 0 then
+        return nil
+    end
+    for _, face in candidate.faces do
+        if type(face) ~= "table" or type(face.name) ~= "string" or type(face.assetId) ~= "string" then
+            return nil
+        end
+        face.name = path.sanitizeFile(face.name)
+        if #face.name == 0 then
+            return nil
+        end
+    end
+    return candidate :: FontManifest
+end
 
 local env = getfenv()
 
@@ -119,7 +120,7 @@ local function variantKey(fontWeight: Enum.FontWeight, fontStyle: Enum.FontStyle
     return tostring(fontWeight) .. "|" .. tostring(fontStyle)
 end
 
-local function resolveId(id: number | string): number?
+local function resolveId(id: unknown): number?
     if type(id) == "number" then
         return id
     end
@@ -131,8 +132,8 @@ local function resolveId(id: number | string): number?
     return nil
 end
 
-function fontManager.__index(self, key)
-    local classMember = fontManager[key]
+function fontManager.__index(self: FontManagerState, key: unknown): unknown
+    local classMember = (fontManager :: any)[key]
     if classMember ~= nil then
         return classMember
     end
@@ -142,8 +143,9 @@ function fontManager.__index(self, key)
         return nil
     end
 
-    if self.fontCache then
-        local cached = self.fontCache[resolvedId]
+    local fontCache = self.fontCache
+    if fontCache then
+        local cached = fontCache[resolvedId]
         if cached then
             local regularKey = variantKey(Enum.FontWeight.Regular, Enum.FontStyle.Normal)
             local regularFont = cached.variants and cached.variants[regularKey]
@@ -164,26 +166,32 @@ function fontManager.new(
     rootFolder: string,
     useDebug: boolean?,
     useCache: boolean?,
-    assetContentDownloadUrl: assetContentDownloadUrl?,
+    assetContentDownloadUrl: assetResolver.AssetDownloadUrl?,
     defaultOptions: FontResolverOptions?
-): fontManager
-    local self = setmetatable({}, fontManager)
-    self.rootFolder = rootFolder
-    -- executors without filesystem support must degrade to the fallback font, not kill the require
-    pcall(fileSystem.ensureFolder, rootFolder)
-    self.fontCache = useCache and {} or nil
-    self.assetResolver = assetResolver.new(useCache, assetContentDownloadUrl)
-    self.defaultOptions = defaultOptions
+): FontManager
+    local defaultResolverOptions = defaultOptions
         or {
             saveToDisk = true,
             skipCache = not useCache or false,
             fallbackFont = Font.fromEnum(Enum.Font.SourceSans),
         }
-    self._debug = useDebug or runService:IsStudio() or false
+    local self = setmetatable(
+        {
+            rootFolder = rootFolder,
+            fontCache = if useCache then {} :: FontCache else nil,
+            assetResolver = assetResolver.new(useCache, assetContentDownloadUrl),
+            defaultOptions = defaultResolverOptions,
+            _debug = useDebug or runService:IsStudio() or false,
+        } :: FontManagerState,
+        fontManager
+    ) :: any
+    -- executors without filesystem support must degrade to the fallback font, not kill the require
+    pcall(fileSystem.ensureFolder, rootFolder)
     return self
 end
 
-function fontManager:loadFont(
+function fontManager.loadFont(
+    self: FontManager,
     id: (number | string)?,
     fontWeight: Enum.FontWeight?,
     fontStyle: Enum.FontStyle?,
@@ -196,9 +204,9 @@ function fontManager:loadFont(
     if skipCache == nil then
         skipCache = self.defaultOptions.skipCache
     end
-    fontWeight = fontWeight or Enum.FontWeight.Regular
-    fontStyle = fontStyle or Enum.FontStyle.Normal
-    local cacheKey = variantKey(fontWeight, fontStyle)
+    local requestedFontWeight = fontWeight or Enum.FontWeight.Regular
+    local requestedFontStyle = fontStyle or Enum.FontStyle.Normal
+    local cacheKey = variantKey(requestedFontWeight, requestedFontStyle)
     local rawId = self.assetResolver:resolve(id)
     local resolvedId = resolveId(rawId)
     if not resolvedId then
@@ -206,8 +214,9 @@ function fontManager:loadFont(
         return self.defaultOptions.fallbackFont
     end
     -- if the font is already cached, return it
-    if self.fontCache and not skipCache then
-        local cachedFont = self.fontCache[resolvedId]
+    local fontCache = self.fontCache
+    if fontCache and not skipCache then
+        local cachedFont = fontCache[resolvedId]
         if cachedFont then
             local cachedVariant = cachedFont.variants and cachedFont.variants[cacheKey]
             if cachedVariant then
@@ -217,7 +226,7 @@ function fontManager:loadFont(
                 return cachedVariant
             end
 
-            local ok, loadedFont = pcall(Font.new, cachedFont.customId, fontWeight, fontStyle)
+            local ok, loadedFont = pcall(Font.new, cachedFont.customId :: any, requestedFontWeight, requestedFontStyle)
             if ok and loadedFont then
                 cachedFont.variants = cachedFont.variants or {}
                 cachedFont.variants[cacheKey] = loadedFont
@@ -229,7 +238,7 @@ function fontManager:loadFont(
                 if self._debug then
                     log.warn("Failed to load font from cache for id: " .. tostring(resolvedId))
                 end
-                self.fontCache[resolvedId] = nil
+                fontCache[resolvedId] = nil
                 return self.defaultOptions.fallbackFont
             end
         end
@@ -293,11 +302,13 @@ function fontManager:loadFont(
 
     -- iterate over each face, caching each to disk like we do images: a face only downloads once,
     -- later sessions reuse the local file and just re-resolve it
-    for i, face in ipairs(fontManifest and fontManifest.faces or {}) do
+    for i, face in ipairs(fontManifest.faces) do
         local fontFacePath = fontDirectory .. "/" .. face.name:gsub(" ", "-") .. ".ttf"
         if not fileSystem.isfile(fontFacePath) then
             local fontFaceId = self.assetResolver:resolve(face.assetId)
-            local fontFaceContent = self.assetResolver:getAssetContentFromId(fontFaceId, false)
+            local fontFaceContent = if fontFaceId ~= nil
+                then self.assetResolver:getAssetContentFromId(fontFaceId, false)
+                else nil
             if fontFaceContent then
                 pcall(fileSystem.writefile, fontFacePath, fontFaceContent)
             elseif self._debug then
@@ -305,7 +316,7 @@ function fontManager:loadFont(
             end
         end
         local ok, uri = pcall(env.getcustomasset, fontFacePath)
-        if ok and uri then
+        if ok and type(uri) == "string" then
             fontManifest.faces[i].assetId = uri
             if self._debug then
                 log.print("Loaded font face for id: " .. tostring(resolvedId) .. ", face: " .. face.name)
@@ -335,7 +346,7 @@ function fontManager:loadFont(
         return self.defaultOptions.fallbackFont
     end
     -- load the font using the manifest
-    local ok, loadedFont = pcall(Font.new, fontManifestId, fontWeight, fontStyle)
+    local ok, loadedFont = pcall(Font.new, fontManifestId :: any, requestedFontWeight, requestedFontStyle)
     if not ok or not loadedFont then
         if self._debug then
             log.warn("Failed to load font for id: " .. tostring(resolvedId))
@@ -344,8 +355,9 @@ function fontManager:loadFont(
     end
 
     -- write the font manifest to the disk
-    if self.fontCache then
-        self.fontCache[resolvedId] = {
+    fontCache = self.fontCache
+    if fontCache then
+        fontCache[resolvedId] = {
             customId = fontManifestId,
             manifest = fontManifest,
             loadedFromDisk = true,
@@ -360,14 +372,15 @@ function fontManager:loadFont(
     return loadedFont
 end
 
-function fontManager:resolve(id: number | string): Font?
+function fontManager.resolve(self: FontManager, id: number | string): Font?
     local resolvedId = resolveId(id)
     if not resolvedId then
         return nil
     end
 
-    if self.fontCache then
-        local cached = self.fontCache[resolvedId]
+    local fontCache = self.fontCache
+    if fontCache then
+        local cached = fontCache[resolvedId]
         if cached then
             if self._debug then
                 log.print("Resolved font for id: " .. tostring(resolvedId))
@@ -381,7 +394,7 @@ function fontManager:resolve(id: number | string): Font?
     return nil
 end
 
-function fontManager:getFontFromId(id: number | string): Font?
+function fontManager.getFontFromId(self: FontManager, id: number | string): Font?
     return self:resolve(id)
 end
 

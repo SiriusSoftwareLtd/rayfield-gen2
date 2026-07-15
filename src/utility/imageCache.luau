@@ -1,4 +1,4 @@
---!nocheck
+--!strict
 
 -- Copyright (c) 2026 Corridon Capital
 -- This Source Code Form is subject to the terms of the Mozilla Public
@@ -10,6 +10,18 @@ local path = require(script.Parent.path)
 local variables = require(script.Parent.variables)
 local constants = require(script.Parent.constants)
 
+export type RewriteMap = { [number]: string }
+export type CacheSettledCallback = (failed: number) -> ()
+export type PreloadCallback = CacheSettledCallback
+export type AvatarCallback = (uri: string) -> ()
+export type OnCachedCallback = (id: number) -> ()
+export type ThumbnailEntry = {
+    state: string?,
+    imageUrl: string?,
+}
+export type ThumbnailResponse = {
+    data: { ThumbnailEntry }?,
+}
 local imageCache = {}
 
 local cacheRoot = variables.fileSystemManager:getRootFolder()
@@ -23,21 +35,22 @@ local headshotPx = 48
 local thumbEndpoint =
     "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=%d&size=%dx%d&format=Png&isCircular=false"
 
-local manifest = {}
+local manifest: { [number]: string } = {}
 for _, id in constants.icons do
-    manifest[id] = assetBase .. id .. ".png"
+    local iconId = id :: number
+    manifest[iconId] = assetBase .. tostring(iconId) .. ".png"
 end
 local manifestSize = 0
 for _ in manifest do
     manifestSize += 1
 end
 
-imageCache.rewrites = {}
-imageCache.onCached = nil -- image sets this to rebind blank instances when a background download lands
+imageCache.rewrites = {} :: RewriteMap
+imageCache.onCached = nil :: OnCachedCallback? -- image sets this to rebind blank instances when a background download lands
 
 local pngMagic = "\137PNG\r\n\26\n"
 
-local function cacheFile(filePath, url)
+local function cacheFile(filePath: string, url: string): string?
     if type(getfenv().getcustomasset) ~= "function" then
         return nil
     end
@@ -55,15 +68,41 @@ local function cacheFile(filePath, url)
         end
     end
     local ok, uri = pcall(getfenv().getcustomasset, filePath)
-    return ok and uri or nil
+    return if ok and type(uri) == "string" then uri else nil
 end
 
-local function avatarPath(userId)
+local function avatarPath(userId: number): string
     return path.join(cacheFolder, "avatar_" .. tostring(userId) .. ".png")
 end
 
-local function fetchAvatar(userId)
-    local cdnUrl
+local function decodeThumbnailUrl(body: string): string?
+    local decodeOk, parsed = pcall(function()
+        return variables.httpService:JSONDecode(body)
+    end)
+    if not decodeOk or type(parsed) ~= "table" then
+        return nil
+    end
+
+    local data = (parsed :: ThumbnailResponse).data
+    if type(data) ~= "table" then
+        return nil
+    end
+
+    local entry = data[1]
+    if type(entry) ~= "table" then
+        return nil
+    end
+
+    local thumbnail = entry :: ThumbnailEntry
+    if thumbnail.state == "Completed" and type(thumbnail.imageUrl) == "string" then
+        return thumbnail.imageUrl
+    end
+
+    return nil
+end
+
+local function fetchAvatar(userId: number): string?
+    local cdnUrl: string? = nil
     for attempt = 1, 4 do
         -- retries must bypass the session cache or a cached "Pending" response wins forever
         local body = assetResolver:getAssetContentFromUrl(
@@ -72,12 +111,9 @@ local function fetchAvatar(userId)
             attempt > 1
         )
         if body then
-            local decodeOk, parsed = pcall(function()
-                return variables.httpService:JSONDecode(body)
-            end)
-            local entry = decodeOk and parsed and parsed.data and parsed.data[1]
-            if entry and entry.state == "Completed" and type(entry.imageUrl) == "string" then
-                cdnUrl = entry.imageUrl
+            local imageUrl = decodeThumbnailUrl(body)
+            if imageUrl then
+                cdnUrl = imageUrl
                 break
             end
         end
@@ -92,7 +128,7 @@ end
 
 -- onSettled(failed) fires once every background download has finished, with the count that never
 -- cached (a genuine failure), so callers can surface it without spamming per-icon.
-function imageCache.preload(onSettled)
+function imageCache.preload(onSettled: PreloadCallback?): (boolean, number)
     local env = getfenv()
     if type(env.getcustomasset) ~= "function" then
         if onSettled then
@@ -121,11 +157,11 @@ function imageCache.preload(onSettled)
     local pending, missing = 0, 0
     local spawning = true -- keep a synchronously-finishing download from settling mid-loop
     for id, url in manifest do
-        local filePath = path.join(cacheFolder, id .. ".png")
-        local uri
+        local filePath = path.join(cacheFolder, tostring(id) .. ".png")
+        local uri: string? = nil
         if filesystem.isfile(filePath) then
             local ok, res = pcall(env.getcustomasset, filePath)
-            uri = ok and res or nil
+            uri = if ok and type(res) == "string" then res else nil
         end
         if uri then
             -- already on disk from a past session: use it right away
@@ -158,7 +194,7 @@ function imageCache.preload(onSettled)
     return missing == 0, missing
 end
 
-function imageCache.avatar(userId, onReady)
+function imageCache.avatar(userId: unknown, onReady: AvatarCallback?): string
     if type(userId) ~= "number" then
         return ""
     end
@@ -166,7 +202,7 @@ function imageCache.avatar(userId, onReady)
     local filePath = avatarPath(userId)
     if filesystem.isfile(filePath) then
         local ok, uri = pcall(getfenv().getcustomasset, filePath)
-        if ok and uri then
+        if ok and type(uri) == "string" then
             return uri
         end
     end

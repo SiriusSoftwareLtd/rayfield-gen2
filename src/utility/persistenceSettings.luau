@@ -1,4 +1,4 @@
---!nocheck
+--!strict
 
 -- Copyright (c) 2026 Corridon Capital
 -- This Source Code Form is subject to the terms of the Mozilla Public
@@ -12,15 +12,36 @@ local enums = require(script.Parent.enums)
 
 local persistenceSettings = {}
 
-function persistenceSettings.getSettingsPath()
+type SettingsWindow = {
+    settings: {
+        toggleKeybind: EnumItem,
+        mouseOverride: boolean,
+        keepOnScreen: boolean,
+        welcomeToast: boolean,
+        haptics: boolean,
+    },
+}
+
+type DecodedSettings = {
+    toggleKeybind: { [number]: unknown }?,
+    mouseOverride: unknown?,
+    keepOnScreen: unknown?,
+    welcomeToast: unknown?,
+    haptics: unknown?,
+}
+
+function persistenceSettings.getSettingsPath(): (string, string)
     return paths.getSettingsPath()
 end
 
-function persistenceSettings.saveSettings(window)
+function persistenceSettings.saveSettings(window: SettingsWindow): boolean
     local dir, fullPath = persistenceSettings.getSettingsPath()
 
-    local data = {
-        toggleKeybind = { tostring(window.settings.toggleKeybind.EnumType), window.settings.toggleKeybind.Value },
+    local data: { [string]: unknown } = {
+        toggleKeybind = {
+            tostring(window.settings.toggleKeybind.EnumType),
+            window.settings.toggleKeybind.Value,
+        } :: { unknown },
         mouseOverride = window.settings.mouseOverride,
         keepOnScreen = window.settings.keepOnScreen,
         welcomeToast = window.settings.welcomeToast,
@@ -44,7 +65,7 @@ function persistenceSettings.saveSettings(window)
     return true
 end
 
-function persistenceSettings.loadSettings(window)
+function persistenceSettings.loadSettings(window: SettingsWindow): boolean
     local _, fullPath = persistenceSettings.getSettingsPath()
 
     local fileExists = false
@@ -65,12 +86,14 @@ function persistenceSettings.loadSettings(window)
         return false
     end
 
-    if parsed.toggleKeybind then
+    local settings = parsed :: DecodedSettings
+
+    if settings.toggleKeybind then
         pcall(function()
-            local enumName = tostring(parsed.toggleKeybind[1]):gsub("^Enum%.", "")
-            local enumType = Enum[enumName]
+            local enumName = tostring(settings.toggleKeybind[1]):gsub("^Enum%.", "")
+            local enumType = (Enum :: any)[enumName]
             if enumType then
-                local enumItem = enums.itemFromValue(enumType, parsed.toggleKeybind[2])
+                local enumItem = enums.itemFromValue(enumType, settings.toggleKeybind[2])
                 if enumItem then
                     window.settings.toggleKeybind = enumItem
                 end
@@ -78,20 +101,20 @@ function persistenceSettings.loadSettings(window)
         end)
     end
 
-    if type(parsed.mouseOverride) == "boolean" then
-        window.settings.mouseOverride = parsed.mouseOverride
+    if type(settings.mouseOverride) == "boolean" then
+        window.settings.mouseOverride = settings.mouseOverride
     end
 
-    if type(parsed.keepOnScreen) == "boolean" then
-        window.settings.keepOnScreen = parsed.keepOnScreen
+    if type(settings.keepOnScreen) == "boolean" then
+        window.settings.keepOnScreen = settings.keepOnScreen
     end
 
-    if type(parsed.welcomeToast) == "boolean" then
-        window.settings.welcomeToast = parsed.welcomeToast
+    if type(settings.welcomeToast) == "boolean" then
+        window.settings.welcomeToast = settings.welcomeToast
     end
 
-    if type(parsed.haptics) == "boolean" then
-        window.settings.haptics = parsed.haptics
+    if type(settings.haptics) == "boolean" then
+        window.settings.haptics = settings.haptics
     end
 
     return true

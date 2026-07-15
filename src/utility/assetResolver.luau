@@ -1,4 +1,4 @@
---!nocheck
+--!strict
 
 -- Copyright (c) 2026 Corridon Capital
 -- This Source Code Form is subject to the terms of the Mozilla Public
@@ -8,7 +8,14 @@
 local network = require(script.Parent.network)
 local log = require(script.Parent.log)
 
+export type AssetId = number | string
 export type AssetDownloadUrl = string
+export type CacheKey = AssetId
+export type ResolvedAsset = AssetId
+export type AssetRequestPayload = {
+    Url: string,
+    Method: string,
+}
 local assetResolver = {
     Enum = {
         AssetDownloadUrl = {
@@ -19,19 +26,14 @@ local assetResolver = {
 }
 assetResolver.__index = assetResolver
 assetResolver.__type = "assetResolver"
-type assetResolver = {
-    contentCache: { [number]: string }?,
-    contentDownloadUrl: AssetDownloadUrl?,
-
-    new: (useCache: boolean?, assetContentDownloadUrl: AssetDownloadUrl?) -> assetResolver,
-    resolve: (self: assetResolver, value: any) -> string | number | nil,
-    getAssetContentFromUrl: (
-        self: assetResolver,
-        url: string,
-        cacheKey: number | string?,
-        forced: boolean?
-    ) -> string | nil,
-    getAssetContentFromId: (self: assetResolver, id: number | string, forced: boolean?) -> string | nil,
+type AssetResolverState = {
+    contentCache: { [CacheKey]: string }?,
+    contentDownloadUrl: AssetDownloadUrl,
+}
+export type AssetResolver = AssetResolverState & {
+    resolve: (self: AssetResolver, value: unknown) -> ResolvedAsset?,
+    getAssetContentFromUrl: (self: AssetResolver, url: string, cacheKey: CacheKey?, forced: boolean?) -> string?,
+    getAssetContentFromId: (self: AssetResolver, id: AssetId, forced: boolean?) -> string?,
 }
 -- example asset ids:
 --[[
@@ -39,14 +41,19 @@ rbxassetid://12187277209,
 rbxassetid://12187293441
 ]]
 
-function assetResolver.new(useCache: boolean?, assetContentDownloadUrl: AssetDownloadUrl?): assetResolver
-    return setmetatable({
-        contentCache = useCache and {} or nil,
-        contentDownloadUrl = assetContentDownloadUrl or assetResolver.Enum.AssetDownloadUrl.RobloxDownloadUrl,
-    }, assetResolver)
+function assetResolver.new(useCache: boolean?, assetContentDownloadUrl: AssetDownloadUrl?): AssetResolver
+    local contentCache: { [CacheKey]: string }? = if useCache then {} else nil
+    local self = setmetatable(
+        {
+            contentCache = contentCache,
+            contentDownloadUrl = assetContentDownloadUrl or assetResolver.Enum.AssetDownloadUrl.RobloxDownloadUrl,
+        } :: AssetResolverState,
+        assetResolver
+    ) :: any
+    return self
 end
 
-function assetResolver:resolve(value)
+function assetResolver.resolve(_self: AssetResolver, value: unknown): ResolvedAsset?
     if type(value) == "number" then
         return value
     end
@@ -69,23 +76,35 @@ end
 
 -- executors disagree on response shape, so trust the body only when whatever status
 -- info the executor does give us says the request actually succeeded
-local function isGoodResponse(response)
-    if type(response) ~= "table" or type(response.Body) ~= "string" or #response.Body == 0 then
+local function isGoodResponse(response: unknown): boolean
+    if type(response) ~= "table" then
         return false
     end
-    if type(response.StatusCode) == "number" then
-        return response.StatusCode >= 200 and response.StatusCode < 300
+    local shaped = response :: { Body: unknown, StatusCode: unknown, Success: unknown }
+    local body = shaped.Body
+    if type(body) ~= "string" or #body == 0 then
+        return false
     end
-    if type(response.Success) == "boolean" then
-        return response.Success
+    if type(shaped.StatusCode) == "number" then
+        local statusCode = shaped.StatusCode :: number
+        return statusCode >= 200 and statusCode < 300
+    end
+    if type(shaped.Success) == "boolean" then
+        return shaped.Success :: boolean
     end
     return true
 end
 
-function assetResolver:getAssetContentFromUrl(url: string, cacheKey: number | string?, forced: boolean?): string?
+function assetResolver.getAssetContentFromUrl(
+    self: AssetResolver,
+    url: string,
+    cacheKey: CacheKey?,
+    forced: boolean?
+): string?
     -- forced skips the session cache, so retry loops see fresh responses
-    if cacheKey ~= nil and self.contentCache and not forced then
-        local cachedContent = self.contentCache[cacheKey :: any]
+    local contentCache = self.contentCache
+    if cacheKey ~= nil and contentCache and not forced then
+        local cachedContent = contentCache[cacheKey]
         if cachedContent then
             return cachedContent
         end
@@ -97,15 +116,19 @@ function assetResolver:getAssetContentFromUrl(url: string, cacheKey: number | st
         return nil
     end
 
-    local success, response = pcall(requestFn, {
-        Url = url,
-        Method = "GET",
-    })
-    local content = nil
+    local success, response = pcall(
+        requestFn,
+        {
+            Url = url,
+            Method = "GET",
+        } :: AssetRequestPayload
+    )
+    local content: string? = nil
     if success and isGoodResponse(response) then
-        content = response.Body
-        if cacheKey ~= nil and self.contentCache then
-            self.contentCache[cacheKey :: any] = content
+        local body = (response :: { Body: string }).Body
+        content = body
+        if cacheKey ~= nil and contentCache then
+            contentCache[cacheKey] = body
         end
     elseif not forced then
         log.warn("Failed to download asset content for url: " .. tostring(url))
@@ -113,16 +136,16 @@ function assetResolver:getAssetContentFromUrl(url: string, cacheKey: number | st
     return content
 end
 
-function assetResolver:getAssetContentFromId(id, forced): string?
-    id = self:resolve(id)
+function assetResolver.getAssetContentFromId(self: AssetResolver, id: AssetId, forced: boolean?): string?
+    local resolvedId = self:resolve(id)
     -- we can only download content for valid asset ids
-    if not id or type(id) ~= "number" then
-        log.warn("Invalid asset id: " .. tostring(id))
+    if not resolvedId or type(resolvedId) ~= "number" then
+        log.warn("Invalid asset id: " .. tostring(resolvedId))
         return nil
     end
 
-    local downloadUrl = string.format(self.contentDownloadUrl, id)
-    return self:getAssetContentFromUrl(downloadUrl, id, forced)
+    local downloadUrl = string.format(self.contentDownloadUrl, resolvedId)
+    return self:getAssetContentFromUrl(downloadUrl, resolvedId, forced)
 end
 
 return assetResolver

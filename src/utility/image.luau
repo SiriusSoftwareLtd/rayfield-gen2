@@ -1,4 +1,4 @@
---!nocheck
+--!strict
 
 -- Copyright (c) 2026 Corridon Capital
 -- This Source Code Form is subject to the terms of the Mozilla Public
@@ -8,22 +8,30 @@
 local imageCache = require(script.Parent.imageCache)
 local variables = require(script.Parent.variables)
 
+type AvatarCallback = imageCache.AvatarCallback
+type PreloadCallback = imageCache.PreloadCallback
+
 local image = {}
 
 image.rewrites = imageCache.rewrites
-image.onBlock = nil
+image.onBlock = nil :: ((unknown) -> ())?
 
 -- images that resolve blank in secure mode (their icon isnt cached yet) register here, so the real
 -- texture can be dropped in once the background download lands instead of leaving a blank
-image.pending = {}
+type PendingImage = {
+    instance: Instance,
+    property: string,
+}
 
-local imageProperties = {
+image.pending = {} :: { [number]: { PendingImage } }
+
+local imageProperties: { [string]: boolean } = {
     Image = true,
     HoverImage = true,
     PressedImage = true,
 }
 
-local function idOf(value)
+local function idOf(value: unknown): number?
     if type(value) == "number" then
         return value
     elseif type(value) == "string" then
@@ -32,18 +40,18 @@ local function idOf(value)
     return nil
 end
 
-local function blocked(value)
+local function blocked(value: unknown): string
     if image.onBlock then
         image.onBlock(value)
     end
     return ""
 end
 
-function image.preload(onSettled)
+function image.preload(onSettled: PreloadCallback?): (boolean, number)
     return imageCache.preload(onSettled)
 end
 
-function image.avatar(userId, onReady)
+function image.avatar(userId: number, onReady: AvatarCallback?): string
     if not variables.secureMode then
         return `rbxthumb://type=AvatarHeadShot&id={userId}&w=48&h=48`
     end
@@ -51,12 +59,13 @@ function image.avatar(userId, onReady)
     return imageCache.avatar(userId, onReady)
 end
 
-function image.assign(instance, property, value)
+function image.assign(instance: Instance, property: string, value: unknown)
+    local target = instance :: any
     if not imageProperties[property] then
-        instance[property] = value
+        target[property] = value
         return
     end
-    instance[property] = image.resolve(value)
+    target[property] = image.resolve(value)
     -- in secure mode an un-cached icon resolves blank; remember it so it appears once cached
     if variables.secureMode then
         local id = idOf(value)
@@ -73,7 +82,7 @@ end
 
 -- imageCache calls this when a background icon download lands: drop the real texture into every
 -- instance that resolved blank waiting for it
-imageCache.onCached = function(id)
+imageCache.onCached = function(id: number)
     local list = image.pending[id]
     if not list then
         return
@@ -81,13 +90,14 @@ imageCache.onCached = function(id)
     local uri = image.rewrites[id]
     for _, entry in list do
         if uri and entry.instance and entry.instance.Parent then
-            entry.instance[entry.property] = uri
+            local target = entry.instance :: any
+            target[entry.property] = uri
         end
     end
     image.pending[id] = nil
 end
 
-function image.resolve(value)
+function image.resolve(value: unknown): string
     if value == nil or value == 0 or value == "" then
         return ""
     end
@@ -101,15 +111,16 @@ function image.resolve(value)
         end
     end
 
-    local id
+    local id: number? = nil
     if type(value) == "number" then
         id = value
     elseif type(value) == "string" then
         id = tonumber(string.match(value, "^rbxassetid://(%d+)$"))
     end
 
-    if id and image.rewrites[id] then
-        return image.rewrites[id]
+    local rewrite = if id then image.rewrites[id] else nil
+    if rewrite then
+        return rewrite
     end
 
     if variables.secureMode then
