@@ -761,6 +761,15 @@ function Dropdown:_applyFilter(query)
         data.frame.Visible = query == "" or string.find(string.lower(data.name), query, 1, true) ~= nil
     end
     self:_updateCorners()
+    self:_resizeToOptions()
+end
+
+-- match the panel to whats visible. only while open: closed height is the header alone.
+function Dropdown:_resizeToOptions()
+    if not self._isOpen then
+        return
+    end
+    variables.tweenService:Create(self.main, searchTween, { Size = UDim2.new(1, -20, 0, self:_openHeight()) }):Play()
 end
 
 -- Per-corner rounding: an option's top corners round off only when nothing sits above it,
@@ -787,8 +796,15 @@ end
 
 -- Open height sized to the options (header + search + paddings + rows), capped so long lists
 -- scroll instead of running off the window. Short lists open just tall enough, no dead space.
+-- sized from the options actually on screen, so a search filter (or an Add/Remove while
+-- open) grows and shrinks the panel to fit rather than leaving dead space
 function Dropdown:_openHeight()
-    local n = #self.options
+    local n = 0
+    for _, data in self._optionFrames do
+        if data.frame.Visible then
+            n += 1
+        end
+    end
     local rows = n * 38 + math.max(0, n - 1) * 5 + 2
     return math.min(180, 95 + rows)
 end
@@ -970,11 +986,13 @@ function Dropdown:Add(option)
     local data = self._buildOption(option)
     table.insert(self._optionFrames, data)
 
-    self:_updateCorners()
-
     if self._isOpen then
         self._renderOptionState(data, true)
     end
+
+    -- reconcile with any active search rather than showing an option the query excludes,
+    -- and resize for the new row (also refreshes corners)
+    self:_applyFilter(if self._searchOpen then self.searchInput.Text else "")
 end
 
 function Dropdown:Remove(option)
@@ -1002,7 +1020,8 @@ function Dropdown:Remove(option)
         self.window:_persist(self)
     end
 
-    self:_updateCorners()
+    -- one row shorter; resize and re-corner around whats left
+    self:_applyFilter(if self._searchOpen then self.searchInput.Text else "")
 end
 
 function Dropdown:Set(value, skipCallback)

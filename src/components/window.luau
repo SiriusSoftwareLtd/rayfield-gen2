@@ -142,6 +142,18 @@ local function resolveTheme(value)
     if typeof(value) == "table" then
         deriveStrokes(resolved, overrides)
     end
+
+    -- theme modules call brandFont at first require and are cached from then on, so a
+    -- fallbackFont set afterwards would never reach them. recompute against the current
+    -- stand-in, unless the dev named a font themselves.
+    local userTable = if typeof(value) == "table" then value else nil
+    if not (userTable and (userTable.Font or userTable.font)) then
+        resolved.Font = variables.brandFont(Enum.FontWeight.Medium)
+    end
+    if not (userTable and (userTable.TitleFont or userTable.titleFont)) then
+        resolved.TitleFont = variables.brandFont(Enum.FontWeight.SemiBold)
+    end
+
     return resolved
 end
 

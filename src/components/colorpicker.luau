@@ -853,6 +853,11 @@ end
 -- RenderStepped loop that self-terminates if the window unloads mid-drag. For a mouse drag
 -- it also bails the moment the button is up, so a dropped InputEnded cant leave it running.
 function ColorPicker:_beginDrag(region, isMouse)
+    -- the interacts stay visible through the close fade, so a click landing in that window
+    -- would drag a picker thats already shut
+    if not self._isOpen then
+        return
+    end
     self._drag = region
     self._dragIsMouse = isMouse
     self:_setHeld(region)

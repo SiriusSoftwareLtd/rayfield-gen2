@@ -153,6 +153,41 @@ return function()
             })
             expect(stringIcon.iconLabel.Image).to.equal("rbxassetid://4483345998")
 
+            -- an open dropdown sizes itself to the options actually on screen, so a search
+            -- filter (and Add/Remove while open) resizes rather than leaving dead space
+            local sized = first:CreateDropdown({
+                name = "Sized",
+                options = { "Alpha", "Beta", "Gamma" },
+                forgetState = true,
+            })
+            sized.interact.MouseButton1Click:Fire()
+            expect(sized._isOpen).to.equal(true)
+            local allHeight = sized:_openHeight()
+
+            -- filtering leaves fewer rows on screen, so the panel must shrink to fit
+            sized._searchOpen = true
+            sized.searchInput.Text = "alp"
+            sized:_applyFilter("alp")
+            expect(sized:_openHeight() < allHeight).to.equal(true)
+
+            -- Add while a query is active must respect it, not show an excluded option
+            sized:Add("Delta")
+            local delta
+            for _, data in sized._optionFrames do
+                if data.name == "Delta" then
+                    delta = data
+                end
+            end
+            expect(delta).to.be.ok()
+            expect(delta.frame.Visible).to.equal(false)
+
+            -- clearing the query brings every row back, including the one added while filtered
+            sized._searchOpen = false
+            sized:_applyFilter("")
+            expect(delta.frame.Visible).to.equal(true)
+            expect(sized:_openHeight() > allHeight or allHeight == 180).to.equal(true)
+            sized:_close()
+
             local handedOut
             local multi = first:CreateDropdown({
                 name = "Multi",
