@@ -329,18 +329,23 @@ function Tab:Select(noAnimation)
     self.window.selectedTab = self
     self.window:_jumpTo(self.tabPage)
 
-    -- noAnimation = initial selection; the pill is still hidden and the window reveal shows it.
-    if not self.neglectSelector and not noAnimation then
+    -- noAnimation = initial selection, the pill is still hidden and the window reveal shows it.
+    -- a dev calling Navigate/Select before the first Show() hits the same case even without
+    -- passing it explicitly - a tween played now would resolve while main is invisible, so the
+    -- icon it targets would just pop straight to its end state the moment the window appears
+    local skipAnimation = noAnimation or not self.window:_interactive()
+
+    if not self.neglectSelector and not skipAnimation then
         self:_applyVisual("selected", selectTweenInfo)
     end
 
     for _, tab in self.window.tabs do
         if tab ~= self.window.selectedTab then
-            tab:Deselect(noAnimation)
+            tab:Deselect(skipAnimation)
         end
     end
 
-    if self ~= self.window.rfSettings and self.window.settingsAction and not noAnimation then
+    if self ~= self.window.rfSettings and self.window.settingsAction and not skipAnimation then
         variables.tweenService
             :Create(
                 self.window.settingsAction.iconLabel,

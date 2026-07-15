@@ -494,6 +494,22 @@ return function()
             expect(w.settingsAction.iconLabel.ImageTransparency).to.equal(0.6)
         end)
 
+        it("doesnt tween the settings icon when a tab is selected before the window ever shows", function()
+            local w = makeWindow({ name = "Navigate Window", showName = "Navigate" })
+            local home = w:CreateTab({ name = "Home" })
+            local other = w:CreateTab({ name = "Other" })
+
+            -- picking a default tab before Show() is a normal setup pattern - it shouldnt play
+            -- a tween that resolves while main is still invisible, popping the icon on reveal
+            w:Navigate(other)
+            expect(w.selectedTab).to.equal(other)
+            expect(w.settingsAction.iconLabel.ImageTransparency).to.equal(1)
+
+            w:Show()
+            w:Navigate(home)
+            expect(w.settingsAction.iconLabel.ImageTransparency).to.equal(0.6)
+        end)
+
         it("reveals late tabs, rebuilds dropdowns without leaking, and guards unloaded surfaces", function()
             local w = makeWindow({
                 name = "Tidy Window",
