@@ -496,13 +496,19 @@ function Statistic:_formatChange(delta)
     end
 end
 
+-- Put a value on a readout: rolls when number easing is on and there's a previous number to
+-- roll from, snaps otherwise. Both card shapes and ResetBaseline go through here.
+function Statistic:_showValue(odo, value, previousValue, hasNoHistory)
+    if self.numberEasing and not hasNoHistory then
+        odo:to(self:_formatValue(value), value >= previousValue)
+    else
+        odo:snap(self:_formatValue(value))
+    end
+end
+
 -- full: roll value + change independently
 function Statistic:_updateFullReadouts(value, previousValue, targetChange, noChange, infinityText, hasNoHistory)
-    if self.numberEasing and not hasNoHistory then
-        self.valueOdo:to(self:_formatValue(value), value >= previousValue)
-    else
-        self.valueOdo:snap(self:_formatValue(value))
-    end
+    self:_showValue(self.valueOdo, value, previousValue, hasNoHistory)
 
     if infinityText then
         self.changeOdo:snap(infinityText)
@@ -530,11 +536,7 @@ function Statistic:_updateCompactReadout(value, previousValue, targetChange, noC
             self._lastChange = targetChange or 0
         end
     else -- "value"
-        if self.numberEasing and not hasNoHistory then
-            self.readoutOdo:to(self:_formatValue(value), value >= previousValue)
-        else
-            self.readoutOdo:snap(self:_formatValue(value))
-        end
+        self:_showValue(self.readoutOdo, value, previousValue, hasNoHistory)
     end
 end
 
@@ -585,19 +587,24 @@ function Statistic:Set(value)
 end
 
 function Statistic:ResetBaseline(newBaseline)
+    local previousValue = self.value
+    local hasNoHistory = not self._hasValue
     local baseline = if typeof(newBaseline) == "number" then newBaseline else self.value
     self._initialValue = baseline
     self.value = baseline
     self._hasValue = true
     self._lastChange = 0
 
-    -- change-display card resets to 0; a value card is unaffected
+    -- change readout drops back to 0; the value readout follows the new baseline
     if self.compact then
         if self.display == "change" then
             self.readoutOdo:snap(self:_formatChange(0))
+        else
+            self:_showValue(self.readoutOdo, baseline, previousValue, hasNoHistory)
         end
     else
         self.changeOdo:snap(self:_formatChange(0))
+        self:_showValue(self.valueOdo, baseline, previousValue, hasNoHistory)
     end
 
     self:_setAccent("neutral", 0)
@@ -646,9 +653,10 @@ end
 function Statistic:_minWidth()
     local w = 30 + 10 -- 15+15 card padding, 10 gap between title and readout
     if self.icon then
-        w += 22 -- 16 icon + 6 gap
+        w += 26 -- 20 icon + 6 gap
     end
-    w += functions.textWidth(self.window.theme.Font, 16, self.name)
+    -- measure what actually renders: the title shows the translated string
+    w += functions.textWidth(self.window.theme.Font, 16, locale.resolve(self.name))
     local readout = if self.display == "change" then self:_formatChange(0) else self:_formatValue(self.value)
     w += functions.textWidth(self.window.theme.Font, 17, readout)
     return w

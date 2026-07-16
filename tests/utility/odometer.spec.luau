@@ -39,6 +39,38 @@ return function()
     end
 
     describe("utility.odometer", function()
+        local variables = helpers.requireUtility("variables")
+        local originalGetTextBoundsAsync
+
+        beforeEach(function()
+            originalGetTextBoundsAsync = variables.textService.GetTextBoundsAsync
+        end)
+
+        afterEach(function()
+            variables.textService.GetTextBoundsAsync = originalGetTextBoundsAsync
+        end)
+
+        it("keys the digit metrics cache on font style", function()
+            -- italic digits measure wider here, so a style-blind cache would hand the italic
+            -- odometer the upright advances
+            variables.textService.GetTextBoundsAsync = function(_, params)
+                local italic = params.Font.Style == Enum.FontStyle.Italic
+                return { X = if italic then 14 else 7, Y = params.Size }
+            end
+
+            local function styledOdometer(style)
+                local window = makeWindow()
+                window.theme.Font = Font.new("font://styled", Enum.FontWeight.Regular, style)
+                return odometer.new(window, Instance.new("Frame"), { textSize = 13 })
+            end
+
+            local upright = styledOdometer(Enum.FontStyle.Normal)
+            local italic = styledOdometer(Enum.FontStyle.Italic)
+
+            expect(upright.maxWidth).to.equal(7)
+            expect(italic.maxWidth).to.equal(14)
+        end)
+
         it("snaps digits and static characters from the right", function()
             local odo = makeOdometer()
 

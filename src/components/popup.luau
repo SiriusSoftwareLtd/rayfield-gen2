@@ -64,6 +64,21 @@ local buttonTextSize = 16
 
 local backdropShown = 0.5 -- how dark the dim gets
 
+-- Open popups, oldest first. Escape only ever closes the last one so two stacked popups dont
+-- both vanish on a single press. A popup torn down some other way (its window went with it)
+-- never runs Close, so entries are pruned by liveness rather than trusted to remove themselves.
+local stack = {}
+
+local function topmost(popup)
+    for index = #stack, 1, -1 do
+        local open = stack[index]
+        if open._closed or not open.screenGui.Parent then
+            table.remove(stack, index)
+        end
+    end
+    return stack[#stack] == popup
+end
+
 function Popup.new(window, properties)
     properties = if typeof(properties) == "table" then properties else {}
 
@@ -91,6 +106,8 @@ function Popup.new(window, properties)
     end
 
     self:_build()
+    table.insert(stack, self) -- built, so it has a screenGui for the liveness prune
+
     task.spawn(function()
         self:_show()
     end)
@@ -227,7 +244,7 @@ function Popup:_build()
         table.insert(
             self._connections,
             window:Connect(variables.userInputService.InputBegan, function(input, processed)
-                if not processed and input.KeyCode == Enum.KeyCode.Escape then
+                if not processed and input.KeyCode == Enum.KeyCode.Escape and topmost(self) then
                     self:Close()
                 end
             end)
@@ -746,6 +763,11 @@ function Popup:Close()
         return
     end
     self._closed = true
+
+    local index = table.find(stack, self)
+    if index then
+        table.remove(stack, index)
+    end
 
     for _, connection in self._connections do
         self.window:Disconnect(connection)

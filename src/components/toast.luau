@@ -84,7 +84,8 @@ function Toast.new(window, properties)
     -- land after the toast builds, hence the onReady that fills the icon in once it's ready
     self._iconImage = if hasAvatar
         then image.avatar(self.avatar, function(uri)
-            if self.iconLabel then
+            -- a slow fetch can land after the toast is gone; dont write to a dead label
+            if self.iconLabel and not self._dismissed and self.main.Parent then
                 image.assign(self.iconLabel, "Image", uri)
             end
         end)

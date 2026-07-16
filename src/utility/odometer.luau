@@ -41,7 +41,14 @@ end
 -- cache. Later odometers reuse the result and never touch TextService again.
 local metricsCache = {}
 local function digitMetrics(font, size)
-    local key = tostring(font.Family) .. "|" .. tostring(font.Weight) .. "|" .. tostring(size)
+    -- Style is part of the key: italic and normal measure differently
+    local key = tostring(font.Family)
+        .. "|"
+        .. tostring(font.Weight)
+        .. "|"
+        .. tostring(font.Style)
+        .. "|"
+        .. tostring(size)
     local cached = metricsCache[key]
     if cached then
         return cached

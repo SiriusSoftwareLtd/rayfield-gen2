@@ -15,6 +15,7 @@
 -- keybind keys and hex codes are data, not language, so they're deliberately left alone.
 
 local variables = require(script.Parent.variables)
+local log = require(script.Parent.log)
 
 local locale = {}
 
@@ -93,6 +94,9 @@ end
 -- each a map of source string -> translation. Merges rather than replaces, so repeated calls (or
 -- several windows) accumulate instead of clobbering. These sit alongside the library's own tables;
 -- a dev translator, if set, still wins over both.
+--
+-- Entries are checked here rather than trusted: a non-string translation would sail through
+-- resolve() into a Text property and only blow up at render, nowhere near the register call.
 function locale.register(tables: TranslationTables?)
     if type(tables) ~= "table" then
         return
@@ -106,7 +110,11 @@ function locale.register(tables: TranslationTables?)
                 locale.strings[id] = target
             end
             for source, translated in entries do
-                target[source] = translated
+                if type(source) == "string" and type(translated) == "string" then
+                    target[source] = translated
+                else
+                    log.warn(`Rayfield: skipping a '{id}' translation, entries must be string to string.`)
+                end
             end
         end
     end
