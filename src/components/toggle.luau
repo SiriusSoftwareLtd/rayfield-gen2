@@ -508,8 +508,8 @@ function Toggle:Set(value, skipCallback)
     -- fire even when unchanged: config load calls Set and relies on the callback to apply
     if not skipCallback then
         self.window:_runGuarded(self, self.callback, self.value)
+        self.window:_persist(self) -- skipCallback means apply quietly, so dont autosave either
     end
-    self.window:_persist(self) -- no-op during load (window._loading)
 end
 
 return Toggle

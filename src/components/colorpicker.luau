@@ -235,7 +235,7 @@ function ColorPicker.new(tab, properties)
     self.hue, self.sat, self.val = self.value:ToHSV()
 
     -- alpha (0..1). the callback gets it as a second arg; opacity of the preview + alpha slider
-    local a = properties.alpha or properties.Alpha or properties.transparency
+    local a = properties.alpha or properties.Alpha
     self.alpha = if type(a) == "number" then clamp01(a) else 1
 
     self.flag = properties.flag
@@ -927,7 +927,8 @@ end
 
 -- read the mouse for the active region, update the stored channels and repaint
 function ColorPicker:_pump()
-    local previousAlpha = self.alpha -- the branches below mutate it in place
+    -- the branches below mutate these in place
+    local prevHue, prevSat, prevVal, prevAlpha = self.hue, self.sat, self.val, self.alpha
 
     if self._drag == "sat" then
         local size = self.map.AbsoluteSize
@@ -956,13 +957,14 @@ function ColorPicker:_pump()
         return
     end
 
-    -- held but stationary: nothing moved, so dont re-render and hammer the callback every frame
-    local newValue = Color3.fromHSV(self.hue, self.sat, self.val)
-    if newValue == self.value and self.alpha == previousAlpha then
+    -- held but stationary: nothing moved, so dont re-render and hammer the callback every frame.
+    -- compare the channels, not the colour they make: at val 0 (or sat 0) every hue is the same
+    -- black, so a colour check would freeze the handles for the whole drag.
+    if self.hue == prevHue and self.sat == prevSat and self.val == prevVal and self.alpha == prevAlpha then
         return
     end
 
-    self.value = newValue
+    self.value = Color3.fromHSV(self.hue, self.sat, self.val)
     self:_render("drag")
     self:_fireCallback()
 end

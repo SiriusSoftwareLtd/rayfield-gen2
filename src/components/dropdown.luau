@@ -1071,8 +1071,8 @@ function Dropdown:Set(value, skipCallback)
 
     if not skipCallback then
         self.window:_runGuarded(self, self.callback, self:_callbackValue())
+        self.window:_persist(self) -- skipCallback means apply quietly, so dont autosave either
     end
-    self.window:_persist(self)
 end
 
 function Dropdown:_setShown(shown, animate)

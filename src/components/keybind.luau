@@ -403,15 +403,22 @@ function Keybind:_beginHold(input)
     end)
 
     -- release edge off the global InputEnded (robust to synthetic input, where the original
-    -- InputObject's state doesnt always transition). tracked on the window so it cant outlive
-    -- Unload.
+    -- InputObject's state doesnt always transition). filed on the element so Tab:Remove drops it
+    -- and a release cant fire the callback against a torn-down keybind.
     local conn
-    conn = self.window:Connect(variables.userInputService.InputEnded, function(ended)
+    conn = self.window:ConnectFor(self, variables.userInputService.InputEnded, function(ended)
         local released = if heldKeyCode ~= Enum.KeyCode.Unknown
             then ended.KeyCode == heldKeyCode
             else ended.UserInputType == heldInputType
         if not released then
             return
+        end
+        -- ConnectFor files it on our list too, so drop it there or repeated holds pile up
+        if self.connections then
+            local index = table.find(self.connections, conn)
+            if index then
+                table.remove(self.connections, index)
+            end
         end
         self.window:Disconnect(conn)
         if self._holdPress == press then
