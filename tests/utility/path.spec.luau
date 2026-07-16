@@ -28,6 +28,21 @@ return function()
             expect(path.sanitizeFolder("a\\b")).to.equal("a/b")
         end)
 
+        -- dots that only become ".." once the illegal characters are stripped used to walk
+        -- straight out of the workspace, so both sanitizers get held to it
+        it("never lets a stripped character rebuild a traversal", function()
+            expect(path.sanitizeFolder(".:./.:./x")).to.equal("x")
+            expect(path.sanitizeFolder(".:.")).to.equal("")
+            expect(path.sanitizeFolder(":..:")).to.equal("")
+            expect(path.sanitizeFolder(".:./.:./.:./etc/passwd")).to.equal("etc/passwd")
+            expect(path.sanitizeFile(".:.")).to.equal("")
+        end)
+
+        it("collapses the empty segments a traversal strip leaves behind", function()
+            expect(path.sanitizeFolder("a/../b")).to.equal("a/b")
+            expect(path.sanitizeFolder("/leading")).to.equal("leading")
+        end)
+
         it("returns the basename", function()
             expect(path.basename("a/b/c.rfld")).to.equal("c.rfld")
             expect(path.basename("solo")).to.equal("solo")

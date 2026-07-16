@@ -31,8 +31,8 @@ return function()
 
             local dir, fullPath = paths.getConfigPath(window)
 
-            expect(dir).to.equal("Root/Configurations/Profiles//Main")
-            expect(fullPath).to.equal("Root/Configurations/Profiles//Main/UserOne.rfld")
+            expect(dir).to.equal("Root/Configurations/Profiles/Main")
+            expect(fullPath).to.equal("Root/Configurations/Profiles/Main/UserOne.rfld")
         end)
 
         it("uses explicit configuration names before window defaults", function()
