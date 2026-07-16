@@ -15,7 +15,7 @@ jobs:
   build:
     name: Build Release Bundle
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     permissions:
       contents: read
     outputs:
@@ -54,6 +54,10 @@ jobs:
 
       - name: Install RoKit packages
         run: make install
+
+      # never ship a red commit: the tag has to clear the same gate CI runs
+      - name: Required checks
+        run: make ci
 
       - name: Bundle
         run: make bundle

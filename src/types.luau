@@ -247,6 +247,15 @@ export type Stat = Moveable & {
 
 export type Section = Moveable & {}
 
+-- Tags sit in the window's title bar and order themselves, so they aren't Moveable.
+export type Tag = {
+    Set: (self: Tag, props: TagProps) -> (),
+    SetColor: (self: Tag, color: Color3) -> (),
+    SetText: (self: Tag, text: string?) -> (),
+    SetIcon: (self: Tag, icon: (string | number)?) -> (),
+    Remove: (self: Tag) -> (),
+}
+
 export type Popup = {
     Close: (self: Popup) -> (),
 }
@@ -280,8 +289,9 @@ export type Tab = {
 }
 
 export type Window = {
+    unloaded: boolean, -- true once Unload has run; the handle is spent
     CreateTab: (self: Window, props: TabProps) -> Tab,
-    CreateTag: (self: Window, props: TagProps) -> any,
+    CreateTag: (self: Window, props: TagProps) -> Tag,
     Notify: (self: Window, props: NotifyProps) -> (),
     Toast: (self: Window, props: ToastProps) -> (),
     Popup: (self: Window, props: PopupProps) -> Popup,

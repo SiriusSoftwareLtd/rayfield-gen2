@@ -32,7 +32,9 @@ TESTEZ_MODEL ?= build/TestEZ.rbxm
 TESTEZ_MODEL_URL ?= https://github.com/Roblox/testez/releases/download/v0.3.2/TestEZ.rbxm
 SOURCEMAP ?= sourcemap.json
 GLOBAL_TYPES ?= globalTypes.d.luau
-GLOBAL_TYPES_URL ?= https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/main/scripts/globalTypes.d.luau
+# pinned so a luau-lsp push cant change what typecheck means. bump it deliberately.
+LUAU_LSP_REF ?= e27c8b37024818c0a3d60f341ae0aba87e6d58d1
+GLOBAL_TYPES_URL ?= https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/$(LUAU_LSP_REF)/scripts/globalTypes.d.luau
 COVERAGE_THRESHOLD ?= 70
 
 .PHONY: help install hooks ci check test test-verbose coverage coverage-baseline testez-model test-place format format-check lint typecheck build bundle serve sourcemap-watch dev clean
@@ -108,9 +110,11 @@ lint:
 	$(SELENE) generate-roblox-std
 	$(SELENE) $(SRC_DIR) $(TESTS_DIR)
 
-typecheck:
+$(GLOBAL_TYPES):
+	$(CURL) -fsSL -o "$(GLOBAL_TYPES)" "$(GLOBAL_TYPES_URL)"
+
+typecheck: $(GLOBAL_TYPES)
 	$(ROJO) sourcemap $(PROJECT_FILE) -o $(SOURCEMAP)
-	$(CURL) -fsSL -o $(GLOBAL_TYPES) $(GLOBAL_TYPES_URL)
 	$(LUAU_LSP) analyze --sourcemap=$(SOURCEMAP) --defs=$(GLOBAL_TYPES) --no-strict-dm-types $(SRC_DIR) $(TEST_SPECS_DIR)
 
 build:

@@ -21,8 +21,11 @@ else
     selene generate-roblox-std >/dev/null
     selene src tests
     rojo sourcemap default.project.json -o sourcemap.json
+    # same pin as the Makefile, so the hook and CI cant typecheck against different defs
+    LUAU_LSP_REF=$(sed -n 's/^LUAU_LSP_REF ?= //p' Makefile)
     if [ ! -f globalTypes.d.luau ]; then
-        curl -fsSL -o globalTypes.d.luau "https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/main/scripts/globalTypes.d.luau"
+        curl -fsSL -o globalTypes.d.luau \
+            "https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/${LUAU_LSP_REF}/scripts/globalTypes.d.luau"
     fi
     luau-lsp analyze --sourcemap=sourcemap.json --defs=globalTypes.d.luau --no-strict-dm-types \
         src tests/components tests/integration tests/runner tests/utility

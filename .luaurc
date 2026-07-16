@@ -1,6 +1,6 @@
 {
     "languageMode": "nonstrict",
-    "lintErrors": false,
+    "lintErrors": true,
     "globals": [
         "writefile",
         "readfile",

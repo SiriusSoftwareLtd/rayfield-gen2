@@ -12,7 +12,31 @@ local constants = require(script.utility.constants)
 local types = require(script.types)
 
 -- re-export public types so consumers can annotate against Rayfield.Window etc
+export type Theme = types.Theme
+export type Translator = types.Translator
+export type Translations = types.Translations
+export type WindowConfiguration = types.WindowConfiguration
+
 export type WindowProps = types.WindowProps
+export type TabProps = types.TabProps
+export type TagProps = types.TagProps
+export type SectionProps = types.SectionProps
+export type GroupProps = types.GroupProps
+export type ButtonProps = types.ButtonProps
+export type ToggleProps = types.ToggleProps
+export type SliderProps = types.SliderProps
+export type DropdownProps = types.DropdownProps
+export type InputProps = types.InputProps
+export type KeybindProps = types.KeybindProps
+export type ColorPickerProps = types.ColorPickerProps
+export type StatProps = types.StatProps
+export type NotifyProps = types.NotifyProps
+export type ToastProps = types.ToastProps
+export type PopupBox = types.PopupBox
+export type PopupOption = types.PopupOption
+export type PopupProps = types.PopupProps
+
+export type Moveable = types.Moveable
 export type Window = types.Window
 export type Tab = types.Tab
 export type Group = types.Group
@@ -22,10 +46,15 @@ export type Slider = types.Slider
 export type Dropdown = types.Dropdown
 export type Input = types.Input
 export type Keybind = types.Keybind
+export type ColorPicker = types.ColorPicker
 export type Stat = types.Stat
 export type Section = types.Section
+export type Tag = types.Tag
 export type Popup = types.Popup
 export type Rayfield = types.Rayfield
+
+-- the components are untyped luau, so this is where the window module meets the public contract
+type WindowModule = { new: (types.WindowProps) -> types.Window }
 
 local rayfield = {} :: Rayfield
 
@@ -60,7 +89,7 @@ end
 function rayfield:CreateWindow(properties: types.WindowProps): types.Window
     local banner = createBanner()
 
-    local window -- forward declared so the settle callback below can reach it
+    local window: types.Window? -- forward declared so the settle callback below can reach it
     -- preload can settle before the window is built; hold the notify until it is
     local queuedNotify: (() -> ())?
 
@@ -73,7 +102,7 @@ function rayfield:CreateWindow(properties: types.WindowProps): types.Window
                 return
             end
             local function notify()
-                if window.unloaded then
+                if not window or window.unloaded then
                     return
                 end
                 window:Notify({
@@ -91,7 +120,18 @@ function rayfield:CreateWindow(properties: types.WindowProps): types.Window
         end)
     end
 
-    window = require(script.components.window).new(properties)
+    -- the banner is only torn down once the window is up, so a throw in here (bad props) would
+    -- otherwise strand it in the gui container for the rest of the session
+    local made, result = pcall(function()
+        return (require(script.components.window) :: WindowModule).new(properties)
+    end)
+    if not made then
+        banner:Destroy()
+        error(result, 0)
+    end
+
+    local built = result :: types.Window
+    window = built
 
     if queuedNotify then
         task.spawn(queuedNotify)
@@ -106,13 +146,13 @@ function rayfield:CreateWindow(properties: types.WindowProps): types.Window
             local title = variables.fontManager:loadFont(constants.fontAsset, Enum.FontWeight.SemiBold)
             -- the download can outlast the window; dont swap into one thats been unloaded
             if
-                not window.unloaded
+                not built.unloaded
                 and body
                 and title
                 and body ~= variables.fallbackFont
                 and title ~= variables.fallbackFont
             then
-                window:ChangeTheme({ Font = body, TitleFont = title })
+                built:ChangeTheme({ Font = body, TitleFont = title })
             end
         end)
     end
@@ -125,12 +165,12 @@ function rayfield:CreateWindow(properties: types.WindowProps): types.Window
         task.wait(0.5)
         -- the window can be unloaded inside this delay; showing it then would fire
         -- saved-config callbacks and build toasts on destroyed instances
-        if not window.unloaded then
-            window:Show()
+        if not built.unloaded then
+            built:Show()
         end
     end)
 
-    return window :: any
+    return built
 end
 
 return rayfield
