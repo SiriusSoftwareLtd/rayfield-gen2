@@ -39,6 +39,7 @@ return function()
                 writefile = filesystem.writefile,
                 isfile = filesystem.isfile,
                 readfile = filesystem.readfile,
+                delfile = filesystem.delfile,
             }
 
             variables.fileSystemManager = {
@@ -68,6 +69,9 @@ return function()
             filesystem.readfile = function(path)
                 return files[path]
             end
+            filesystem.delfile = function(path)
+                files[path] = nil
+            end
         end)
 
         afterEach(function()
@@ -77,6 +81,7 @@ return function()
             filesystem.writefile = originalFilesystem.writefile
             filesystem.isfile = originalFilesystem.isfile
             filesystem.readfile = originalFilesystem.readfile
+            filesystem.delfile = originalFilesystem.delfile
         end)
 
         it("returns the shared settings path", function()
@@ -94,6 +99,38 @@ return function()
             expect(encodedData.toggleKeybind[2]).to.equal(Enum.KeyCode.RightShift.Value)
             expect(encodedData.keepOnScreen).to.equal(true)
             expect(encodedData.haptics).to.equal(true)
+        end)
+
+        it("parks a whole copy before it overwrites the real file", function()
+            local written = {}
+            filesystem.writefile = function(path, content)
+                table.insert(written, path)
+                files[path] = content
+            end
+
+            expect(persistenceSettings.saveSettings(makeWindow())).to.equal(true)
+            expect(written[1]).to.equal("Root/Settings/rayfield.rfld.saving")
+            expect(written[2]).to.equal("Root/Settings/rayfield.rfld")
+            -- the parked copy goes once the real file is whole again
+            expect(files["Root/Settings/rayfield.rfld.saving"]).never.to.be.ok()
+        end)
+
+        it("recovers settings from the parked copy when the real file is torn", function()
+            local window = makeWindow()
+            files["Root/Settings/rayfield.rfld"] = "torn"
+            files["Root/Settings/rayfield.rfld.saving"] = "settings-json"
+            variables.httpService.JSONDecode = function(_, text)
+                if text == "torn" then
+                    error("decode failed")
+                end
+                return { haptics = false }
+            end
+
+            expect(persistenceSettings.loadSettings(window)).to.equal(true)
+            expect(window.settings.haptics).to.equal(false)
+            -- and the wreck gets put right, so the next load reads it straight
+            expect(files["Root/Settings/rayfield.rfld"]).to.equal("settings-json")
+            expect(files["Root/Settings/rayfield.rfld.saving"]).never.to.be.ok()
         end)
 
         it("returns false when settings encoding or writing fails", function()

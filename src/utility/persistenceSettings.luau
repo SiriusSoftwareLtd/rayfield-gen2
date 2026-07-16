@@ -8,6 +8,7 @@
 local variables = require(script.Parent.variables)
 local filesystem = require(script.Parent.filesystem)
 local paths = require(script.Parent.persistencePaths)
+local atomic = require(script.Parent.persistenceWrite)
 local enums = require(script.Parent.enums)
 
 local persistenceSettings = {}
@@ -53,10 +54,7 @@ function persistenceSettings.saveSettings(window: SettingsWindow): boolean
         return false
     end
 
-    local writeOk, _err = pcall(function()
-        filesystem.ensureDir(dir)
-        filesystem.writefile(fullPath, encoded)
-    end)
+    local writeOk = pcall(atomic.write, dir, fullPath, encoded)
 
     if not writeOk then
         return false
@@ -65,29 +63,48 @@ function persistenceSettings.saveSettings(window: SettingsWindow): boolean
     return true
 end
 
-function persistenceSettings.loadSettings(window: SettingsWindow): boolean
-    local _, fullPath = persistenceSettings.getSettingsPath()
-
+-- Decode the settings file. Also hands back the raw text, so a parked copy can be put back.
+local function decodeFile(fullPath: string): (DecodedSettings?, string?)
     local fileExists = false
     pcall(function()
         fileExists = filesystem.isfile(fullPath)
     end)
     if not fileExists then
-        return false
+        return nil, nil
     end
 
-    local readOk, config = pcall(filesystem.readfile, fullPath)
-    if not readOk or not config then
-        return false
+    local readOk, contents = pcall(filesystem.readfile, fullPath)
+    if not readOk or type(contents) ~= "string" then
+        return nil, nil
     end
 
-    local decodeOk, parsed = pcall(variables.httpService.JSONDecode, variables.httpService, config)
+    local decodeOk, parsed = pcall(variables.httpService.JSONDecode, variables.httpService, contents)
     -- JSONDecode happily returns scalars; a corrupt file must not brick CreateWindow
     if not decodeOk or type(parsed) ~= "table" then
-        return false
+        return nil, contents
     end
 
-    local settings = parsed :: DecodedSettings
+    return parsed :: DecodedSettings, contents
+end
+
+function persistenceSettings.loadSettings(window: SettingsWindow): boolean
+    local dir, fullPath = persistenceSettings.getSettingsPath()
+
+    local settings = decodeFile(fullPath)
+
+    -- a save that died mid-overwrite leaves its whole copy parked beside the wreck, so take that
+    if not settings then
+        local parked, parkedRaw = decodeFile(atomic.tempPathFor(fullPath))
+        if parked and parkedRaw then
+            settings = parked
+            -- put it back where it belongs so the next load reads it straight
+            pcall(atomic.write, dir, fullPath, parkedRaw)
+        end
+    end
+
+    if not settings then
+        return false
+    end
 
     if settings.toggleKeybind then
         pcall(function()

@@ -22,6 +22,7 @@ return function()
                     fileName = "Main",
                 },
                 controls = {},
+                _loading = false,
             }
         end
 
@@ -137,6 +138,67 @@ return function()
             end
 
             expect(persistenceConfig.save(makeWindow())).to.equal(false)
+        end)
+
+        it("parks a whole copy before it overwrites the real file", function()
+            local written = {}
+            filesystem.writefile = function(path, content)
+                table.insert(written, path)
+                files[path] = content
+            end
+
+            expect(persistenceConfig.save(makeWindow())).to.equal(true)
+            expect(written[1]).to.equal("Root/Configurations/Main.rfld.saving")
+            expect(written[2]).to.equal("Root/Configurations/Main.rfld")
+            -- the parked copy goes once the real file is whole again
+            expect(files["Root/Configurations/Main.rfld.saving"]).never.to.be.ok()
+        end)
+
+        it("leaves the real file alone when the parked copy reads back short", function()
+            filesystem.readfile = function()
+                return "truncated"
+            end
+            files["Root/Configurations/Main.rfld"] = "previous"
+
+            expect(persistenceConfig.save(makeWindow())).to.equal(false)
+            expect(files["Root/Configurations/Main.rfld"]).to.equal("previous")
+        end)
+
+        it("recovers from the parked copy when the real file is torn", function()
+            local window = makeWindow()
+            local setValue
+            files["Root/Configurations/Main.rfld"] = "torn"
+            files["Root/Configurations/Main.rfld.saving"] = "stored-json"
+            variables.httpService.JSONDecode = function(_, text)
+                if text == "torn" then
+                    error("decode failed")
+                end
+                return { Alpha = 7 }
+            end
+            window.controls = {
+                Alpha = {
+                    Set = function(_, value)
+                        setValue = value
+                    end,
+                },
+            }
+
+            expect(persistenceConfig.load(window)).to.equal(true)
+            expect(setValue).to.equal(7)
+            -- the wreck is replaced rather than backed up, nothing was lost
+            expect(files["Root/Configurations/Main.rfld"]).to.equal("stored-json")
+            expect(files["Root/Configurations/Main (Incorrect Format).rfld"]).never.to.be.ok()
+            expect(files["Root/Configurations/Main.rfld.saving"]).never.to.be.ok()
+        end)
+
+        it("never resurrects a deleted config from a parked copy", function()
+            local window = makeWindow()
+            files["Root/Configurations/Main.rfld"] = "stored-json"
+            files["Root/Configurations/Main.rfld.saving"] = "stored-json"
+
+            expect(persistenceConfig.delete(window, "Main")).to.equal(true)
+            expect(files["Root/Configurations/Main.rfld.saving"]).never.to.be.ok()
+            expect(persistenceConfig.load(window)).to.equal(false)
         end)
 
         it("loads values through control deserializers and setters", function()
@@ -267,6 +329,48 @@ return function()
             expect(files["Root/Configurations/My Hub (Incorrect Format).rfld"]).to.equal("not-json")
         end)
 
+        it("numbers each corrupt backup instead of overwriting the last", function()
+            local window = makeWindow()
+            variables.httpService.JSONDecode = function()
+                error("decode failed")
+            end
+
+            files["Root/Configurations/Main.rfld"] = "first-wreck"
+            expect(persistenceConfig.load(window)).to.equal(false)
+            files["Root/Configurations/Main.rfld"] = "second-wreck"
+            expect(persistenceConfig.load(window)).to.equal(false)
+
+            -- the first backup is the salvageable one, it must survive the second corruption
+            expect(files["Root/Configurations/Main (Incorrect Format).rfld"]).to.equal("first-wreck")
+            expect(files["Root/Configurations/Main (Incorrect Format 2).rfld"]).to.equal("second-wreck")
+        end)
+
+        it("keeps an outer load's guard up when a control callback loads again", function()
+            local window = makeWindow()
+            local guardDuringNested
+            local nested = false
+            files["Root/Configurations/Main.rfld"] = "stored-json"
+            files["Root/Configurations/Other.rfld"] = "stored-json"
+            decodedData = { Alpha = 1 }
+            window.controls = {
+                Alpha = {
+                    Set = function()
+                        if nested then
+                            return
+                        end
+                        nested = true
+                        persistenceConfig.load(window, "Other")
+                        guardDuringNested = window._loading
+                    end,
+                },
+            }
+
+            expect(persistenceConfig.load(window)).to.equal(true)
+            -- the nested load used to drop the guard here, so the rest of the outer restore autosaved
+            expect(guardDuringNested).to.equal(true)
+            expect(window._loading).to.equal(false)
+        end)
+
         it("resets the loading flag even when applying the config throws", function()
             local window = makeWindow()
             files["Root/Configurations/Main.rfld"] = "stored-json"
@@ -296,10 +400,26 @@ return function()
             }
             -- Late's element isn't built yet; Alpha's control must still win over its old value
             window._loadedConfig = { Late = "saved", Alpha = "stale" }
+            window._loadedConfigPath = "Root/Configurations/Main.rfld"
 
             expect(persistenceConfig.save(window)).to.equal(true)
             expect(encodedData.Late).to.equal("saved")
             expect(encodedData.Alpha).to.equal(1)
+        end)
+
+        it("only carries loaded flags into the config they came from", function()
+            local window = makeWindow()
+            files["Root/Configurations/A.rfld"] = "stored-json"
+            decodedData = { Late = "saved" }
+
+            expect(persistenceConfig.load(window, "A")).to.equal(true)
+
+            -- saving somewhere else must not smuggle A's unbuilt flags into B
+            expect(persistenceConfig.save(window, "B")).to.equal(true)
+            expect(encodedData.Late).never.to.be.ok()
+
+            expect(persistenceConfig.save(window, "A")).to.equal(true)
+            expect(encodedData.Late).to.equal("saved")
         end)
 
         it("returns false when the configuration file is missing or unreadable", function()
@@ -317,6 +437,8 @@ return function()
             listedFiles = {
                 "Root/Configurations/zeta.rfld",
                 "Root/Configurations/Beta (Incorrect Format).rfld",
+                "Root/Configurations/Beta (Incorrect Format 2).rfld",
+                "Root/Configurations/alpha.rfld.saving",
                 "Root/Configurations/alpha.rfld",
             }
 
