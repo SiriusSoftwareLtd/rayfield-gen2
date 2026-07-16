@@ -107,6 +107,7 @@ function Group:_add(componentName, properties)
     if self.compact then
         self:_wrapChild(element)
     end
+    self:_reflowRow() -- a leaf landing in a row of columns has to widen the gap back out
 
     -- same as Tab:_register: elements added after Window:Show must be revealed here
     -- or they stay fully transparent
@@ -115,6 +116,27 @@ function Group:_add(componentName, properties)
     end
 
     return element
+end
+
+-- Padding is one property for the whole row, so it has to suit whatever the row ends up
+-- holding. Columns carry their own 10px side margin (the 1,-20), so where two meet the gutter
+-- is 10+10=20, twice the 10px outer margin - pull them together by one margin's worth to match.
+-- Leaves carry no margin, so the same pull would just overlap them: a row holding any leaf
+-- keeps the leaf gap and lets the columns sit a touch wider apart.
+function Group:_reflowRow()
+    if self.direction ~= Enum.FillDirection.Horizontal then
+        return
+    end
+
+    local onlyGroups = #self.elements > 0
+    for _, element in self.elements do
+        if element.__type ~= "Group" then
+            onlyGroups = false
+            break
+        end
+    end
+
+    self.layout.Padding = if onlyGroups then UDim.new(0, -10) else UDim.new(0, elementPadding)
 end
 
 -- A row wraps instead of shrinking forever. Each child is frozen to the width it actually
@@ -163,10 +185,6 @@ function Group:_addGroup(properties)
 
     -- adapt a row that's about to hold columns instead of compact leaves:
     if self.direction == Enum.FillDirection.Horizontal then
-        -- columns carry their own 10px side margin (the 1,-20), so where two meet the gutter
-        -- is 10+10=20, twice the 10px outer margin. pull them together by one margin's worth
-        -- so the gutter matches the outer margins. leaf compact elements keep the 8px gap.
-        self.layout.Padding = UDim.new(0, -10)
         -- top-align, not centre: a column growing (e.g. a dropdown opening) must push down,
         -- not re-centre and shove the other column around.
         self.layout.VerticalAlignment = Enum.VerticalAlignment.Top
@@ -180,6 +198,7 @@ function Group:_addGroup(properties)
     local group = Group.new(self, properties)
     table.insert(self.elements, group)
     group.main.LayoutOrder = #self.elements * 10
+    self:_reflowRow()
     return group
 end
 

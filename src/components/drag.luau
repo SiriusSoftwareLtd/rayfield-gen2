@@ -137,6 +137,34 @@ function Drag.new(window, properties)
         end
     end)
 
+    -- Letting go, however it happens: the button coming up, the client losing focus, or the
+    -- window going away out from under the grab. Only settle the bar back into line when
+    -- theres something to look at, otherwise theres a tween to fight.
+    local function releaseDrag()
+        if not dragging then
+            return
+        end
+        dragging = false
+
+        if not self.window:_interactive() then
+            return
+        end
+
+        variables.tweenService
+            :Create(
+                self.dragCosmetic,
+                TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+                { Size = UDim2.new(0, 100, 0, 4), BackgroundTransparency = 0.7 }
+            )
+            :Play()
+
+        -- main lags while dragging, so settle both into line on release
+        local settle = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+        local mainTarget, dragTarget = getTargets()
+        variables.tweenService:Create(self.window.main, settle, { Position = mainTarget }):Play()
+        variables.tweenService:Create(self.drag, settle, { Position = dragTarget }):Play()
+    end
+
     self.window:Connect(self.dragInteract.InputBegan, function(input, processed)
         if processed then
             return
@@ -144,6 +172,11 @@ function Drag.new(window, properties)
 
         local inputType = input.UserInputType.Name
         if inputType == "MouseButton1" or inputType == "Touch" then
+            -- a grab started mid-reveal would fight the tween thats still moving the window
+            if not self.window:_interactive() then
+                return
+            end
+
             dragging = true
 
             -- refetch in case the inset changed (e.g. topbar toggled) since construction
@@ -167,31 +200,15 @@ function Drag.new(window, properties)
     end)
 
     self.window:Connect(variables.userInputService.InputEnded, function(input)
-        if not dragging then
-            return
-        end
-
         local inputType = input.UserInputType.Name
         if inputType == "MouseButton1" or inputType == "Touch" then
-            dragging = false
-
-            if not self.window.hidden then
-                variables.tweenService
-                    :Create(
-                        self.dragCosmetic,
-                        TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-                        { Size = UDim2.new(0, 100, 0, 4), BackgroundTransparency = 0.7 }
-                    )
-                    :Play()
-
-                -- main lags while dragging, so settle both into line on release
-                local settle = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-                local mainTarget, dragTarget = getTargets()
-                variables.tweenService:Create(self.window.main, settle, { Position = mainTarget }):Play()
-                variables.tweenService:Create(self.drag, settle, { Position = dragTarget }):Play()
-            end
+            releaseDrag()
         end
     end)
+
+    -- alt-tabbing with the button still down never delivers InputEnded, so without this the
+    -- grab stays armed and the window snaps to the cursor the moment youre back
+    self.window:Connect(variables.userInputService.WindowFocusReleased, releaseDrag)
 
     -- exponential smoothing per frame instead of a new tween each frame. constant is the
     -- fraction of the gap left after 1s, so smaller = snappier. main lags, the bar tracks tight
@@ -199,12 +216,21 @@ function Drag.new(window, properties)
     local barRemaining = 1e-60
 
     self.window:Connect(variables.runService.RenderStepped, function(dt)
-        if dragging and not self.window.hidden then
-            local mainTarget, dragTarget = getTargets()
-
-            self.window.main.Position = self.window.main.Position:Lerp(mainTarget, 1 - mainRemaining ^ dt)
-            self.drag.Position = self.drag.Position:Lerp(dragTarget, 1 - barRemaining ^ dt)
+        if not dragging then
+            return
         end
+
+        -- hidden or mid-animation means the grab went stale under us, so drop it here rather
+        -- than let it wake up later and yank the window to wherever the cursor drifted
+        if not self.window:_interactive() then
+            releaseDrag()
+            return
+        end
+
+        local mainTarget, dragTarget = getTargets()
+
+        self.window.main.Position = self.window.main.Position:Lerp(mainTarget, 1 - mainRemaining ^ dt)
+        self.drag.Position = self.drag.Position:Lerp(dragTarget, 1 - barRemaining ^ dt)
     end)
 
     return self

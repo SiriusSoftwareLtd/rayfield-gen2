@@ -37,7 +37,7 @@ runtime.secureMode = (function()
 end)()
 
 runtime.coreGui = services.getService("CoreGui") :: CoreGui
-runtime.workspace = services.getService("Workspace") :: Workspace -- where HapticEngine parents its effects
+runtime.workspace = services.getService("Workspace") :: Workspace -- read for CurrentCamera
 runtime.runService = services.getService("RunService") :: RunService
 runtime.userInputService = services.getService("UserInputService") :: UserInputService
 runtime.guiService = services.getService("GuiService") :: GuiService

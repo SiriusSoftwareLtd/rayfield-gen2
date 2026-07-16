@@ -595,6 +595,7 @@ function Window.new(properties)
     self.minimised = false
     self.hidden = true
     self.animating = false
+    self._revealing = false
     self.hasShownOnce = false
 
     self.settings = {
@@ -606,6 +607,7 @@ function Window.new(properties)
     }
 
     self:LoadSettings()
+    hapticEngine.setContainer(self.screenGui) -- effects live with the interface, not the workspace
     hapticEngine.setEnabled(self.settings.haptics) -- honour a saved off before any interaction
     chrome.buildCollapsedFace(self)
     self:_bindKeybind()
@@ -917,6 +919,7 @@ function Window:Hide()
     end
 
     self.animating = true
+    self._revealing = true
     self.hidden = true
     self.collapsedInteract.Visible = false -- re-shown once the collapse settles, below
 
@@ -1010,6 +1013,7 @@ function Window:Hide()
         end
         self.collapsedInteract.Visible = true
         self.animating = false
+        self._revealing = false
     end)
 end
 
@@ -1237,6 +1241,11 @@ function Window:_bindTopbarDrag()
             return
         end
 
+        -- a grab started mid-reveal would fight the tween thats still moving the window
+        if not self:_interactive() then
+            return
+        end
+
         dragging = true
 
         if self.screenGui and self.screenGui.IgnoreGuiInset then
@@ -1247,18 +1256,27 @@ function Window:_bindTopbarDrag()
     end)
 
     self:Connect(uis.InputEnded, function(input)
-        if not dragging then
-            return
-        end
-
         local inputType = input.UserInputType.Name
         if inputType == "MouseButton1" or inputType == "Touch" then
             dragging = false
         end
     end)
 
+    -- alt-tabbing with the button still down never delivers InputEnded, so without this the
+    -- grab stays armed and the window snaps to the cursor the moment youre back
+    self:Connect(uis.WindowFocusReleased, function()
+        dragging = false
+    end)
+
     self:Connect(variables.runService.RenderStepped, function()
-        if not dragging or self.hidden then
+        if not dragging then
+            return
+        end
+
+        -- hidden or mid-animation means the grab went stale under us, so drop it here rather
+        -- than let it wake up later and yank the window to wherever the cursor drifted
+        if not self:_interactive() then
+            dragging = false
             return
         end
 
@@ -1515,6 +1533,7 @@ function Window:Show()
         return
     end
     self.animating = true
+    self._revealing = true
 
     -- autoLoad reflects the saved config once, on first open. Re-loading on every show would
     -- wipe any changes the user made and closed without saving. a load that throws must not
@@ -1626,6 +1645,7 @@ function Window:_quickRestore()
 
     task.delay(0.6, function()
         self.animating = false
+        self._revealing = false
     end)
 end
 
@@ -1744,6 +1764,7 @@ function Window:_firstShow()
         :Play()
 
     self.animating = false
+    self._revealing = false
 
     -- Welcome the user once if this is a new/changed account on this device (unless they've
     -- turned it off in settings). Just a toast now - the profile chip is a toast like any other.
@@ -2251,6 +2272,13 @@ function Window:_interactive()
     return not self.animating and not self.hidden
 end
 
+-- true when the window is up and not mid reveal or hide. action icons settle on this rather
+-- than _interactive: minimise animates too, but it never repaints the icons the way show and
+-- hide do, so an icon settling during it has nothing to fight and would otherwise stay lit.
+function Window:_settled()
+    return not self.hidden and not self._revealing
+end
+
 function Window:Connect(signal, callback)
     local connection = signal:Connect(callback)
     table.insert(self.connections, connection)
@@ -2307,7 +2335,10 @@ end
 
 function Window:Unload()
     self.unloaded = true
-    hapticEngine.setEnabled(false) -- tears the pooled effects out of the workspace
+    -- drop our effects and release the gui they hung on, but leave the enabled flag alone -
+    -- another window may still be open and haptics arent ours to switch off for it
+    hapticEngine.teardown()
+    hapticEngine.releaseContainer(self.screenGui)
     if self._liveTween then
         self._liveTween:Cancel() -- unparks the LiveAnimation loop before we destroy the gradient
         self._liveTween = nil
@@ -2318,6 +2349,16 @@ function Window:Unload()
     for i = #self.instances, 1, -1 do
         self.instances[i]:Destroy()
     end
+
+    -- destroying isnt forgetting: a hub that loads and unloads repeatedly would keep the whole
+    -- dead instance graph reachable through the handle it still holds. DestroySubtree already
+    -- clears as it goes, so match it here.
+    table.clear(self.connections)
+    table.clear(self.instances)
+    table.clear(self.themeProperties)
+    table.clear(self.localeProperties)
+    table.clear(self.controls)
+    table.clear(self.tabs)
 end
 
 return Window

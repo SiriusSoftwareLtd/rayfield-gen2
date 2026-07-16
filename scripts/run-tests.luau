@@ -960,6 +960,7 @@ local services = {
         InputBegan = makeSignal(),
         InputEnded = makeSignal(),
         InputChanged = makeSignal(),
+        WindowFocusReleased = makeSignal(),
         MouseBehavior = Enum.MouseBehavior.Default,
         MouseIconEnabled = true,
         GetMouseLocation = function()

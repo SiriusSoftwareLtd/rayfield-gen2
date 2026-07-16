@@ -30,6 +30,10 @@ local shrinkInfo = TweenInfo.new(0.9, Enum.EasingStyle.Exponential, Enum.EasingD
 local offscreenRight = UDim2.new(0.5, 360, 0.5, 0)
 local centred = UDim2.new(0.5, 0, 0.5, 0)
 
+-- Roughly what fits in the 800px stack. Past this the oldest is retired early rather than
+-- left to march off the top of the screen still running its own dwell loop.
+local maxLive = 6
+
 -- Gap between stacked notifications. Applied INSIDE each notification (as top
 -- padding on the outer frame) rather than on the container's UIListLayout, so
 -- removing one collapses its gap with it instead of dropping an external gap
@@ -208,6 +212,21 @@ function Notification.new(window, properties)
     self.window._notificationCount = (self.window._notificationCount or 0) + 1
     self.main.LayoutOrder = self.window._notificationCount
 
+    -- a callback that notifies in a loop would stack cards forever, so retire the oldest once
+    -- theres more than the stack can show
+    local live = self.window._liveNotifications
+    if not live then
+        live = {}
+        self.window._liveNotifications = live
+    end
+    table.insert(live, self)
+    while #live > maxLive do
+        local oldest = table.remove(live, 1)
+        if oldest and oldest ~= self then
+            task.spawn(oldest._dismiss, oldest)
+        end
+    end
+
     -- tracked so _dismiss can drop them; notifications come and go so we cant let their
     -- connections/instances sit in the window lists until Unload
     self._connections = {
@@ -301,6 +320,12 @@ function Notification:_dismiss()
         return
     end
     self._dismissed = true
+
+    local live = self.window._liveNotifications
+    local index = live and table.find(live, self)
+    if live and index then
+        table.remove(live, index)
+    end
 
     if not self.main.Parent then
         return

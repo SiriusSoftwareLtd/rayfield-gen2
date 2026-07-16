@@ -36,10 +36,35 @@ if supported then
     types = resolvedTypes
 end
 
--- One reusable effect per preset, made on first use and kept parented for the session. A
--- HapticEffect only plays as a descendant of the world, so it lives in the (cloneref'd)
--- Workspace like Roblox's own examples.
+-- One reusable effect per preset, made on first use and kept parented for the session.
+--
+-- These live with the interface, not in the Workspace the docs examples use. Workspace is
+-- readable by the game's own scripts, so a pooled effect sitting there is the one piece of
+-- Rayfield a game could find by walking the tree - everything else hides behind gethui with
+-- a random name. An effect only needs *a* parent to play, not a world one.
 local effects: { [Enum.HapticEffectType]: Instance } = {}
+local container: Instance? = nil
+
+-- Where new effects get parented. The window hands us its ScreenGui; until then (or after it
+-- goes away) fall back to the container every Rayfield gui lives in.
+function hapticEngine.setContainer(target: Instance?)
+    container = target
+end
+
+-- Let go of a gui thats being torn down, without stamping on a container another window may
+-- have set since. Passing nil clears whatever is held.
+function hapticEngine.releaseContainer(target: Instance?)
+    if target == nil or container == target then
+        container = nil
+    end
+end
+
+local function containerFor(): Instance
+    if container and container.Parent then
+        return container
+    end
+    return variables.guiContainer
+end
 
 local function effectFor(hapticType: Enum.HapticEffectType): Instance?
     local effect = effects[hapticType]
@@ -53,7 +78,13 @@ local function effectFor(hapticType: Enum.HapticEffectType): Instance?
     end
     local hapticEffect = made :: any
     hapticEffect.Type = hapticType
-    made.Parent = variables.workspace
+    local parented = pcall(function()
+        made.Parent = containerFor()
+    end)
+    if not parented then
+        made:Destroy()
+        return nil
+    end
     effects[hapticType] = made
     return made
 end
@@ -80,14 +111,20 @@ function hapticEngine.notify()
 end
 
 -- Global on/off for the settings toggle. Turning it off tears the pooled effects down so
--- nothing lingers in the world; they're remade lazily if it's turned back on.
+-- nothing lingers behind; they're remade lazily if it's turned back on.
 function hapticEngine.setEnabled(state: boolean?)
     hapticEngine.enabled = state and true or false
     if not hapticEngine.enabled then
-        for hapticType, effect in effects do
-            pcall(effect.Destroy, effect)
-            effects[hapticType] = nil
-        end
+        hapticEngine.teardown()
+    end
+end
+
+-- Drop the pool without touching the enabled flag, so a window can clean up after itself
+-- without deciding haptics for anyone else.
+function hapticEngine.teardown()
+    for hapticType, effect in effects do
+        pcall(effect.Destroy, effect)
+        effects[hapticType] = nil
     end
 end
 
