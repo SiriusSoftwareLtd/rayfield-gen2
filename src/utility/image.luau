@@ -17,13 +17,14 @@ image.rewrites = imageCache.rewrites
 image.onBlock = nil :: ((unknown) -> ())?
 
 -- images that resolve blank in secure mode (their icon isnt cached yet) register here, so the real
--- texture can be dropped in once the background download lands instead of leaving a blank
-type PendingImage = {
-    instance: Instance,
-    property: string,
-}
+-- texture can be dropped in once the background download lands instead of leaving a blank. keyed by
+-- instance so re-assigning the same icon cant stack up, and weakly so a destroyed one isnt pinned
+type PendingProperties = { [string]: boolean }
 
-image.pending = {} :: { [number]: { PendingImage } }
+image.pending = {} :: { [number]: { [Instance]: PendingProperties } }
+
+-- once preload settles nothing else will ever land, so theres nothing left worth tracking
+local settled = false
 
 local imageProperties: { [string]: boolean } = {
     Image = true,
@@ -48,14 +49,12 @@ local function blocked(value: unknown): string
 end
 
 function image.preload(onSettled: PreloadCallback?): (boolean, number)
+    settled = false
     return imageCache.preload(function(failed)
-        -- ids that never cached will never fire onCached; drop their pending lists so they
-        -- dont grow all session and pin destroyed instances
-        for id in image.pending do
-            if not image.rewrites[id] then
-                image.pending[id] = nil
-            end
-        end
+        -- everything that cached has already rebound through onCached, and everything else never
+        -- will, so drop whats left and stop tracking rather than growing all session
+        settled = true
+        table.clear(image.pending)
         if onSettled then
             onSettled(failed)
         end
@@ -78,15 +77,20 @@ function image.assign(instance: Instance, property: string, value: unknown)
     end
     target[property] = image.resolve(value)
     -- in secure mode an un-cached icon resolves blank; remember it so it appears once cached
-    if variables.secureMode then
+    if variables.secureMode and not settled then
         local id = idOf(value)
         if id and not image.rewrites[id] then
-            local list = image.pending[id]
-            if not list then
-                list = {}
-                image.pending[id] = list
+            local waiting = image.pending[id]
+            if not waiting then
+                waiting = setmetatable({}, { __mode = "k" }) :: any
+                image.pending[id] = waiting
             end
-            table.insert(list, { instance = instance, property = property })
+            local properties = waiting[instance]
+            if not properties then
+                properties = {}
+                waiting[instance] = properties
+            end
+            properties[property] = true
         end
     end
 end
@@ -94,15 +98,19 @@ end
 -- imageCache calls this when a background icon download lands: drop the real texture into every
 -- instance that resolved blank waiting for it
 imageCache.onCached = function(id: number)
-    local list = image.pending[id]
-    if not list then
+    local waiting = image.pending[id]
+    if not waiting then
         return
     end
     local uri = image.rewrites[id]
-    for _, entry in list do
-        if uri and entry.instance and entry.instance.Parent then
-            local target = entry.instance :: any
-            target[entry.property] = uri
+    if uri then
+        for instance, properties in waiting do
+            if instance.Parent then
+                local target = instance :: any
+                for property in properties do
+                    target[property] = uri
+                end
+            end
         end
     end
     image.pending[id] = nil

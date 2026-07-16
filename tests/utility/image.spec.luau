@@ -8,12 +8,24 @@ return function()
     describe("utility.image", function()
         local originalAvatar
 
+        -- image.preload clears its settled flag on entry, so drive it through a stub that never
+        -- settles. otherwise a test that settles would stop every later one from tracking
+        local function resetSettled()
+            local originalPreload = imageCache.preload
+            imageCache.preload = function()
+                return true, 0
+            end
+            image.preload()
+            imageCache.preload = originalPreload
+        end
+
         beforeEach(function()
             variables.secureMode = false
             image.onBlock = nil
             originalAvatar = imageCache.avatar
             table.clear(image.rewrites)
             table.clear(image.pending)
+            resetSettled()
         end)
 
         afterEach(function()
@@ -22,6 +34,7 @@ return function()
             imageCache.avatar = originalAvatar
             table.clear(image.rewrites)
             table.clear(image.pending)
+            resetSettled()
         end)
 
         it("normalizes empty image values", function()
@@ -87,8 +100,7 @@ return function()
             image.assign(instance, "Image", 321)
 
             expect(instance.Image).to.equal("")
-            expect(image.pending[321][1].instance).to.equal(instance)
-            expect(image.pending[321][1].property).to.equal("Image")
+            expect(image.pending[321][instance].Image).to.equal(true)
 
             image.rewrites[321] = "rbxasset://cached/icon.png"
             imageCache.onCached(321)
@@ -97,18 +109,50 @@ return function()
             expect(image.pending[321]).never.to.be.ok()
         end)
 
-        it("clears pending lists for ids that never cached once preload settles", function()
+        it("rebinds every waiting property of an instance", function()
+            variables.secureMode = true
+            local instance: any = {
+                Parent = {},
+            }
+
+            image.assign(instance, "Image", 321)
+            image.assign(instance, "HoverImage", 321)
+
+            image.rewrites[321] = "rbxasset://cached/icon.png"
+            imageCache.onCached(321)
+
+            expect(instance.Image).to.equal("rbxasset://cached/icon.png")
+            expect(instance.HoverImage).to.equal("rbxasset://cached/icon.png")
+        end)
+
+        it("keeps re-assigning the same icon from stacking up", function()
+            variables.secureMode = true
+            local instance: any = {
+                Parent = {},
+            }
+
+            -- hot paths like a minimise toggle re-assign the same icon all session
+            for _ = 1, 50 do
+                image.assign(instance, "Image", 321)
+            end
+
+            local waiting = 0
+            for _ in image.pending[321] do
+                waiting += 1
+            end
+            expect(waiting).to.equal(1)
+        end)
+
+        it("stops tracking pending images once preload settles", function()
             variables.secureMode = true
             local instance: any = {
                 Parent = {},
             }
             image.assign(instance, "Image", 654) -- never caches
-            image.assign(instance, "Image", 321) -- caches during preload below
             expect(image.pending[654]).to.be.ok()
 
             local originalPreload = imageCache.preload
             imageCache.preload = function(onSettled)
-                image.rewrites[321] = "rbxasset://cached/icon.png"
                 onSettled(1)
                 return false, 1
             end
@@ -120,9 +164,11 @@ return function()
             imageCache.preload = originalPreload
 
             expect(settledFailed).to.equal(1)
-            -- the failed id's list is gone; the cached id still waits for onCached
             expect(image.pending[654]).never.to.be.ok()
-            expect(image.pending[321]).to.be.ok()
+
+            -- nothing can land after settle, so tracking anything more would just leak
+            image.assign(instance, "Image", 654)
+            expect(image.pending[654]).never.to.be.ok()
         end)
 
         it("blocks secure-mode thumbnails and reports the blocked value", function()

@@ -12,6 +12,8 @@ return function()
         local files
         local folders
         local fallback
+        -- a real face body starts with a font signature; anything else never reaches disk
+        local fontBinary = "\0\1\0\0font-binary"
 
         beforeEach(function()
             files = {}
@@ -165,13 +167,13 @@ return function()
             end
             manager.assetResolver.getAssetContentFromId = function(_, id)
                 expect(id).to.equal(456)
-                return "font-binary"
+                return fontBinary
             end
 
             local loaded = manager:loadFont("123")
 
             expect(loaded.Family).to.equal("asset://Fonts/SpecFont/manifest.json")
-            expect(files["Fonts/SpecFont/Regular.ttf"]).to.equal("font-binary")
+            expect(files["Fonts/SpecFont/Regular.ttf"]).to.equal(fontBinary)
             expect(files["Fonts/SpecFont/manifest.json"]).to.equal("encoded-manifest")
             expect(
                 manager.fontCache[123].variants[tostring(Enum.FontWeight.Regular) .. "|" .. tostring(
@@ -200,7 +202,7 @@ return function()
                 return tonumber(id) or 456
             end
             manager.assetResolver.getAssetContentFromId = function(_, id)
-                return if id == 123 then "downloaded-manifest" else "font-binary"
+                return if id == 123 then "downloaded-manifest" else fontBinary
             end
 
             -- invalid body: nothing may land on disk
@@ -253,14 +255,50 @@ return function()
                 return tonumber(id) or 456
             end
             manager.assetResolver.getAssetContentFromId = function()
-                return "font-binary"
+                return fontBinary
             end
 
             manager:loadFont(123)
 
-            expect(files["Fonts/escape/Regular.ttf"]).to.equal("font-binary")
+            expect(files["Fonts/escape/Regular.ttf"]).to.equal(fontBinary)
             for storedPath in files do
                 expect(storedPath:find("%.%.")).never.to.be.ok()
+            end
+        end)
+
+        it("rejects face bodies that arent fonts instead of writing them to disk", function()
+            local manager = makeManager(true)
+            manager._debug = false
+            files["Fonts/123.json"] = "stored-manifest"
+            manager.assetResolver.resolve = function(_, id)
+                return tonumber(id) or 456
+            end
+            manager.assetResolver.getAssetContentFromId = function()
+                return "<html>error page</html>"
+            end
+
+            -- a poisoned .ttf is never re-downloaded (we only fetch when the file is missing),
+            -- so writing one would break the font for every session after
+            expect(manager:loadFont(123)).to.equal(fallback)
+            expect(files["Fonts/SpecFont/Regular.ttf"]).never.to.be.ok()
+            expect(files["Fonts/SpecFont/manifest.json"]).never.to.be.ok()
+        end)
+
+        it("accepts every font signature we know", function()
+            for _, signature in { "\0\1\0\0", "OTTO", "true", "ttcf", "wOFF", "wOF2" } do
+                local manager = makeManager(true)
+                manager._debug = false
+                files = {}
+                files["Fonts/123.json"] = "stored-manifest"
+                manager.assetResolver.resolve = function(_, id)
+                    return tonumber(id) or 456
+                end
+                manager.assetResolver.getAssetContentFromId = function()
+                    return signature .. "rest-of-the-face"
+                end
+
+                expect(manager:loadFont(123)).never.to.equal(fallback)
+                expect(files["Fonts/SpecFont/Regular.ttf"]).to.equal(signature .. "rest-of-the-face")
             end
         end)
 
@@ -272,7 +310,7 @@ return function()
                 return tonumber(id) or 456
             end
             manager.assetResolver.getAssetContentFromId = function()
-                return "font-binary"
+                return fontBinary
             end
             getfenv().getcustomasset = function(assetPath)
                 if assetPath:find("%.ttf$") then

@@ -51,7 +51,8 @@ imageCache.onCached = nil :: OnCachedCallback? -- image sets this to rebind blan
 local pngMagic = "\137PNG\r\n\26\n"
 
 local function cacheFile(filePath: string, url: string): string?
-    if type(getfenv().getcustomasset) ~= "function" then
+    -- no custom assets or no file API means nothing can be cached at all
+    if type(getfenv().getcustomasset) ~= "function" or typeof(filesystem.isfile) ~= "function" then
         return nil
     end
     if not filesystem.isfile(filePath) then
@@ -130,7 +131,7 @@ end
 -- cached (a genuine failure), so callers can surface it without spamming per-icon.
 function imageCache.preload(onSettled: PreloadCallback?): (boolean, number)
     local env = getfenv()
-    if type(env.getcustomasset) ~= "function" then
+    if type(env.getcustomasset) ~= "function" or typeof(filesystem.isfile) ~= "function" then
         if onSettled then
             -- defer so a caller that assigns state right after calling preload still sees this
             task.defer(onSettled, manifestSize)
@@ -175,7 +176,8 @@ function imageCache.preload(onSettled: PreloadCallback?): (boolean, number)
                 if cached then
                     rewrites[id] = cached
                     if imageCache.onCached then
-                        imageCache.onCached(id)
+                        -- a throw in here would strand the counter and settle would never fire
+                        pcall(imageCache.onCached, id)
                     end
                 end
                 pending -= 1

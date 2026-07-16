@@ -114,6 +114,19 @@ local function validateManifest(manifest: unknown): FontManifest?
     return candidate :: FontManifest
 end
 
+-- a face only downloads when its file is missing, so an error page or a truncated body written to
+-- disk would shadow the real font every session after. check the signature like we do for pngs
+local fontSignatures = { "\0\1\0\0", "OTTO", "true", "ttcf", "wOFF", "wOF2" }
+
+local function isFontBody(body: string): boolean
+    for _, signature in fontSignatures do
+        if string.sub(body, 1, #signature) == signature then
+            return true
+        end
+    end
+    return false
+end
+
 local env = getfenv()
 
 local function variantKey(fontWeight: Enum.FontWeight, fontStyle: Enum.FontStyle): string
@@ -318,11 +331,19 @@ function fontManager.loadFont(
             local fontFaceContent = if fontFaceId ~= nil
                 then self.assetResolver:getAssetContentFromId(fontFaceId, false)
                 else nil
-            if fontFaceContent then
-                pcall(fileSystem.writefile, fontFacePath, fontFaceContent)
-            elseif self._debug then
-                log.warn("Font face content is nil for font id: " .. tostring(resolvedId) .. ", face: " .. face.name)
+            if not fontFaceContent or not isFontBody(fontFaceContent) then
+                madeAllFontsLocal = false
+                if self._debug then
+                    log.warn(
+                        "Font face content is missing or not a font for font id: "
+                            .. tostring(resolvedId)
+                            .. ", face: "
+                            .. face.name
+                    )
+                end
+                continue
             end
+            pcall(fileSystem.writefile, fontFacePath, fontFaceContent)
         end
         local ok, uri = pcall(env.getcustomasset, fontFacePath)
         if ok and type(uri) == "string" then

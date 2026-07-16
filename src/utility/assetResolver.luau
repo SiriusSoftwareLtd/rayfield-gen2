@@ -28,6 +28,7 @@ assetResolver.__index = assetResolver
 assetResolver.__type = "assetResolver"
 type AssetResolverState = {
     contentCache: { [CacheKey]: string }?,
+    contentCacheOrder: { CacheKey }?,
     contentDownloadUrl: AssetDownloadUrl,
 }
 export type AssetResolver = AssetResolverState & {
@@ -41,11 +42,17 @@ rbxassetid://12187277209,
 rbxassetid://12187293441
 ]]
 
+-- bodies are whole pngs and ttfs, and every caller gates on isfile, so a cached body is only ever
+-- re-read inside a retry loop. keep the last few for that and evict the oldest, rather than pinning
+-- a session's worth of assets in memory for readers that never come back
+local contentCacheLimit = 8
+
 function assetResolver.new(useCache: boolean?, assetContentDownloadUrl: AssetDownloadUrl?): AssetResolver
     local contentCache: { [CacheKey]: string }? = if useCache then {} else nil
     local self = setmetatable(
         {
             contentCache = contentCache,
+            contentCacheOrder = if useCache then {} :: { CacheKey } else nil,
             contentDownloadUrl = assetContentDownloadUrl or assetResolver.Enum.AssetDownloadUrl.RobloxDownloadUrl,
         } :: AssetResolverState,
         assetResolver
@@ -92,7 +99,8 @@ local function isGoodResponse(response: unknown): boolean
     if type(shaped.Success) == "boolean" then
         return shaped.Success :: boolean
     end
-    return true
+    -- no status of any kind: a shape we dont know, so we cant say the body is the asset
+    return false
 end
 
 function assetResolver.getAssetContentFromUrl(
@@ -128,6 +136,14 @@ function assetResolver.getAssetContentFromUrl(
         local body = (response :: { Body: string }).Body
         content = body
         if cacheKey ~= nil and contentCache then
+            local order = self.contentCacheOrder
+            if order and contentCache[cacheKey] == nil then
+                table.insert(order, cacheKey)
+                local oldest = if #order > contentCacheLimit then table.remove(order, 1) else nil
+                if oldest ~= nil then
+                    contentCache[oldest] = nil
+                end
+            end
             contentCache[cacheKey] = body
         end
     elseif not forced then

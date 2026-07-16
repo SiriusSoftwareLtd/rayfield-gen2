@@ -46,7 +46,7 @@ return function()
                 return function(request)
                     calls += 1
                     lastRequest = request
-                    return { Body = "asset-body" }
+                    return { StatusCode = 200, Body = "asset-body" }
                 end
             end
 
@@ -71,7 +71,7 @@ return function()
             network.getRequestFn = function()
                 return function(request)
                     requestedUrl = request.Url
-                    return { Body = "asset-content" }
+                    return { StatusCode = 200, Body = "asset-content" }
                 end
             end
 
@@ -97,6 +97,7 @@ return function()
                 { StatusCode = 404, Body = "<html>not found</html>" },
                 { Success = false, Body = "rate limited" },
                 { Body = "" },
+                { Body = "no status of any kind" }, -- unknown shape, so we cant call it a success
                 "not-a-table",
             }
             local call = 0
@@ -124,6 +125,35 @@ return function()
             end
 
             expect(resolver:getAssetContentFromUrl("https://example.invalid/raw", "ok")).to.equal("good-body")
+        end)
+
+        it("evicts the oldest cached bodies instead of growing forever", function()
+            local calls = 0
+            resolver = assetResolver.new(true, "https://example.invalid/asset?id=%d")
+            network.getRequestFn = function()
+                return function()
+                    calls += 1
+                    return { StatusCode = 200, Body = "body-" .. calls }
+                end
+            end
+
+            -- well past the cap, so the first keys must have been dropped
+            for key = 1, 32 do
+                resolver:getAssetContentFromUrl("https://example.invalid/raw", key)
+            end
+
+            local held = 0
+            for _ in resolver.contentCache do
+                held += 1
+            end
+            expect(held).to.equal(8)
+            expect(resolver.contentCache[1]).never.to.be.ok()
+            expect(resolver.contentCache[32]).to.equal("body-32")
+
+            -- an evicted key refetches, and a still-held one doesnt
+            expect(resolver:getAssetContentFromUrl("https://example.invalid/raw", 1)).to.equal("body-33")
+            expect(resolver:getAssetContentFromUrl("https://example.invalid/raw", 32)).to.equal("body-32")
+            expect(calls).to.equal(33)
         end)
 
         it("bypasses the session cache when forced", function()

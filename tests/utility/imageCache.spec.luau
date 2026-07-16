@@ -123,6 +123,40 @@ return function()
             expect(imageCache.rewrites[constants.icons.close]).to.be.ok()
         end)
 
+        it("still settles when the cached callback throws", function()
+            getfenv().getcustomasset = function(path)
+                return "asset://" .. path
+            end
+            imageCache.onCached = function()
+                error("callback blew up")
+            end
+            local settled
+
+            local ok, missing = imageCache.preload(function(failed)
+                settled = failed
+            end)
+
+            -- a throw used to strand the pending counter, so settle never fired
+            expect(ok).to.equal(false)
+            expect(missing).to.be.ok()
+            expect(settled).to.equal(0)
+        end)
+
+        it("returns all failures when no file API exists", function()
+            getfenv().getcustomasset = function(path)
+                return "asset://" .. path
+            end
+            filesystem.isfile = nil
+            local settled
+
+            local ok, missing = imageCache.preload(function(failed)
+                settled = failed
+            end)
+
+            expect(ok).to.equal(false)
+            expect(missing).to.equal(settled)
+        end)
+
         it("returns nothing for avatars when no file API exists", function()
             filesystem.isfile = nil
 
