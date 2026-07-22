@@ -2,52 +2,84 @@ name: Release Bundle
 
 permissions: {}
 
+# Releasing is one action: land a new version.txt on main. That builds the bundle,
+# and only if it goes green does the release get cut. A broken build never ships.
+# Re-run by hand from the Actions tab (force = rebuild a version already out).
 on:
-  release:
-    types:
-      - published
+  push:
+    branches: [main]
+    paths:
+      - version.txt
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Rebuild and overwrite even if this version is already released
+        type: boolean
+        default: false
 
 concurrency:
-  group: release-bundle-${{ github.event.release.tag_name }}
+  group: release-bundle
   cancel-in-progress: false
 
 jobs:
-  build:
-    name: Build Release Bundle
+  guard:
+    name: Decide whether to release
     runs-on: ubuntu-latest
-    timeout-minutes: 25
     permissions:
       contents: read
     outputs:
-      release_tag: ${{ steps.validate.outputs.release_tag }}
+      release_tag: ${{ steps.resolve.outputs.release_tag }}
+      should_release: ${{ steps.resolve.outputs.should_release }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
-          ref: ${{ github.event.release.tag_name }}
-          fetch-depth: 0
-          submodules: true
+          ref: main
 
-      - name: Validate release ref
-        id: validate
+      # version.txt is the single source of truth. We only cut a version the first
+      # time it appears, so re-pushing main never re-clobbers a build that already shipped.
+      - name: Resolve version
+        id: resolve
         env:
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          FORCE: ${{ github.event.inputs.force }}
         run: |
           set -euo pipefail
 
           VERSION="$(tr -d '[:space:]' < version.txt)"
-          if [ "$RELEASE_TAG" != "$VERSION" ]; then
-            echo "Release tag '$RELEASE_TAG' must match version.txt '$VERSION'." >&2
+          if [ -z "$VERSION" ]; then
+            echo "version.txt is empty." >&2
             exit 1
           fi
 
-          git fetch --no-tags origin "$DEFAULT_BRANCH:refs/remotes/origin/$DEFAULT_BRANCH"
-          if ! git merge-base --is-ancestor HEAD "origin/$DEFAULT_BRANCH"; then
-            echo "Release tag '$RELEASE_TAG' does not point to a commit on '$DEFAULT_BRANCH'." >&2
-            exit 1
+          SHOULD=true
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$FORCE" = "true" ]; then
+              echo "Release $VERSION already exists; forcing a rebuild."
+            else
+              echo "::notice::Release $VERSION already exists. Bump version.txt (or dispatch with force) to cut a new one."
+              SHOULD=false
+            fi
           fi
 
-          printf 'release_tag=%s\n' "$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          printf 'release_tag=%s\n' "$VERSION" >> "$GITHUB_OUTPUT"
+          printf 'should_release=%s\n' "$SHOULD" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build Release Bundle
+    needs: guard
+    if: needs.guard.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: main
+          fetch-depth: 0
+          submodules: true
 
       - name: Setup RoKit
         uses: CompeyDev/setup-rokit@1d9390883f7ebce19d48f5b8d006e11d387c92ab
@@ -55,12 +87,25 @@ jobs:
       - name: Install RoKit packages
         run: make install
 
-      # never ship a red commit: the tag has to clear the same gate CI runs
+      # never ship a red commit: the bundle only exists if this clears the same gate CI runs
       - name: Required checks
         run: make ci
 
       - name: Bundle
         run: make bundle
+
+      # a header so the served file says what it is at a glance. loadstring ignores comments.
+      - name: Stamp version header
+        env:
+          VERSION: ${{ needs.guard.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          {
+            printf -- '-- Rayfield Gen2 v%s\n' "$VERSION"
+            printf -- '-- loadstring(game:HttpGet("https://sirius.menu/gen2"))()\n'
+            cat build/bundled.luau
+          } > build/bundled.luau.stamped
+          mv build/bundled.luau.stamped build/bundled.luau
 
       - name: Generate bundle checksum
         run: sha256sum build/bundled.luau > build/bundled.luau.sha256
@@ -75,9 +120,9 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  upload:
-    name: Upload Bundle to Release
-    needs: build
+  publish:
+    name: Publish Bundle to Release
+    needs: [guard, build]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -96,10 +141,25 @@ jobs:
       - name: Create raw text file of bundle
         run: cp build/bundled.luau build/bundled.txt
 
-      - name: Upload bundle to release
+      # the release is created here, after a green build, so an empty or broken one never appears.
+      - name: Publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
-        # clobber so a re-run of a published release replaces its assets instead of failing
-        run: gh release upload "$RELEASE_TAG" --clobber build/bundled.luau build/bundled.luau.sha256 build/bundled.txt
+          RELEASE_TAG: ${{ needs.guard.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            {
+              printf 'The `%s` release of Rayfield Gen2.\n\n' "$RELEASE_TAG"
+              printf '    local Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2"))()\n\n'
+              printf 'Docs: https://docs.sirius.menu/rayfield-gen2\n'
+            } > release-notes.md
+            gh release create "$RELEASE_TAG" --target main --latest \
+              --title "Rayfield Gen2 $RELEASE_TAG" \
+              --notes-file release-notes.md
+          fi
+
+          # clobber so a forced rebuild replaces the assets instead of failing
+          gh release upload "$RELEASE_TAG" --clobber build/bundled.luau build/bundled.luau.sha256 build/bundled.txt
