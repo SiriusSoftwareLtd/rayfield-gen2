@@ -554,4 +554,170 @@ return function()
             expect(w:Popup({ title = "Late" })).never.to.be.ok()
         end)
     end)
+
+    -- The primary flow: a dev sets autoSave/autoLoad and never opens the config manager.
+    -- A change to an element must autosave, and a fresh window must autoLoad it back.
+    describe("config round trip without the config manager", function()
+        local variables = helpers.requireUtility("variables")
+        local filesystem = helpers.requireUtility("filesystem")
+
+        local windows
+        local files
+        local blobs
+        local originals
+
+        beforeEach(function()
+            windows = {}
+            files = {}
+            blobs = {}
+            local nextBlob = 0
+
+            originals = {
+                fileSystemManager = variables.fileSystemManager,
+                httpService = variables.httpService,
+                ensureDir = filesystem.ensureDir,
+                writefile = filesystem.writefile,
+                readfile = filesystem.readfile,
+                isfile = filesystem.isfile,
+                delfile = filesystem.delfile,
+                listfiles = filesystem.listfiles,
+            }
+
+            variables.fileSystemManager = {
+                getPath = function(_, childPath)
+                    return "Root/" .. childPath
+                end,
+            }
+            -- a JSON stand-in that round-trips real tables: encode parks the table under a
+            -- token, the token is what lands on disk, decode reads it back.
+            variables.httpService = {
+                GenerateGUID = function()
+                    return "00000000-0000-4000-8000-000000000000"
+                end,
+                JSONEncode = function(_, data)
+                    nextBlob += 1
+                    local token = "blob-" .. nextBlob
+                    blobs[token] = data
+                    return token
+                end,
+                JSONDecode = function(_, text)
+                    local stored = blobs[text]
+                    if stored == nil then
+                        error("no blob for " .. tostring(text))
+                    end
+                    return stored
+                end,
+            }
+
+            filesystem.ensureDir = function() end
+            filesystem.writefile = function(path, content)
+                files[path] = content
+            end
+            filesystem.readfile = function(path)
+                if files[path] == nil then
+                    error("missing " .. path)
+                end
+                return files[path]
+            end
+            filesystem.isfile = function(path)
+                return files[path] ~= nil
+            end
+            filesystem.delfile = function(path)
+                files[path] = nil
+            end
+            filesystem.listfiles = function()
+                local out = {}
+                for path in files do
+                    table.insert(out, path)
+                end
+                return out
+            end
+        end)
+
+        afterEach(function()
+            for _, w in windows do
+                if w and not w.unloaded then
+                    w:Unload()
+                end
+            end
+            variables.fileSystemManager = originals.fileSystemManager
+            variables.httpService = originals.httpService
+            filesystem.ensureDir = originals.ensureDir
+            filesystem.writefile = originals.writefile
+            filesystem.readfile = originals.readfile
+            filesystem.isfile = originals.isfile
+            filesystem.delfile = originals.delfile
+            filesystem.listfiles = originals.listfiles
+        end)
+
+        local function newWindow(autoLoad)
+            local w = Window.new({
+                name = "Farm",
+                showName = "Farm",
+                configuration = {
+                    autoSave = true,
+                    autoLoad = autoLoad,
+                    fileName = "FarmSave",
+                    customFolder = "farmFolder",
+                },
+            })
+            table.insert(windows, w)
+            return w
+        end
+
+        it("autosaves a change and autoLoads it into a fresh window with an explicit flag", function()
+            -- session 1: the player flips a toggle, autosave writes the file
+            local w1 = newWindow(false)
+            local tab1 = w1:CreateTab({ name = "Main" })
+            local t1 = tab1:CreateToggle({ name = "Auto Farm", flag = "autoFarm", value = false })
+            t1:Set(true)
+            expect(next(files)).to.be.ok()
+
+            -- session 2: same script re-run, a brand new window autoLoads on first Show
+            local w2 = newWindow(true)
+            local tab2 = w2:CreateTab({ name = "Main" })
+            local restored
+            local t2 = tab2:CreateToggle({
+                name = "Auto Farm",
+                flag = "autoFarm",
+                value = false,
+                callback = function(value)
+                    restored = value
+                end,
+            })
+            w2:Show()
+
+            expect(t2.value).to.equal(true)
+            -- the callback has to fire, so the dev's own logic (a farm loop, say) resumes
+            expect(restored).to.equal(true)
+        end)
+
+        it("round trips the same way with no flag, using the name-derived key", function()
+            local w1 = newWindow(false)
+            local tab1 = w1:CreateTab({ name = "Main" })
+            tab1:CreateToggle({ name = "Auto Farm", value = false }):Set(true)
+
+            local w2 = newWindow(true)
+            local tab2 = w2:CreateTab({ name = "Main" })
+            local t2 = tab2:CreateToggle({ name = "Auto Farm", value = false })
+            w2:Show()
+
+            expect(t2.value).to.equal(true)
+        end)
+
+        it("restores a value into an element built after autoLoad already ran", function()
+            local w1 = newWindow(false)
+            local tab1 = w1:CreateTab({ name = "Main" })
+            tab1:CreateSlider({ name = "Speed", range = { 0, 100 }, increment = 1, value = 0 }):Set(80)
+
+            -- session 2 builds its UI only after the window has already opened (e.g. after a
+            -- remote fetch). the late element still has to come back from the saved file.
+            local w2 = newWindow(true)
+            w2:Show()
+            local tab2 = w2:CreateTab({ name = "Main" })
+            local late = tab2:CreateSlider({ name = "Speed", range = { 0, 100 }, increment = 1, value = 0 })
+
+            expect(late.value).to.equal(80)
+        end)
+    end)
 end
