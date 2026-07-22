@@ -802,8 +802,7 @@ function Window:_persist(control)
     -- _loading: a config restore fires every control's callback, but must not autosave back over
     -- the file it's reading (or storm Save once per control)
     if control.flag and not control.forgetState and self.configuration.autoSave and not self._loading then
-        -- keep the active config current: the one the player last loaded/saved, or the default file
-        task.spawn(self.Save, self, self.settings.lastConfig)
+        task.spawn(self.Save, self)
     end
 end
 
@@ -1373,8 +1372,7 @@ function Window:_buildSettingsUI()
     if next(self.configuration) ~= nil then
         self.rfSettings:CreateSection({ name = "Configurations" })
 
-        -- open on the config the player last used, so the manager reflects what autoLoad restored
-        local selected = self.settings.lastConfig or self:ListConfigs()[1]
+        local selected = self:ListConfigs()[1]
         local configDropdown, nameInput
 
         local function refreshConfigs()
@@ -1386,12 +1384,6 @@ function Window:_buildSettingsUI()
             if selected then
                 configDropdown:Set(selected, true)
             end
-        end
-
-        -- remember which config is active so autoLoad and autosave both follow it next session
-        local function setActiveConfig(name)
-            self.settings.lastConfig = name
-            self:SaveSettings()
         end
 
         configDropdown = self.rfSettings:CreateDropdown({
@@ -1429,7 +1421,6 @@ function Window:_buildSettingsUI()
                 if self:Save(name) then
                     nameInput:Set("")
                     selected = name
-                    setActiveConfig(name)
                     refreshConfigs()
                     self:Toast({
                         title = locale.resolve("Saved configuration"),
@@ -1449,8 +1440,7 @@ function Window:_buildSettingsUI()
                     self:Toast({ title = locale.resolve("Pick a configuration to load") })
                     return
                 end
-                if self:Load(selected) then
-                    setActiveConfig(selected)
+                if self:_applyNamedConfig(selected) then
                     self:Toast({ title = locale.resolve("Loaded configuration"), subtitle = selected })
                 else
                     self:Toast({ title = locale.resolve("Couldn't load configuration"), subtitle = selected })
@@ -1467,10 +1457,6 @@ function Window:_buildSettingsUI()
                     return
                 end
                 if self:DeleteConfig(deleting) then
-                    -- if we deleted the active one, drop back to the default file next session
-                    if self.settings.lastConfig == deleting then
-                        setActiveConfig(nil)
-                    end
                     refreshConfigs()
                     self:Toast({ title = locale.resolve("Deleted configuration"), subtitle = deleting })
                 else
@@ -1554,14 +1540,7 @@ function Window:Show()
     -- strand animating=true, or the window could never open again.
     if self.configuration.autoLoad and not self._autoLoaded then
         self._autoLoaded = true
-        -- bring back the config the player last used (the config manager remembers it), or the
-        -- default file when they never picked one. if the remembered config is gone, fall back.
-        local remembered = self.settings.lastConfig
-        local ok, err = pcall(function()
-            if not (remembered and self:Load(remembered)) then
-                self:Load()
-            end
-        end)
+        local ok, err = pcall(self.Load, self)
         if not ok then
             log.warn("Rayfield: Failed to load configuration - " .. tostring(err))
         end
@@ -1819,6 +1798,17 @@ function Window:Load(name)
         return false
     end
     return persistence.load(self, name)
+end
+
+-- Load a named config and make it the live state autoLoad restores next session. Loading only
+-- applies to the running UI; writing it back to the default file is what carries it across
+-- sessions, so the config manager can pick a config once and have it stick.
+function Window:_applyNamedConfig(name)
+    if not self:Load(name) then
+        return false
+    end
+    self:Save()
+    return true
 end
 
 function Window:ListConfigs()

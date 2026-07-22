@@ -719,5 +719,27 @@ return function()
 
             expect(late.value).to.equal(80)
         end)
+
+        it("makes a config picked in the manager stick across sessions", function()
+            local w1 = newWindow(false)
+            local tab1 = w1:CreateTab({ name = "Main" })
+            local t1 = tab1:CreateToggle({ name = "Auto Farm", flag = "autoFarm", value = false })
+
+            t1:Set(true)
+            expect(w1:Save("PvP")).to.equal(true) -- snapshot the on state under a name
+            t1:Set(false) -- the live default is now off, the named config still on
+
+            -- picking PvP in the manager applies it and makes it the live state
+            expect(w1:_applyNamedConfig("PvP")).to.equal(true)
+            expect(t1.value).to.equal(true)
+
+            -- next session autoLoads the default file, which now holds PvP's values
+            local w2 = newWindow(true)
+            local tab2 = w2:CreateTab({ name = "Main" })
+            local t2 = tab2:CreateToggle({ name = "Auto Farm", flag = "autoFarm", value = false })
+            w2:Show()
+
+            expect(t2.value).to.equal(true)
+        end)
     end)
 end

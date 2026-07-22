@@ -20,7 +20,6 @@ type SettingsWindow = {
         keepOnScreen: boolean,
         welcomeToast: boolean,
         haptics: boolean,
-        lastConfig: string?,
     },
 }
 
@@ -30,7 +29,6 @@ type DecodedSettings = {
     keepOnScreen: unknown?,
     welcomeToast: unknown?,
     haptics: unknown?,
-    lastConfig: unknown?,
 }
 
 function persistenceSettings.getSettingsPath(): (string, string)
@@ -49,8 +47,6 @@ function persistenceSettings.saveSettings(window: SettingsWindow): boolean
         keepOnScreen = window.settings.keepOnScreen,
         welcomeToast = window.settings.welcomeToast,
         haptics = window.settings.haptics,
-        -- the config the player last used, so autoLoad brings it back next session
-        lastConfig = window.settings.lastConfig,
     }
 
     local ok, encoded = pcall(variables.httpService.JSONEncode, variables.httpService, data)
@@ -137,10 +133,6 @@ function persistenceSettings.loadSettings(window: SettingsWindow): boolean
 
     if type(settings.haptics) == "boolean" then
         window.settings.haptics = settings.haptics
-    end
-
-    if type(settings.lastConfig) == "string" then
-        window.settings.lastConfig = settings.lastConfig
     end
 
     return true

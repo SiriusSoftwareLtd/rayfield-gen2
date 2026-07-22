@@ -184,33 +184,6 @@ return function()
             expect(window.settings.haptics).to.equal(true)
         end)
 
-        it("persists the last used config name", function()
-            local window = makeWindow()
-            window.settings.lastConfig = "PvP Loadout"
-
-            expect(persistenceSettings.saveSettings(window)).to.equal(true)
-            expect(encodedData.lastConfig).to.equal("PvP Loadout")
-        end)
-
-        it("restores the last used config name", function()
-            local window = makeWindow()
-            files["Root/Settings/rayfield.rfld"] = "settings-json"
-            decodedData = { lastConfig = "PvP Loadout" }
-
-            expect(persistenceSettings.loadSettings(window)).to.equal(true)
-            expect(window.settings.lastConfig).to.equal("PvP Loadout")
-        end)
-
-        it("ignores a non-string last config", function()
-            local window = makeWindow()
-            window.settings.lastConfig = "keep"
-            files["Root/Settings/rayfield.rfld"] = "settings-json"
-            decodedData = { lastConfig = 42 }
-
-            expect(persistenceSettings.loadSettings(window)).to.equal(true)
-            expect(window.settings.lastConfig).to.equal("keep")
-        end)
-
         it("returns false when settings are missing, unreadable, or invalid", function()
             expect(persistenceSettings.loadSettings(makeWindow())).to.equal(false)
 
