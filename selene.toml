@@ -14,3 +14,6 @@ roblox_manual_fromscale_or_fromoffset = "allow"
 mixed_table = "allow"
 # Unit specs intentionally monkeypatch Roblox globals in the Lune shim.
 incorrect_standard_library_use = "allow"
+# lint regenerates the roblox std from Roblox's live API each run, so their deprecation
+# flags drift under us. KeyCode.Unknown is our unbound sentinel and stays valid at runtime.
+deprecated = "allow"
