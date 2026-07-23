@@ -175,6 +175,9 @@ end
 function Group:CreateDropdown(properties)
     return self:_add("dropdown", properties)
 end
+function Group:CreateList(properties)
+    return self:_add("list", properties)
+end
 function Group:CreateSection(properties)
     return self:_add("section", properties)
 end

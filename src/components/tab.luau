@@ -410,6 +410,11 @@ function Tab:CreateDropdown(properties)
     return self:_register(require(script.Parent.dropdown).new(self, properties))
 end
 
+-- List
+function Tab:CreateList(properties)
+    return self:_register(require(script.Parent.list).new(self, properties))
+end
+
 -- Input
 function Tab:CreateInput(properties)
     return self:_register(require(script.Parent.input).new(self, properties))

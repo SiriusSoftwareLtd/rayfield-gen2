@@ -104,6 +104,19 @@ export type DropdownProps = {
     callback: ((value: any) -> ())?,
 }
 
+export type ListProps = {
+    name: string?,
+    description: string?,
+    icon: (string | number)?,
+    flag: string?,
+    options: { string }?,
+    value: (string | { string })?,
+    multiSelect: boolean?,
+    placeholder: string?,
+    forgetState: boolean?,
+    callback: ((value: any) -> ())?,
+}
+
 export type InputProps = {
     name: string?,
     description: string?,
@@ -222,6 +235,11 @@ export type Dropdown = Moveable & {
     Set: (self: Dropdown, value: string | { string }, skipCallback: boolean?) -> (),
 }
 
+export type List = Moveable & {
+    value: { string },
+    Set: (self: List, value: string | { string }, skipCallback: boolean?) -> (),
+}
+
 export type Input = Moveable & {
     value: string,
     Set: (self: Input, value: string, skipCallback: boolean?) -> (),
@@ -270,6 +288,7 @@ export type Group = Moveable & {
     CreateStat: (self: Group, props: StatProps) -> Stat,
     CreateSlider: (self: Group, props: SliderProps) -> Slider,
     CreateDropdown: (self: Group, props: DropdownProps) -> Dropdown,
+    CreateList: (self: Group, props: ListProps) -> List,
     CreateSection: (self: Group, props: SectionProps) -> Section,
     CreateGroup: (self: Group, props: GroupProps?) -> Group,
 }
@@ -280,6 +299,7 @@ export type Tab = {
     CreateSwitch: (self: Tab, props: ToggleProps) -> Toggle,
     CreateSlider: (self: Tab, props: SliderProps) -> Slider,
     CreateDropdown: (self: Tab, props: DropdownProps) -> Dropdown,
+    CreateList: (self: Tab, props: ListProps) -> List,
     CreateInput: (self: Tab, props: InputProps) -> Input,
     CreateKeybind: (self: Tab, props: KeybindProps) -> Keybind,
     CreateColorPicker: (self: Tab, props: ColorPickerProps) -> ColorPicker,

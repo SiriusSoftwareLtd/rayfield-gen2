@@ -208,6 +208,88 @@ return function()
             table.insert(handedOut, "Z")
             expect(#multi.value).to.equal(2)
 
+            local listVal
+            local list = first:CreateList({
+                name = "Weapons",
+                options = { "Sword", "Bow", "Bow" },
+                value = "Sword",
+                callback = function(value)
+                    listVal = value
+                end,
+            })
+            expect(#list.options).to.equal(2)
+            list:Set("Bow")
+            expect(list.value[1]).to.equal("Bow")
+            expect(listVal).to.equal("Bow")
+            list:Add("Axe")
+            list:Add("Axe")
+            expect(#list.options).to.equal(3)
+            list:Remove("Sword")
+            list:Refresh({ "Mace", "Staff" })
+            list:Set("Mace")
+            expect(list.selectedLabel.Text).to.equal("Mace")
+            list:Remove("Mace")
+            expect(listVal).to.equal(nil)
+
+            local multiVal
+            local multiList = first:CreateList({
+                name = "Mods",
+                options = { "A", "B", "C" },
+                multiSelect = true,
+                value = { "A", "B", "A" },
+                callback = function(selected)
+                    multiVal = selected
+                end,
+            })
+            expect(#multiList.value).to.equal(2)
+            multiList:Set({ "B", "C", "Z" })
+            expect(#multiList.value).to.equal(2)
+            expect(multiList.selectedLabel.Text).to.equal("Various")
+
+            expect(multiVal).never.to.equal(multiList.value)
+            table.insert(multiVal, "Z")
+            expect(#multiList.value).to.equal(2)
+
+            list:Refresh({ "Alpha", "Beta" })
+            list:Set("Alpha")
+            listVal = nil
+            for _, data in list._optionFrames do
+                if data.name == "Alpha" then
+                    data.interact.MouseButton1Click:Fire()
+                    break
+                end
+            end
+            expect(listVal).to.equal(nil)
+            expect(list.value[1]).to.equal("Alpha")
+
+            for _, data in list._optionFrames do
+                if data.name == "Beta" then
+                    data.interact.MouseButton1Click:Fire()
+                    break
+                end
+            end
+            expect(list.value[1]).to.equal("Beta")
+            expect(listVal).to.equal("Beta")
+
+            multiList:Refresh({ "X", "Y" })
+            multiList:Set({})
+            multiVal = nil
+            for _, data in multiList._optionFrames do
+                if data.name == "X" then
+                    data.interact.MouseButton1Click:Fire()
+                    break
+                end
+            end
+            expect(table.find(multiList.value, "X")).to.be.ok()
+
+            for _, data in multiList._optionFrames do
+                if data.name == "X" then
+                    data.interact.MouseButton1Click:Fire()
+                    break
+                end
+            end
+            expect(table.find(multiList.value, "X")).never.to.be.ok()
+
             local input = first:CreateInput({
                 name = "Amount",
                 value = "10",
@@ -304,6 +386,7 @@ return function()
             local column = first:CreateGroup({ direction = "column" })
             expect(column:CreateSection({ name = "Column Section" }).__type).to.equal("Section")
             expect(column:CreateDropdown({ name = "Column Dropdown", options = { "X" } }).__type).to.equal("Dropdown")
+            expect(column:CreateList({ name = "Column List", options = { "X" } }).__type).to.equal("List")
 
             w:ChangeTheme("frost")
             w:RegisterTranslations({
@@ -532,6 +615,15 @@ return function()
             dropdown:Refresh({ "A", "B", "C" })
             expect(#w.instances).to.equal(instancesBefore)
             expect(#w.connections).to.equal(connectionsBefore)
+
+            -- list refresh must also not leak instances or connections
+            local cleanList = tab:CreateList({ name = "Clean", options = { "A", "B", "C" }, value = "A" })
+            local listInstBefore = #w.instances
+            local listConnBefore = #w.connections
+            cleanList:Refresh({ "A", "B", "C" })
+            cleanList:Refresh({ "A", "B", "C" })
+            expect(#w.instances).to.equal(listInstBefore)
+            expect(#w.connections).to.equal(listConnBefore)
 
             -- search stays closed while minimised: it would render outside the collapsed bar
             w:ToggleMinimise()

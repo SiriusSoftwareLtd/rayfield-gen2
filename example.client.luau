@@ -85,6 +85,26 @@ home:CreateDropdown({
     end,
 })
 
+home:CreateList({
+    name = "Weapons",
+    options = { "AK-47", "M4A4", "AWP", "Desert Eagle" },
+    value = "AK-47",
+    callback = function(value)
+        print("Selected weapon:", value)
+    end,
+})
+
+home:CreateList({
+    name = "Mods",
+    multiSelect = true,
+    options = { "Aimbot", "ESP", "Triggerbot", "Fly" },
+    value = { "ESP" },
+    placeholder = "None selected",
+    callback = function(value)
+        print("Selected mods:", table.concat(value, ", "))
+    end,
+})
+
 home:CreateSection({ name = "Feedback" })
 
 home:CreateButton({
