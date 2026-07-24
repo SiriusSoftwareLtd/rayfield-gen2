@@ -24,6 +24,19 @@ local resizeInfo = constants.pillResizeInfo
 -- text is muted at rest, opaque while typing
 local focusInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
+-- Parse a simple exponent expression like "5^3" → 125. Falls back to tonumber for
+-- plain numbers and scientific notation ("9e9" → 9000000000).
+local function parseExp(text)
+    local a, b = text:match("^([%d%.%-]+)%^([%d%.%-]+)$")
+    if a and b then
+        local na, nb = tonumber(a), tonumber(b)
+        if na and nb then
+            return na ^ nb
+        end
+    end
+    return tonumber(text)
+end
+
 function Input.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
 
@@ -161,7 +174,7 @@ function Input.new(tab, properties)
     -- resize to hug the text; numeric mode also strips non-number chars as they're typed
     self.window:ConnectFor(self, self.input:GetPropertyChangedSignal("Text"), function()
         if self.numeric then
-            local cleaned = (self.input.Text:gsub("[^%d%.%-]", ""))
+            local cleaned = (self.input.Text:gsub("[^%d%.%-eE%^]", ""))
             if cleaned ~= self.input.Text then
                 self.input.Text = cleaned
                 return -- the reassignment re-fires this, we size on that pass
@@ -218,9 +231,15 @@ end
 function Input:_commit(text, silent)
     text = tostring(text)
     if self.numeric then
-        -- a numeric field commits an actual number; malformed input (1.2.3, --5) clears
-        local n = tonumber(text)
-        text = if n then tostring(n) else ""
+        local n = parseExp(text)
+        if not n or n == math.huge or n == -math.huge then
+            -- invalid or non-finite number: revert the textbox to the previous value
+            if self.input.Text ~= self.value then
+                self.input.Text = self.value
+            end
+            return
+        end
+        text = tostring(n)
     end
 
     local changed = text ~= self.value
