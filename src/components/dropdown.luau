@@ -62,6 +62,29 @@ local function normalizeValue(value, multi)
     return {}
 end
 
+-- The visible selection is always the intent narrowed to options that currently exist.
+local function intersectWithOptions(value, options)
+    local out = {}
+    for _, v in value do
+        if table.find(options, v) then
+            table.insert(out, v)
+        end
+    end
+    return out
+end
+
+local function sameSelection(a, b)
+    if #a ~= #b then
+        return false
+    end
+    for _, v in a do
+        if not table.find(b, v) then
+            return false
+        end
+    end
+    return true
+end
+
 function Dropdown.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
 
@@ -98,14 +121,10 @@ function Dropdown.new(tab, properties)
         _optionFrames = {},
     }, Dropdown)
 
-    -- Prune the initial value to options that actually exist (matches Set/Refresh)
-    local prunedValue = {}
-    for _, v in self.value do
-        if table.find(self.options, v) then
-            table.insert(prunedValue, v)
-        end
-    end
-    self.value = prunedValue
+    -- Remember the full intent so a selection survives options that only load later (via
+    -- Refresh), while self.value stays narrowed to options that currently exist.
+    self._desiredValue = self.value
+    self.value = intersectWithOptions(self.value, self.options)
 
     -- Register as a saveable control if flagged
     self.window:_registerControl(self)
@@ -530,6 +549,10 @@ function Dropdown.new(tab, properties)
                         table.insert(self.value, optionName)
                     end
                 end
+
+                -- the visible selection is now the player's intent; a later Refresh must build
+                -- on this, not revert to whatever was restored before they touched it
+                self._desiredValue = table.clone(self.value)
 
                 for _, d in self._optionFrames do
                     renderOptionState(d, true)
@@ -972,14 +995,12 @@ function Dropdown:Refresh(newOptions)
     end
     table.clear(self._optionFrames)
 
-    local pruned = {}
-    for _, v in self.value do
-        if table.find(self.options, v) then
-            table.insert(pruned, v)
-        end
-    end
-    local selectionChanged = #pruned ~= #self.value
-    self.value = pruned
+    -- re-derive the visible selection from the full intent: an option that loads now (or
+    -- comes back) re-selects, one that's genuinely gone drops out. self.value only ever holds
+    -- real options, so the saved config never carries a stale selection across sessions.
+    local previous = self.value
+    self.value = intersectWithOptions(self._desiredValue or self.value, self.options)
+    local selectionChanged = not sameSelection(self.value, previous)
 
     for _, opt in self.options do
         local data = self._buildOption(opt)
@@ -995,8 +1016,7 @@ function Dropdown:Refresh(newOptions)
     -- reconcile with any active search (also refreshes corners); empty query shows all
     self:_applyFilter(if self._searchOpen then self.searchInput.Text else "")
 
-    -- pruning dropped part of the selection: the dev needs to hear it, and the saved
-    -- config must not resurrect it
+    -- the visible selection changed (options arrived or dropped): tell the dev and save it
     if selectionChanged then
         self.window:_runGuarded(self, self.callback, self:_callbackValue())
         self.window:_persist(self)
@@ -1043,6 +1063,7 @@ function Dropdown:Remove(option)
     local valueIdx = table.find(self.value, option)
     if valueIdx then
         table.remove(self.value, valueIdx)
+        self._desiredValue = table.clone(self.value)
         self._updateSelectedLabel()
         -- removing a selected option changes the selection; surface and save that
         self.window:_runGuarded(self, self.callback, self:_callbackValue())
@@ -1055,14 +1076,9 @@ end
 
 function Dropdown:Set(value, skipCallback)
     local newValue = normalizeValue(value, self.multiSelect)
-
-    local pruned = {}
-    for _, v in newValue do
-        if table.find(self.options, v) then
-            table.insert(pruned, v)
-        end
-    end
-    self.value = pruned
+    -- keep the full request so options that arrive later can restore it (see Refresh)
+    self._desiredValue = newValue
+    self.value = intersectWithOptions(newValue, self.options)
 
     for _, data in self._optionFrames do
         self._renderOptionState(data, true)

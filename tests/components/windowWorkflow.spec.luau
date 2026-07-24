@@ -831,5 +831,95 @@ return function()
 
             expect(t2.value).to.equal(true)
         end)
+
+        it("round trips a slider, toggle, and multi-select dropdown together", function()
+            local w1 = newWindow(false)
+            local tab1 = w1:CreateTab({ name = "Main" })
+            tab1:CreateSlider({ name = "Slider Tap Delay", range = { 0, 1 }, increment = 0.01, value = 0.01 }):Set(0.5)
+            tab1:CreateToggle({ name = "Toggle Auto Tap", value = false }):Set(true)
+            tab1:CreateDropdown({
+                name = "Drop Ultimate",
+                multiSelect = true,
+                options = { "Ult A", "Ult B", "Ult C" },
+                value = {},
+            }):Set({ "Ult A", "Ult C" })
+
+            local w2 = newWindow(true)
+            local tab2 = w2:CreateTab({ name = "Main" })
+            local s2 =
+                tab2:CreateSlider({ name = "Slider Tap Delay", range = { 0, 1 }, increment = 0.01, value = 0.01 })
+            local t2 = tab2:CreateToggle({ name = "Toggle Auto Tap", value = false })
+            local d2 = tab2:CreateDropdown({
+                name = "Drop Ultimate",
+                multiSelect = true,
+                options = { "Ult A", "Ult B", "Ult C" },
+                value = {},
+            })
+            w2:Show()
+
+            expect(s2.value).to.equal(0.5)
+            expect(t2.value).to.equal(true)
+            expect(#d2.value).to.equal(2)
+        end)
+
+        it("keeps a restored dropdown selection when its options arrive after autoLoad", function()
+            -- session 1: options are known, the player picks one
+            local w1 = newWindow(false)
+            local tab1 = w1:CreateTab({ name = "Main" })
+            tab1:CreateDropdown({
+                name = "Drop Ultimate",
+                multiSelect = true,
+                options = { "Ult A", "Ult B", "Ult C" },
+                value = {},
+            }):Set({ "Ult A" })
+
+            -- session 2: the dropdown is built before its options exist (populated later from
+            -- game data), which is a normal pattern for a live list.
+            local w2 = newWindow(true)
+            local tab2 = w2:CreateTab({ name = "Main" })
+            local d2 = tab2:CreateDropdown({ name = "Drop Ultimate", multiSelect = true, options = {}, value = {} })
+            w2:Show()
+            d2:Refresh({ "Ult A", "Ult B", "Ult C" })
+
+            expect(#d2.value).to.equal(1)
+        end)
+
+        it("drops a selection whose option is genuinely removed", function()
+            local w = newWindow(false)
+            local tab = w:CreateTab({ name = "Main" })
+            local d =
+                tab:CreateDropdown({ name = "Drop Ultimate", multiSelect = true, options = { "A", "B" }, value = {} })
+            d:Set({ "A", "B" })
+
+            -- a real options list that no longer offers A: the selection has to drop, not linger
+            d:Refresh({ "B" })
+            expect(#d.value).to.equal(1)
+            expect(d.value[1]).to.equal("B")
+        end)
+
+        it("keeps an interactive pick when the options are refreshed", function()
+            local w = newWindow(false)
+            local tab = w:CreateTab({ name = "Main" })
+            local d = tab:CreateDropdown({
+                name = "Drop Ultimate",
+                multiSelect = true,
+                options = { "A", "B", "C" },
+                value = {},
+            })
+
+            d.interact.MouseButton1Click:Fire() -- open the panel
+            for _, data in d._optionFrames do
+                if data.name == "B" then
+                    data.interact.MouseButton1Click:Fire() -- the player picks B
+                end
+            end
+            expect(#d.value).to.equal(1)
+            expect(d.value[1]).to.equal("B")
+
+            -- a refresh of the same options must build on the live pick, not revert it
+            d:Refresh({ "A", "B", "C" })
+            expect(#d.value).to.equal(1)
+            expect(d.value[1]).to.equal("B")
+        end)
     end)
 end
