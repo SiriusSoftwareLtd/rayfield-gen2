@@ -223,6 +223,43 @@ return function()
             input.input.FocusLost:Fire()
             expect(input.value).to.equal("13")
 
+            -- scientific notation via :Set
+            input:Set("9e9")
+            expect(input.value).to.equal("9000000000")
+            expect(inputValue).to.equal("9000000000")
+
+            -- lowercase e
+            input:Set("1.5e3")
+            expect(input.value).to.equal("1500")
+
+            -- uppercase E
+            input:Set("2E5")
+            expect(input.value).to.equal("200000")
+
+            -- exponent operator ^
+            input:Set("5^5")
+            expect(input.value).to.equal("3125")
+
+            -- zero exponent
+            input:Set("123^0")
+            expect(input.value).to.equal("1")
+
+            -- invalid e expression keeps the previous value
+            input:Set("e9")
+            expect(input.value).to.equal("1")
+
+            -- invalid exponent keeps the previous value
+            input:Set("5^")
+            expect(input.value).to.equal("1")
+
+            -- overflow (9e999999999 → math.huge) keeps the previous value
+            input:Set("9e999999999")
+            expect(input.value).to.equal("1")
+
+            -- plain numbers still work normally
+            input:Set("42.5")
+            expect(input.value).to.equal("42.5")
+
             local keybind = first:CreateKeybind({
                 name = "Hotkey",
                 value = Enum.KeyCode.H,
