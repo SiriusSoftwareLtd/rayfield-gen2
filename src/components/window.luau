@@ -862,18 +862,25 @@ function Window:Notify(properties)
     return require(script.Parent.notification).new(self, properties)
 end
 
--- Top-centre toast stack. Like Notify but for brief, centred messages that drop in from the
--- top of the screen (newest on top). Each toast takes { title, subtitle?, icon?, duration? }.
+-- Top-centre / bottom-centre toast stack. Like Notify but for brief, centred messages that drop
+-- in from the top (or rise from the bottom) of the screen (newest on top). Each toast takes
+-- { title, subtitle?, icon?, duration?, position? }.
 function Window:Toast(properties)
     if self.unloaded then
         return
     end
-    if not self.toasts then
-        self.toasts = self:Create("Frame", {
+
+    local position = (properties or {}).position or "Top"
+    local isTop = position == "Top"
+    local containerKey = if isTop then "_toastsTop" else "_toastsBottom"
+    local container = self[containerKey]
+
+    if not container then
+        container = self:Create("Frame", {
             Name = "Toasts",
             Size = UDim2.new(0, maxToastWidth, 1, -24),
-            Position = UDim2.new(0.5, 0, 0, 12),
-            AnchorPoint = Vector2.new(0.5, 0),
+            Position = if isTop then UDim2.new(0.5, 0, 0, 12) else UDim2.new(0.5, 0, 1, -12),
+            AnchorPoint = if isTop then Vector2.new(0.5, 0) else Vector2.new(0.5, 1),
             BackgroundTransparency = 1,
             ZIndex = constants.zIndex.toast,
 
@@ -882,17 +889,19 @@ function Window:Toast(properties)
 
         self:Create("UIListLayout", {
             FillDirection = Enum.FillDirection.Vertical,
-            VerticalAlignment = Enum.VerticalAlignment.Top,
+            VerticalAlignment = if isTop then Enum.VerticalAlignment.Top else Enum.VerticalAlignment.Bottom,
             HorizontalAlignment = Enum.HorizontalAlignment.Center,
             SortOrder = Enum.SortOrder.LayoutOrder,
             -- gap lives inside each toast so removing one collapses its gap with it
             Padding = UDim.new(0, 0),
 
-            Parent = self.toasts,
+            Parent = container,
         })
+
+        self[containerKey] = container
     end
 
-    return require(script.Parent.toast).new(self, properties)
+    return require(script.Parent.toast).new(self, properties, container)
 end
 
 -- Centred modal over a dimmed backdrop. Takes { title, subtitle?, icon?, content?, boxes?,

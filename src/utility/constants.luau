@@ -63,7 +63,7 @@ constants.zIndex = {
     -- pierced by them (they land over the window's lower-right corner)
     notification = 1500,
     drag = 1000,
-    -- top-centre toasts float over the whole window
+    -- top-centre and bottom-centre toasts float over the whole window
     toast = 2000,
     toastContent = 2001,
     restoreContent = 100001,

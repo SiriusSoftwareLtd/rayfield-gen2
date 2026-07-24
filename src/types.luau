@@ -171,6 +171,7 @@ export type ToastProps = {
     avatar: number?, -- optional user id; shows that user's headshot as a larger avatar
     minWidth: number?, -- floor the pill width; slack becomes right-hand room (content is left-aligned)
     duration: number?,
+    position: "Top" | "Bottom"?,
 }
 
 export type PopupBox = {
