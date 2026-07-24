@@ -38,6 +38,7 @@ local MIN_WIDTH, MAX_WIDTH = 140, 320
 
 -- how far above its slot the pill starts, so it flies in from off the top of the screen
 local offscreenAbove = UDim2.new(0.5, 0, 0.5, -180)
+local offscreenBelow = UDim2.new(0.5, 0, 0.5, 180)
 local centred = UDim2.new(0.5, 0, 0.5, 0)
 
 -- Auto duration from the text length, clamped to a sensible window (matches notifications).
@@ -53,7 +54,7 @@ local function resolveImage(icon)
     return icon
 end
 
-function Toast.new(window, properties)
+function Toast.new(window, properties, container)
     properties = if typeof(properties) == "table" then properties else {}
 
     local self = setmetatable({
@@ -70,6 +71,7 @@ function Toast.new(window, properties)
         -- put the subtitle line above the title (for label-over-value toasts like "Signed in
         -- as" / name); default is the usual title-on-top
         subtitleAbove = properties.subtitleAbove or properties.SubtitleAbove or false,
+        position = properties.position or "Top",
         _hovered = false,
         _dismissed = false,
     }, Toast)
@@ -106,7 +108,7 @@ function Toast.new(window, properties)
         BorderSizePixel = 0,
         ZIndex = constants.zIndex.toast,
 
-        Parent = self.window.toasts,
+        Parent = container or self.window.toasts,
     })
 
     -- inter-toast gap lives here (not on the stack layout) so it collapses with the card
@@ -120,7 +122,7 @@ function Toast.new(window, properties)
     self.body = self.window:Create("Frame", {
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         Size = UDim2.new(1, 0, 1, 0),
-        Position = offscreenAbove,
+        Position = if self.position == "Bottom" then offscreenBelow else offscreenAbove,
         AnchorPoint = Vector2.new(0.5, 0.5),
         Active = true, -- takes clicks for click-to-dismiss
         BorderSizePixel = 0,
