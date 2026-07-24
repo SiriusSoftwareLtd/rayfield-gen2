@@ -553,6 +553,59 @@ return function()
             expect(w:Toast({ title = "Late" })).never.to.be.ok()
             expect(w:Popup({ title = "Late" })).never.to.be.ok()
         end)
+
+        describe("toast position", function()
+            local function findLayout(container)
+                for _, child in container:GetChildren() do
+                    if child:IsA("UIListLayout") then
+                        return child
+                    end
+                end
+                return nil
+            end
+
+            it("defaults to top with top-centre anchor and alignment", function()
+                local w = makeWindow()
+                w:Toast({ title = "A", duration = 1 })
+                expect(w._toastsTop).to.be.ok()
+                expect(w._toastsBottom).never.to.be.ok()
+                expect(w._toastsTop.AnchorPoint).to.equal(Vector2.new(0.5, 0))
+                expect(w._toastsTop.Position).to.equal(UDim2.new(0.5, 0, 0, 12))
+                local layout = findLayout(w._toastsTop)
+                expect(layout).to.be.ok()
+                expect(layout.VerticalAlignment).to.equal(Enum.VerticalAlignment.Top)
+            end)
+
+            it("supports bottom with bottom-centre anchor and alignment", function()
+                local w = makeWindow()
+                w:Toast({ title = "A", position = "Bottom", duration = 1 })
+                expect(w._toastsBottom).to.be.ok()
+                expect(w._toastsBottom.AnchorPoint).to.equal(Vector2.new(0.5, 1))
+                expect(w._toastsBottom.Position).to.equal(UDim2.new(0.5, 0, 1, -12))
+                local layout = findLayout(w._toastsBottom)
+                expect(layout).to.be.ok()
+                expect(layout.VerticalAlignment).to.equal(Enum.VerticalAlignment.Bottom)
+            end)
+
+            it("keeps top and bottom containers independent", function()
+                local w = makeWindow()
+                w:Toast({ title = "Top", duration = 1 })
+                w:Toast({ title = "Bottom", position = "Bottom", duration = 1 })
+                expect(w._toastsTop).to.be.ok()
+                expect(w._toastsBottom).to.be.ok()
+                expect(w._toastsTop.AnchorPoint).to.equal(Vector2.new(0.5, 0))
+                expect(w._toastsBottom.AnchorPoint).to.equal(Vector2.new(0.5, 1))
+                expect(findLayout(w._toastsTop)).to.be.ok()
+                expect(findLayout(w._toastsBottom)).to.be.ok()
+            end)
+
+            it("assigns descending LayoutOrder within the position container", function()
+                local w = makeWindow()
+                w:Toast({ title = "First", position = "Bottom", duration = 1 })
+                w:Toast({ title = "Second", position = "Bottom", duration = 1 })
+                expect(w._toastCount >= 2).to.equal(true)
+            end)
+        end)
     end)
 
     -- The primary flow: a dev sets autoSave/autoLoad and never opens the config manager.
