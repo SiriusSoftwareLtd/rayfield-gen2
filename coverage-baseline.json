@@ -3,9 +3,9 @@
   "measuredDate": "2026-07-24",
   "command": "make coverage-baseline",
   "threshold": 70.00,
-  "lineCoverage": 86.21,
-  "coveredLines": 3971,
-  "coverableLines": 4606,
+  "lineCoverage": 86.23,
+  "coveredLines": 3976,
+  "coverableLines": 4611,
   "notes": [
     "Generated reports are written to coverage/coverage.txt and coverage/coverage-summary.json.",
     "The enforced Lune coverage scope is discovered dynamically from src by default.",
