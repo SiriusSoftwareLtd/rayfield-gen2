@@ -7,6 +7,7 @@
 
 local imageCache = require(script.Parent.imageCache)
 local variables = require(script.Parent.variables)
+local icons = require(script.Parent.icons)
 
 type AvatarCallback = imageCache.AvatarCallback
 type PreloadCallback = imageCache.PreloadCallback
@@ -119,6 +120,10 @@ end
 function image.resolve(value: unknown): string
     if value == nil or value == 0 or value == "" then
         return ""
+    end
+
+    if type(value) == "string" and icons[value] then
+        return icons[value]
     end
 
     if type(value) == "string" then
