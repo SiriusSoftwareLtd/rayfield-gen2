@@ -14,7 +14,10 @@ local services = require(script.Parent.services)
 local filesystem = {}
 
 local isStudio = services.getService("RunService"):IsStudio()
-local hasNativeFS = not isStudio and typeof(writefile) == "function"
+-- add support for robloxstu
+local env = getfenv()
+local hasNativeFS = (env["identifyexecutor"] and typeof(env["identifyexecutor"]) == "function" or not isStudio)
+    and typeof(writefile) == "function"
 
 if hasNativeFS then
     -- Native executor environment - wrap globals directly
