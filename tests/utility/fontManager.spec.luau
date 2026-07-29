@@ -166,7 +166,7 @@ return function()
                 return tonumber(id) or 456
             end
             manager.assetResolver.getAssetContentFromId = function(_, id)
-                expect(id).to.equal(456)
+                expect(id).to.equal("rbxassetid://456")
                 return fontBinary
             end
 
@@ -180,6 +180,73 @@ return function()
                     Enum.FontStyle.Normal
                 )]
             ).to.equal(loaded)
+        end)
+
+        it("batch downloads multiple missing font faces", function()
+            local manager = makeManager(true)
+            manager._debug = false
+            files["Fonts/123.json"] = "stored-manifest"
+            game:GetService("HttpService").JSONDecode = function()
+                return {
+                    name = "SpecFont",
+                    faces = {
+                        { name = "Regular", weight = 400, style = "normal", assetId = "rbxassetid://456" },
+                        { name = "Bold", weight = 700, style = "normal", assetId = "rbxassetid://789" },
+                    },
+                }
+            end
+            manager.assetResolver.resolve = function(_, id)
+                return tonumber(tostring(id):match("%d+"))
+            end
+            local requestedIds
+            manager.assetResolver.getAssetContentFromId = function()
+                error("single download should not be used")
+            end
+            manager.assetResolver.getAssetContentsFromIds = function(_, ids)
+                requestedIds = ids
+                return {
+                    { content = fontBinary .. "-regular" },
+                    { content = "OTTO-bold" },
+                }
+            end
+
+            expect(manager:loadFont(123)).never.to.equal(fallback)
+            expect(requestedIds[1]).to.equal("rbxassetid://456")
+            expect(requestedIds[2]).to.equal("rbxassetid://789")
+            expect(files["Fonts/SpecFont/Regular.ttf"]).to.equal(fontBinary .. "-regular")
+            expect(files["Fonts/SpecFont/Bold.ttf"]).to.equal("OTTO-bold")
+        end)
+
+        it("falls back when a batched face fails or is not a font", function()
+            for _, failure in { {}, { content = "<html>not a font</html>" } } do
+                local manager = makeManager(true)
+                manager._debug = false
+                files = {
+                    ["Fonts/123.json"] = "stored-manifest",
+                }
+                game:GetService("HttpService").JSONDecode = function()
+                    return {
+                        name = "SpecFont",
+                        faces = {
+                            { name = "Regular", weight = 400, style = "normal", assetId = "rbxassetid://456" },
+                            { name = "Bold", weight = 700, style = "normal", assetId = "rbxassetid://789" },
+                        },
+                    }
+                end
+                manager.assetResolver.resolve = function(_, id)
+                    return tonumber(tostring(id):match("%d+"))
+                end
+                manager.assetResolver.getAssetContentsFromIds = function()
+                    return {
+                        { content = fontBinary },
+                        { content = failure.content, error = "failed" },
+                    }
+                end
+
+                expect(manager:loadFont(123)).to.equal(fallback)
+                expect(files["Fonts/SpecFont/Bold.ttf"]).never.to.be.ok()
+                expect(files["Fonts/SpecFont/manifest.json"]).never.to.be.ok()
+            end
         end)
 
         it("returns the fallback when the manifest shape is invalid and drops the cached file", function()

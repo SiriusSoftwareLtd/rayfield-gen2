@@ -6,36 +6,12 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 local services = require(script.Parent.services)
-local httpService = services.getService("HttpService")
 local runService = services.getService("RunService")
 local fileSystem = require(script.Parent.filesystem)
 local assetResolver = require(script.Parent.assetResolver)
+local encoding = require(script.Parent.encoding)
 local log = require(script.Parent.log)
 local path = require(script.Parent.path)
-
-local function jsonEncode(data: unknown): string?
-    local success, result = pcall(function()
-        return httpService:JSONEncode(data)
-    end)
-    if success and type(result) == "string" then
-        return result
-    else
-        log.warn("Failed to encode JSON:", result)
-        return nil
-    end
-end
-
-local function jsonDecode(jsonString: string): unknown?
-    local success, result = pcall(function()
-        return httpService:JSONDecode(jsonString)
-    end)
-    if success then
-        return result
-    else
-        log.warn("Failed to decode JSON:", result)
-        return nil
-    end
-end
 
 local fontManager = {}
 fontManager.__type = "fontManager"
@@ -80,7 +56,7 @@ export type FontManager = FontManagerState & {
     resolve: (self: FontManager, id: number | string) -> Font?,
     loadFont: (
         self: FontManager,
-        id: (number | string)?,
+        id: number | string,
         fontWeight: Enum.FontWeight?,
         fontStyle: Enum.FontStyle?,
         saveToDisk: boolean?,
@@ -205,7 +181,7 @@ end
 
 function fontManager.loadFont(
     self: FontManager,
-    id: (number | string)?,
+    id: number | string,
     fontWeight: Enum.FontWeight?,
     fontStyle: Enum.FontStyle?,
     saveToDisk: boolean?,
@@ -223,7 +199,9 @@ function fontManager.loadFont(
     local rawId = self.assetResolver:resolve(id)
     local resolvedId = resolveId(rawId)
     if not resolvedId then
-        log.warn("Invalid font id: " .. tostring(id))
+        if self._debug then
+            log.warn("Invalid font id: " .. tostring(id))
+        end
         return self.defaultOptions.fallbackFont
     end
     -- if the font is already cached, return it
@@ -288,8 +266,8 @@ function fontManager.loadFont(
     end
     local fontManifest: FontManifest? = nil
     if possibleFontManifest then
-        local ok, parsedManifest = pcall(jsonDecode, possibleFontManifest)
-        if ok and parsedManifest then
+        local parsedManifest = encoding.json.decode(possibleFontManifest)
+        if parsedManifest then
             fontManifest = validateManifest(parsedManifest)
         else
             if self._debug then
@@ -322,15 +300,40 @@ function fontManager.loadFont(
         return self.defaultOptions.fallbackFont
     end
 
+    local missingFaceIds: { assetResolver.AssetId } = {}
+    local missingFaceIndexes: { number } = {}
+    local downloadedFaces: { [number]: string } = {}
+    for index, face in ipairs(fontManifest.faces) do
+        local fontFacePath = fontDirectory .. "/" .. face.name:gsub(" ", "-") .. ".ttf"
+        if not fileSystem.isfile(fontFacePath) then
+            -- Keep the manifest's decimal text intact; the byte API validates it without
+            -- passing through tonumber, so future 20-digit ids cannot lose precision here.
+            table.insert(missingFaceIds, face.assetId)
+            table.insert(missingFaceIndexes, index)
+        end
+    end
+
+    if #missingFaceIds > 1 then
+        local faceResults = self.assetResolver:getAssetContentsFromIds(missingFaceIds, false)
+        for resultIndex, faceIndex in ipairs(missingFaceIndexes) do
+            local result = faceResults[resultIndex]
+            if result and result.content then
+                downloadedFaces[faceIndex] = result.content
+            end
+        end
+    elseif #missingFaceIds == 1 then
+        local content = self.assetResolver:getAssetContentFromId(missingFaceIds[1], false)
+        if content then
+            downloadedFaces[missingFaceIndexes[1]] = content
+        end
+    end
+
     -- iterate over each face, caching each to disk like we do images: a face only downloads once,
     -- later sessions reuse the local file and just re-resolve it
     for i, face in ipairs(fontManifest.faces) do
         local fontFacePath = fontDirectory .. "/" .. face.name:gsub(" ", "-") .. ".ttf"
         if not fileSystem.isfile(fontFacePath) then
-            local fontFaceId = self.assetResolver:resolve(face.assetId)
-            local fontFaceContent = if fontFaceId ~= nil
-                then self.assetResolver:getAssetContentFromId(fontFaceId, false)
-                else nil
+            local fontFaceContent = downloadedFaces[i]
             if not fontFaceContent or not isFontBody(fontFaceContent) then
                 madeAllFontsLocal = false
                 if self._debug then
@@ -364,7 +367,7 @@ function fontManager.loadFont(
         return self.defaultOptions.fallbackFont
     end
 
-    local encodedManifest = jsonEncode(fontManifest)
+    local encodedManifest = encoding.json.encode(fontManifest)
     if not encodedManifest or not pcall(fileSystem.writefile, fontDirectory .. "/manifest.json", encodedManifest) then
         return self.defaultOptions.fallbackFont
     end
