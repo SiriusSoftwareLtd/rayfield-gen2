@@ -1,11 +1,11 @@
 {
   "scope": "src",
-  "measuredDate": "2026-07-24",
+  "measuredDate": "2026-07-29",
   "command": "make coverage-baseline",
   "threshold": 70.00,
-  "lineCoverage": 86.37,
-  "coveredLines": 3987,
-  "coverableLines": 4616,
+  "lineCoverage": 86.56,
+  "coveredLines": 4097,
+  "coverableLines": 4733,
   "notes": [
     "Generated reports are written to coverage/coverage.txt and coverage/coverage-summary.json.",
     "The enforced Lune coverage scope is discovered dynamically from src by default.",
@@ -195,9 +195,9 @@
     },
     {
       "path": "src/utility/assetResolver.luau",
-      "lineCoverage": 100.00,
-      "coveredLines": 65,
-      "coverableLines": 65
+      "lineCoverage": 93.18,
+      "coveredLines": 123,
+      "coverableLines": 132
     },
     {
       "path": "src/utility/colors.luau",
@@ -210,6 +210,12 @@
       "lineCoverage": 100.00,
       "coveredLines": 9,
       "coverableLines": 9
+    },
+    {
+      "path": "src/utility/encoding.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 38,
+      "coverableLines": 38
     },
     {
       "path": "src/utility/enums.luau",
@@ -237,9 +243,9 @@
     },
     {
       "path": "src/utility/fontManager.luau",
-      "lineCoverage": 83.25,
-      "coveredLines": 164,
-      "coverableLines": 197
+      "lineCoverage": 85.57,
+      "coveredLines": 172,
+      "coverableLines": 201
     },
     {
       "path": "src/utility/functions.luau",
@@ -255,9 +261,9 @@
     },
     {
       "path": "src/utility/imageCache.luau",
-      "lineCoverage": 94.55,
-      "coveredLines": 104,
-      "coverableLines": 110
+      "lineCoverage": 93.22,
+      "coveredLines": 110,
+      "coverableLines": 118
     },
     {
       "path": "src/utility/locale.luau",
