@@ -28,17 +28,14 @@ local cacheRoot = variables.fileSystemManager:getRootFolder()
 local cacheFolder = variables.fileSystemManager:getAssetsFolder()
 local assetResolver = variables.assetResolver
 
--- raw host, not the /blob/ page: that 302s and executors that dont follow redirects
--- would cache the redirect body instead of the png
-local assetBase = "https://raw.githubusercontent.com/SiriusSoftwareLtd/rayfield-gen2/main/assets/"
 local headshotPx = 48
 local thumbEndpoint =
     "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=%d&size=%dx%d&format=Png&isCircular=false"
 
-local manifest: { [number]: string } = {}
+local manifest: { [number]: boolean } = {}
 for _, id in constants.icons do
     local iconId = id :: number
-    manifest[iconId] = assetBase .. tostring(iconId) .. ".png"
+    manifest[iconId] = true
 end
 local manifestSize = 0
 for _ in manifest do
@@ -67,6 +64,19 @@ local function cacheFile(filePath: string, url: string): string?
         if not pcall(filesystem.writefile, filePath, body) then
             return nil
         end
+    end
+    local ok, uri = pcall(getfenv().getcustomasset, filePath)
+    return if ok and type(uri) == "string" then uri else nil
+end
+
+local function cacheAssetBody(filePath: string, body: string?): string?
+    if not body or string.sub(body, 1, 8) ~= pngMagic then
+        return nil
+    end
+    pcall(filesystem.ensureFolder, cacheRoot)
+    pcall(filesystem.ensureFolder, cacheFolder)
+    if not pcall(filesystem.writefile, filePath, body) then
+        return nil
     end
     local ok, uri = pcall(getfenv().getcustomasset, filePath)
     return if ok and type(uri) == "string" then uri else nil
@@ -155,9 +165,9 @@ function imageCache.preload(onSettled: PreloadCallback?): (boolean, number)
         onSettled(failed)
     end
 
-    local pending, missing = 0, 0
-    local spawning = true -- keep a synchronously-finishing download from settling mid-loop
-    for id, url in manifest do
+    local missingIds: { number } = {}
+    local missingPaths: { string } = {}
+    for id in manifest do
         local filePath = path.join(cacheFolder, tostring(id) .. ".png")
         local uri: string? = nil
         if filesystem.isfile(filePath) then
@@ -168,29 +178,36 @@ function imageCache.preload(onSettled: PreloadCallback?): (boolean, number)
             -- already on disk from a past session: use it right away
             rewrites[id] = uri
         else
-            -- not cached yet: fetch it in the background and swap it in once it lands
-            missing += 1
-            pending += 1
-            task.spawn(function()
-                local cached = cacheFile(filePath, url)
-                if cached then
-                    rewrites[id] = cached
-                    if imageCache.onCached then
-                        -- a throw in here would strand the counter and settle would never fire
-                        pcall(imageCache.onCached, id)
-                    end
-                end
-                pending -= 1
-                if pending == 0 and not spawning then
-                    settle()
-                end
-            end)
+            table.insert(missingIds, id)
+            table.insert(missingPaths, filePath)
         end
     end
 
-    spawning = false
-    if pending == 0 then
+    local missing = #missingIds
+    if missing == 0 then
         settle()
+    else
+        -- One background task preserves preload's non-blocking contract while the resolver
+        -- chunks proxy requests and returns results in the same order as missingIds.
+        task.spawn(function()
+            local ok, results = pcall(function()
+                return assetResolver:getAssetContentsFromIds(missingIds, false)
+            end)
+            if ok and type(results) == "table" then
+                for index, id in ipairs(missingIds) do
+                    local result = results[index]
+                    local body = if type(result) == "table" then result.content else nil
+                    local cached = cacheAssetBody(missingPaths[index], body)
+                    if cached then
+                        rewrites[id] = cached
+                        if imageCache.onCached then
+                            pcall(imageCache.onCached, id)
+                        end
+                    end
+                end
+            end
+            settle()
+        end)
     end
 
     return missing == 0, missing
