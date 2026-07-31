@@ -29,6 +29,7 @@ return function()
             originalGetCustomAsset = getfenv().getcustomasset
             originalAssetResolver = {
                 getAssetContentFromUrl = variables.assetResolver.getAssetContentFromUrl,
+                getAssetContentsFromIds = variables.assetResolver.getAssetContentsFromIds,
             }
             originalJsonDecode = variables.httpService.JSONDecode
             originalWait = task.wait
@@ -45,6 +46,16 @@ return function()
             variables.assetResolver.getAssetContentFromUrl = function(_, url)
                 -- real icon/avatar bodies are pngs; cacheFile checks the magic before writing
                 return "\137PNG\r\n\26\nbody:" .. tostring(url)
+            end
+            variables.assetResolver.getAssetContentsFromIds = function(_, ids)
+                local results = {}
+                for index, id in ipairs(ids) do
+                    results[index] = {
+                        assetId = tostring(id),
+                        content = "\137PNG\r\n\26\nbody:" .. tostring(id),
+                    }
+                end
+                return results
             end
             variables.httpService.JSONDecode = function()
                 return {
@@ -67,6 +78,7 @@ return function()
             filesystem.writefile = originalFilesystem.writefile
             getfenv().getcustomasset = originalGetCustomAsset
             variables.assetResolver.getAssetContentFromUrl = originalAssetResolver.getAssetContentFromUrl
+            variables.assetResolver.getAssetContentsFromIds = originalAssetResolver.getAssetContentsFromIds
             variables.httpService.JSONDecode = originalJsonDecode
             task.wait = originalWait
         end)
@@ -107,6 +119,15 @@ return function()
                 return "asset://" .. path
             end
             local cachedIds = {}
+            local requestedIds
+            variables.assetResolver.getAssetContentsFromIds = function(_, ids)
+                requestedIds = ids
+                local results = {}
+                for index, id in ipairs(ids) do
+                    results[index] = { content = "\137PNG\r\n\26\n" .. tostring(id) }
+                end
+                return results
+            end
             imageCache.onCached = function(id)
                 cachedIds[id] = true
             end
@@ -119,6 +140,7 @@ return function()
             expect(ok).to.equal(false)
             expect(missing).to.be.ok()
             expect(settled).to.equal(0)
+            expect(#requestedIds).to.equal(missing)
             expect(cachedIds[constants.icons.close]).to.equal(true)
             expect(imageCache.rewrites[constants.icons.close]).to.be.ok()
         end)
@@ -192,8 +214,12 @@ return function()
             getfenv().getcustomasset = function(path)
                 return "asset://" .. path
             end
-            variables.assetResolver.getAssetContentFromUrl = function()
-                return "<html>error page</html>"
+            variables.assetResolver.getAssetContentsFromIds = function(_, ids)
+                local results = {}
+                for index in ipairs(ids) do
+                    results[index] = { content = "<html>error page</html>" }
+                end
+                return results
             end
             local settled
 

@@ -36,19 +36,13 @@ end)
 variables.fallbackFont = Font.fromEnum(Enum.Font.BuilderSans)
 
 variables.fileSystemManager = fileSystemManager.new()
-variables.assetResolver =
-    assetResolver.new(true, assetResolver.Enum.AssetDownloadUrl.RoProxyDownloadUrl) :: AssetResolver
-variables.fontManager = fontManager.new(
-    variables.fileSystemManager:getAssetsFolder("fonts"),
-    false,
-    true,
-    assetResolver.Enum.AssetDownloadUrl.RoProxyDownloadUrl,
-    {
-        saveToDisk = true,
-        skipCache = false,
-        fallbackFont = variables.fallbackFont,
-    }
-) :: FontManager
+variables.assetResolver = assetResolver.new(true) :: AssetResolver
+variables.fontManager = fontManager.new(variables.fileSystemManager:getAssetsFolder("fonts"), true, true, nil, {
+    saveToDisk = true,
+    skipCache = false,
+    fallbackFont = variables.fallbackFont,
+}) :: FontManager
+print("initialized font manager", variables.fontManager)
 
 -- let a dev pick the stand-in font, as an Enum.Font or a ready Font. keeps the font managers
 -- own fallback in step so the swap check in init still lines up.
