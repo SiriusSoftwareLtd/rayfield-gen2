@@ -44,6 +44,11 @@ local function teardownElements(window, elements)
             element._dragConnection:Disconnect()
             element._dragConnection = nil
         end
+        -- a keybind removed mid-rebind would otherwise leave the window skipping its toggle
+        -- key (and every keybind bailing) forever
+        if window._recordingKeybind == element then
+            window._recordingKeybind = nil
+        end
         if element._outsideClickConn then
             window:Disconnect(element._outsideClickConn)
             element._outsideClickConn = nil

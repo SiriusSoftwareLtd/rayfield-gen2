@@ -69,6 +69,11 @@ local backdropShown = 0.5 -- how dark the dim gets
 -- never runs Close, so entries are pruned by liveness rather than trusted to remove themselves.
 local stack = {}
 
+-- The Escape press that just closed a popup. Every open popup listens to the same InputBegan
+-- and closing the top one synchronously makes the next one topmost, so without this a single
+-- press would fall through the whole stack.
+local consumedEscape = nil
+
 local function topmost(popup)
     for index = #stack, 1, -1 do
         local open = stack[index]
@@ -245,6 +250,10 @@ function Popup:_build()
             self._connections,
             window:Connect(variables.userInputService.InputBegan, function(input, processed)
                 if not processed and input.KeyCode == Enum.KeyCode.Escape and topmost(self) then
+                    if input == consumedEscape then
+                        return
+                    end
+                    consumedEscape = input
                     self:Close()
                 end
             end)

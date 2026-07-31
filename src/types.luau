@@ -221,6 +221,9 @@ export type Slider = Moveable & {
 export type Dropdown = Moveable & {
     value: { string }, -- always stored pruned to the current options, even single-select
     Set: (self: Dropdown, value: string | { string }, skipCallback: boolean?) -> (),
+    Refresh: (self: Dropdown, options: { string }) -> (),
+    Add: (self: Dropdown, option: string) -> (),
+    Remove: (self: Dropdown, option: string) -> (),
 }
 
 export type Input = Moveable & {
@@ -270,12 +273,16 @@ export type Group = Moveable & {
     CreateSwitch: (self: Group, props: ToggleProps) -> Toggle,
     CreateStat: (self: Group, props: StatProps) -> Stat,
     CreateSlider: (self: Group, props: SliderProps) -> Slider,
-    CreateDropdown: (self: Group, props: DropdownProps) -> Dropdown,
-    CreateSection: (self: Group, props: SectionProps) -> Section,
+    -- nil on a row: only columns take dropdowns and sections
+    CreateDropdown: (self: Group, props: DropdownProps) -> Dropdown?,
+    CreateSection: (self: Group, props: SectionProps) -> Section?,
     CreateGroup: (self: Group, props: GroupProps?) -> Group,
 }
 
 export type Tab = {
+    Select: (self: Tab, noAnimation: boolean?) -> (),
+    Deselect: (self: Tab, noAnimation: boolean?) -> (),
+    Remove: (self: Tab) -> (),
     CreateButton: (self: Tab, props: ButtonProps) -> Button,
     CreateToggle: (self: Tab, props: ToggleProps) -> Toggle,
     CreateSwitch: (self: Tab, props: ToggleProps) -> Toggle,
@@ -291,11 +298,14 @@ export type Tab = {
 
 export type Window = {
     unloaded: boolean, -- true once Unload has run; the handle is spent
+    -- always-live view of every saved control, keyed by flag; reads give the current value,
+    -- writes route through the control's Set
+    Flags: { [string]: any },
     CreateTab: (self: Window, props: TabProps) -> Tab,
     CreateTag: (self: Window, props: TagProps) -> Tag,
     Notify: (self: Window, props: NotifyProps) -> (),
     Toast: (self: Window, props: ToastProps) -> (),
-    Popup: (self: Window, props: PopupProps) -> Popup,
+    Popup: (self: Window, props: PopupProps) -> Popup?, -- nil once the window is unloaded
     Show: (self: Window) -> (),
     Hide: (self: Window) -> (),
     ToggleHide: (self: Window) -> (),
@@ -309,6 +319,9 @@ export type Window = {
     Load: (self: Window, name: string?) -> boolean,
     ListConfigs: (self: Window) -> { string },
     DeleteConfig: (self: Window, name: string) -> boolean,
+    GetPath: (self: Window) -> (string, string),
+    Get: (self: Window, flag: string) -> any,
+    Set: (self: Window, flag: string, value: any) -> boolean,
     Unload: (self: Window) -> (),
 }
 
