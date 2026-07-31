@@ -70,6 +70,7 @@ export type FontResolverOptions = {
 
 type FontManagerState = {
     _debug: boolean,
+    _pendingLoads: { [string]: { thread } },
     rootFolder: string,
     assetResolver: assetResolver.AssetResolver,
     defaultOptions: FontResolverOptions,
@@ -195,12 +196,165 @@ function fontManager.new(
             assetResolver = assetResolver.new(useCache, assetContentDownloadUrl),
             defaultOptions = defaultResolverOptions,
             _debug = useDebug or runService:IsStudio() or false,
+            _pendingLoads = {},
         } :: FontManagerState,
         fontManager
     ) :: any
     -- executors without filesystem support must degrade to the fallback font, not kill the require
     pcall(fileSystem.ensureFolder, rootFolder)
     return self
+end
+
+-- the full manifest + face pipeline for one font. slow path only; loadFont wraps it
+-- with the session cache and in-flight dedup
+local function fetchFont(
+    self: FontManager,
+    resolvedId: number,
+    requestedFontWeight: Enum.FontWeight,
+    requestedFontStyle: Enum.FontStyle,
+    cacheKey: string
+): Font?
+    local manifestPath = self.rootFolder .. "/" .. resolvedId .. ".json"
+    -- fonts only load through the disk cache; without a file API there is just the fallback
+    if typeof(fileSystem.isfile) ~= "function" then
+        return self.defaultOptions.fallbackFont
+    end
+    local possibleFontManifest: string? = nil
+    local downloadedManifest = false
+    if runService:IsStudio() and self._debug then
+        log.warn("Font manifest loading is not supported in Studio. Using default font manifest for testing.")
+        possibleFontManifest =
+            '{"name":"Inter","faces":[{"name":"Thin","weight":100,"style":"normal","assetId":"rbxassetid://12187277209"},{"name":"Extra Light","weight":200,"style":"normal","assetId":"rbxassetid://12187293441"},{"name":"Light","weight":300,"style":"normal","assetId":"rbxassetid://12187268450"},{"name":"Regular","weight":400,"style":"normal","assetId":"rbxassetid://12187266066"},{"name":"Medium","weight":500,"style":"normal","assetId":"rbxassetid://12187336822"},{"name":"Semi Bold","weight":600,"style":"normal","assetId":"rbxassetid://12187254443"},{"name":"Bold","weight":700,"style":"normal","assetId":"rbxassetid://12187275575"},{"name":"Extra Bold","weight":800,"style":"normal","assetId":"rbxassetid://12187267750"},{"name":"Black","weight":900,"style":"normal","assetId":"rbxassetid://12187359223"}]}'
+    elseif fileSystem.isfile(manifestPath) then
+        local ok, contents = pcall(fileSystem.readfile, manifestPath)
+        possibleFontManifest = ok and contents or nil
+    else
+        -- written below only once it validates, so a bad body never poisons the cache
+        possibleFontManifest = self.assetResolver:getAssetContentFromId(resolvedId, false)
+        downloadedManifest = possibleFontManifest ~= nil
+    end
+    local fontManifest: FontManifest? = nil
+    if possibleFontManifest then
+        local ok, parsedManifest = pcall(jsonDecode, possibleFontManifest)
+        if ok and parsedManifest then
+            fontManifest = validateManifest(parsedManifest)
+        else
+            if self._debug then
+                log.warn(
+                    "Failed to parse font manifest for font id: "
+                        .. tostring(resolvedId)
+                        .. ". Error: "
+                        .. tostring(parsedManifest)
+                )
+            end
+        end
+    else
+        return self.defaultOptions.fallbackFont
+    end
+    if not fontManifest then
+        if self._debug then
+            log.warn("Font manifest is nil for font id: " .. tostring(resolvedId))
+        end
+        -- a cached manifest that fails validation would fail forever; drop it
+        pcall(fileSystem.delfile, manifestPath)
+        return self.defaultOptions.fallbackFont
+    end
+    if downloadedManifest and possibleFontManifest then
+        pcall(fileSystem.writefile, manifestPath, possibleFontManifest)
+    end
+    local fontDirectory = self.rootFolder .. "/" .. fontManifest.name
+    local madeAllFontsLocal = true
+    -- create folder for the font
+    if not pcall(fileSystem.ensureFolder, fontDirectory) then
+        return self.defaultOptions.fallbackFont
+    end
+
+    -- iterate over each face, caching each to disk like we do images: a face only downloads once,
+    -- later sessions reuse the local file and just re-resolve it
+    for i, face in ipairs(fontManifest.faces) do
+        local fontFacePath = fontDirectory .. "/" .. face.name:gsub(" ", "-") .. ".ttf"
+        -- a crash mid-write leaves a truncated face that shadows the real font forever, so
+        -- recheck the signature and let a bad file heal the way the manifest does above
+        if fileSystem.isfile(fontFacePath) then
+            local readOk, existing = pcall(fileSystem.readfile, fontFacePath)
+            if not readOk or type(existing) ~= "string" or not isFontBody(existing) then
+                pcall(fileSystem.delfile, fontFacePath)
+            end
+        end
+        if not fileSystem.isfile(fontFacePath) then
+            local fontFaceId = self.assetResolver:resolve(face.assetId)
+            local fontFaceContent = if fontFaceId ~= nil
+                then self.assetResolver:getAssetContentFromId(fontFaceId, false)
+                else nil
+            if not fontFaceContent or not isFontBody(fontFaceContent) then
+                madeAllFontsLocal = false
+                if self._debug then
+                    log.warn(
+                        "Font face content is missing or not a font for font id: "
+                            .. tostring(resolvedId)
+                            .. ", face: "
+                            .. face.name
+                    )
+                end
+                continue
+            end
+            pcall(fileSystem.writefile, fontFacePath, fontFaceContent)
+        end
+        local ok, uri = pcall(env.getcustomasset, fontFacePath)
+        if ok and type(uri) == "string" then
+            fontManifest.faces[i].assetId = uri
+            if self._debug then
+                log.print("Loaded font face for id: " .. tostring(resolvedId) .. ", face: " .. face.name)
+            end
+        else
+            madeAllFontsLocal = false
+            if self._debug then
+                log.warn("Failed to load font face for id: " .. tostring(resolvedId) .. ", face: " .. face.name)
+            end
+        end
+    end
+    -- every face must be local before we hand the font over; falling back to the remote id
+    -- here would fetch the asset this whole flow exists to keep off the wire
+    if not madeAllFontsLocal then
+        return self.defaultOptions.fallbackFont
+    end
+
+    local encodedManifest = jsonEncode(fontManifest)
+    if not encodedManifest or not pcall(fileSystem.writefile, fontDirectory .. "/manifest.json", encodedManifest) then
+        return self.defaultOptions.fallbackFont
+    end
+    local manifestOk, fontManifestId = pcall(env.getcustomasset, fontDirectory .. "/manifest.json")
+    if not manifestOk or not fontManifestId then
+        if self._debug then
+            log.warn("Failed to load font manifest for id: " .. tostring(resolvedId))
+        end
+        return self.defaultOptions.fallbackFont
+    end
+    -- load the font using the manifest
+    local ok, loadedFont = pcall(Font.new, fontManifestId :: any, requestedFontWeight, requestedFontStyle)
+    if not ok or not loadedFont then
+        if self._debug then
+            log.warn("Failed to load font for id: " .. tostring(resolvedId))
+        end
+        return self.defaultOptions.fallbackFont
+    end
+
+    -- write the font manifest to the disk
+    local fontCache = self.fontCache
+    if fontCache then
+        fontCache[resolvedId] = {
+            customId = fontManifestId,
+            manifest = fontManifest,
+            loadedFromDisk = true,
+            variants = {
+                [cacheKey] = loadedFont,
+            },
+        }
+        if self._debug then
+            log.print("Cached font for id: " .. tostring(resolvedId))
+        end
+    end
+    return loadedFont
 end
 
 function fontManager.loadFont(
@@ -266,137 +420,27 @@ function fontManager.loadFont(
         return self.defaultOptions.fallbackFont
     end
 
-    -- if the font is not cached, we need to load it from the asset resolver
-    local manifestPath = self.rootFolder .. "/" .. resolvedId .. ".json"
-    -- fonts only load through the disk cache; without a file API there is just the fallback
-    if typeof(fileSystem.isfile) ~= "function" then
-        return self.defaultOptions.fallbackFont
+    -- concurrent loads of the same variant share one pipeline instead of downloading twice
+    local pendingLoads = self._pendingLoads
+    local pendingKey = tostring(resolvedId) .. "|" .. cacheKey
+    local waiting = pendingLoads[pendingKey]
+    if waiting then
+        table.insert(waiting, coroutine.running())
+        return coroutine.yield()
     end
-    local possibleFontManifest: string? = nil
-    local downloadedManifest = false
-    if runService:IsStudio() and self._debug then
-        log.warn("Font manifest loading is not supported in Studio. Using default font manifest for testing.")
-        possibleFontManifest =
-            '{"name":"Inter","faces":[{"name":"Thin","weight":100,"style":"normal","assetId":"rbxassetid://12187277209"},{"name":"Extra Light","weight":200,"style":"normal","assetId":"rbxassetid://12187293441"},{"name":"Light","weight":300,"style":"normal","assetId":"rbxassetid://12187268450"},{"name":"Regular","weight":400,"style":"normal","assetId":"rbxassetid://12187266066"},{"name":"Medium","weight":500,"style":"normal","assetId":"rbxassetid://12187336822"},{"name":"Semi Bold","weight":600,"style":"normal","assetId":"rbxassetid://12187254443"},{"name":"Bold","weight":700,"style":"normal","assetId":"rbxassetid://12187275575"},{"name":"Extra Bold","weight":800,"style":"normal","assetId":"rbxassetid://12187267750"},{"name":"Black","weight":900,"style":"normal","assetId":"rbxassetid://12187359223"}]}'
-    elseif fileSystem.isfile(manifestPath) then
-        local ok, contents = pcall(fileSystem.readfile, manifestPath)
-        possibleFontManifest = ok and contents or nil
-    else
-        -- written below only once it validates, so a bad body never poisons the cache
-        possibleFontManifest = self.assetResolver:getAssetContentFromId(resolvedId, false)
-        downloadedManifest = possibleFontManifest ~= nil
-    end
-    local fontManifest: FontManifest? = nil
-    if possibleFontManifest then
-        local ok, parsedManifest = pcall(jsonDecode, possibleFontManifest)
-        if ok and parsedManifest then
-            fontManifest = validateManifest(parsedManifest)
-        else
-            if self._debug then
-                log.warn(
-                    "Failed to parse font manifest for font id: "
-                        .. tostring(resolvedId)
-                        .. ". Error: "
-                        .. tostring(parsedManifest)
-                )
-            end
-        end
-    else
-        return self.defaultOptions.fallbackFont
-    end
-    if not fontManifest then
-        if self._debug then
-            log.warn("Font manifest is nil for font id: " .. tostring(resolvedId))
-        end
-        -- a cached manifest that fails validation would fail forever; drop it
-        pcall(fileSystem.delfile, manifestPath)
-        return self.defaultOptions.fallbackFont
-    end
-    if downloadedManifest and possibleFontManifest then
-        pcall(fileSystem.writefile, manifestPath, possibleFontManifest)
-    end
-    local fontDirectory = self.rootFolder .. "/" .. fontManifest.name
-    local madeAllFontsLocal = true
-    -- create folder for the font
-    if not pcall(fileSystem.ensureFolder, fontDirectory) then
-        return self.defaultOptions.fallbackFont
-    end
+    pendingLoads[pendingKey] = {}
 
-    -- iterate over each face, caching each to disk like we do images: a face only downloads once,
-    -- later sessions reuse the local file and just re-resolve it
-    for i, face in ipairs(fontManifest.faces) do
-        local fontFacePath = fontDirectory .. "/" .. face.name:gsub(" ", "-") .. ".ttf"
-        if not fileSystem.isfile(fontFacePath) then
-            local fontFaceId = self.assetResolver:resolve(face.assetId)
-            local fontFaceContent = if fontFaceId ~= nil
-                then self.assetResolver:getAssetContentFromId(fontFaceId, false)
-                else nil
-            if not fontFaceContent or not isFontBody(fontFaceContent) then
-                madeAllFontsLocal = false
-                if self._debug then
-                    log.warn(
-                        "Font face content is missing or not a font for font id: "
-                            .. tostring(resolvedId)
-                            .. ", face: "
-                            .. face.name
-                    )
-                end
-                continue
-            end
-            pcall(fileSystem.writefile, fontFacePath, fontFaceContent)
-        end
-        local ok, uri = pcall(env.getcustomasset, fontFacePath)
-        if ok and type(uri) == "string" then
-            fontManifest.faces[i].assetId = uri
-            if self._debug then
-                log.print("Loaded font face for id: " .. tostring(resolvedId) .. ", face: " .. face.name)
-            end
-        else
-            madeAllFontsLocal = false
-            if self._debug then
-                log.warn("Failed to load font face for id: " .. tostring(resolvedId) .. ", face: " .. face.name)
-            end
-        end
-    end
-    -- every face must be local before we hand the font over; falling back to the remote id
-    -- here would fetch the asset this whole flow exists to keep off the wire
-    if not madeAllFontsLocal then
-        return self.defaultOptions.fallbackFont
-    end
+    local ok, result = pcall(fetchFont, self, resolvedId, requestedFontWeight, requestedFontStyle, cacheKey)
+    local loadedFont = if ok then result else self.defaultOptions.fallbackFont
 
-    local encodedManifest = jsonEncode(fontManifest)
-    if not encodedManifest or not pcall(fileSystem.writefile, fontDirectory .. "/manifest.json", encodedManifest) then
-        return self.defaultOptions.fallbackFont
-    end
-    local manifestOk, fontManifestId = pcall(env.getcustomasset, fontDirectory .. "/manifest.json")
-    if not manifestOk or not fontManifestId then
-        if self._debug then
-            log.warn("Failed to load font manifest for id: " .. tostring(resolvedId))
-        end
-        return self.defaultOptions.fallbackFont
-    end
-    -- load the font using the manifest
-    local ok, loadedFont = pcall(Font.new, fontManifestId :: any, requestedFontWeight, requestedFontStyle)
-    if not ok or not loadedFont then
-        if self._debug then
-            log.warn("Failed to load font for id: " .. tostring(resolvedId))
-        end
-        return self.defaultOptions.fallbackFont
-    end
-
-    -- write the font manifest to the disk
-    fontCache = self.fontCache
-    if fontCache then
-        fontCache[resolvedId] = {
-            customId = fontManifestId,
-            manifest = fontManifest,
-            loadedFromDisk = true,
-            variants = {
-                [cacheKey] = loadedFont,
-            },
-        }
-        if self._debug then
-            log.print("Cached font for id: " .. tostring(resolvedId))
+    -- hand every waiter the same result, and always clear the entry so a failure
+    -- doesnt strand later callers. plain resume, since not every runtime's
+    -- task.spawn can take a thread
+    waiting = pendingLoads[pendingKey]
+    pendingLoads[pendingKey] = nil
+    if waiting then
+        for _, thread in waiting do
+            coroutine.resume(thread, loadedFont)
         end
     end
     return loadedFont

@@ -50,7 +50,12 @@ runtime.localizationService = services.getService("LocalizationService") :: Loca
 -- a gethui stub that returns nil would parent every ScreenGui nowhere, so fall back to CoreGui
 runtime.guiContainer = (function(): Instance
     if runtime.runService:IsStudio() then
-        return (runtime.localPlayer :: Player).PlayerGui
+        -- Run mode and the command bar have no LocalPlayer, so land in CoreGui instead
+        local player = runtime.localPlayer
+        if player then
+            return player.PlayerGui
+        end
+        return runtime.coreGui
     end
     if typeof(gethui) == "function" then
         local ok, container = pcall(gethui)

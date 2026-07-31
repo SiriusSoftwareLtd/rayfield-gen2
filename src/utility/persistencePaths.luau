@@ -18,13 +18,21 @@ type ConfigWindow = {
     name: string,
 }
 
-function paths.getConfigPath(window: ConfigWindow, name: unknown?): (string, string)
+function paths.getConfigPath(window: ConfigWindow, name: unknown?): (string?, string?)
     local dir = variables.fileSystemManager:getPath("Configurations")
     if window.configuration.customFolder then
         dir = path.join(dir, path.sanitizeFolder(window.configuration.customFolder))
     end
-    local base = name or window.configuration.fileName or window.name
-    local safe = path.sanitizeFile(base)
+    if name ~= nil then
+        -- an explicit name that sanitizes away must fail here, not quietly
+        -- target the window's default file
+        local safe = path.sanitizeFile(name)
+        if safe == "" then
+            return nil, nil
+        end
+        return dir, path.join(dir, safe .. ".rfld")
+    end
+    local safe = path.sanitizeFile(window.configuration.fileName or window.name)
     if safe == "" then
         safe = path.sanitizeFile(window.name)
     end

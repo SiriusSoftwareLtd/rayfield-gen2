@@ -48,6 +48,19 @@ return function()
             expect(fullPath).to.equal("Root/Configurations/NamedConfig.rfld")
         end)
 
+        it("rejects explicit names that sanitize to nothing", function()
+            local window = {
+                name = "Window Name",
+                configuration = {},
+            }
+
+            -- falling back here would aim DeleteConfig("::") at the default config file
+            local dir, fullPath = paths.getConfigPath(window, "::")
+
+            expect(dir).never.to.be.ok()
+            expect(fullPath).never.to.be.ok()
+        end)
+
         it("falls back to a default file name when sanitized names are empty", function()
             local window = {
                 name = "..",

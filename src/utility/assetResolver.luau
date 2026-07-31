@@ -30,6 +30,7 @@ type AssetResolverState = {
     contentCache: { [CacheKey]: string }?,
     contentCacheOrder: { CacheKey }?,
     contentDownloadUrl: AssetDownloadUrl,
+    pendingRequests: { [CacheKey]: { thread } },
 }
 export type AssetResolver = AssetResolverState & {
     resolve: (self: AssetResolver, value: unknown) -> ResolvedAsset?,
@@ -54,6 +55,7 @@ function assetResolver.new(useCache: boolean?, assetContentDownloadUrl: AssetDow
             contentCache = contentCache,
             contentCacheOrder = if useCache then {} :: { CacheKey } else nil,
             contentDownloadUrl = assetContentDownloadUrl or assetResolver.Enum.AssetDownloadUrl.RobloxDownloadUrl,
+            pendingRequests = {},
         } :: AssetResolverState,
         assetResolver
     ) :: any
@@ -118,36 +120,59 @@ function assetResolver.getAssetContentFromUrl(
         end
     end
 
+    -- one download per key at a time; late callers wait on the first request's body
+    -- instead of racing their own copy down
+    local pendingRequests = self.pendingRequests
+    if cacheKey ~= nil then
+        local pending = pendingRequests[cacheKey]
+        if pending then
+            table.insert(pending, coroutine.running())
+            return coroutine.yield()
+        end
+        pendingRequests[cacheKey] = {}
+    end
+
+    local content: string? = nil
     local requestFn = network.getRequestFn()
     if not requestFn then
         log.warn("No request function available to download asset content.")
-        return nil
+    else
+        local success, response = pcall(
+            requestFn,
+            {
+                Url = url,
+                Method = "GET",
+            } :: AssetRequestPayload
+        )
+        if success and isGoodResponse(response) then
+            local body = (response :: { Body: string }).Body
+            content = body
+            if cacheKey ~= nil and contentCache then
+                local order = self.contentCacheOrder
+                if order and contentCache[cacheKey] == nil then
+                    table.insert(order, cacheKey)
+                    local oldest = if #order > contentCacheLimit then table.remove(order, 1) else nil
+                    if oldest ~= nil then
+                        contentCache[oldest] = nil
+                    end
+                end
+                contentCache[cacheKey] = body
+            end
+        elseif not forced then
+            log.warn("Failed to download asset content for url: " .. tostring(url))
+        end
     end
 
-    local success, response = pcall(
-        requestFn,
-        {
-            Url = url,
-            Method = "GET",
-        } :: AssetRequestPayload
-    )
-    local content: string? = nil
-    if success and isGoodResponse(response) then
-        local body = (response :: { Body: string }).Body
-        content = body
-        if cacheKey ~= nil and contentCache then
-            local order = self.contentCacheOrder
-            if order and contentCache[cacheKey] == nil then
-                table.insert(order, cacheKey)
-                local oldest = if #order > contentCacheLimit then table.remove(order, 1) else nil
-                if oldest ~= nil then
-                    contentCache[oldest] = nil
-                end
+    -- resume waiters with whatever we got, nil included, and always clear the entry.
+    -- plain resume, since not every runtime's task.spawn can take a thread
+    if cacheKey ~= nil then
+        local waiting = pendingRequests[cacheKey]
+        pendingRequests[cacheKey] = nil
+        if waiting then
+            for _, thread in waiting do
+                coroutine.resume(thread, content)
             end
-            contentCache[cacheKey] = body
         end
-    elseif not forced then
-        log.warn("Failed to download asset content for url: " .. tostring(url))
     end
     return content
 end

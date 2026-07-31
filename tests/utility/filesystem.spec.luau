@@ -30,6 +30,15 @@ return function()
             expect(filesystem.isfile(filePath)).never.to.be.ok()
         end)
 
+        it("creates the file when appending to a missing path", function()
+            local filePath = rootName .. "/fresh.txt"
+
+            -- same semantics as the native appendfile global and the read+write fallback
+            filesystem.appendfile(filePath, "alpha")
+
+            expect(filesystem.readfile(filePath)).to.equal("alpha")
+        end)
+
         it("creates, lists, checks, and deletes folders", function()
             local folderPath = rootName .. "/children"
             filesystem.makefolder(folderPath)
