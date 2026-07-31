@@ -10,7 +10,8 @@
 
 local windowSizing = {}
 
--- Default window size, and the smallest we'll shrink it to on a tiny screen.
+-- Default window size, and the smallest we'll shrink it to on a tiny screen. The minimum is a
+-- floor, not a guarantee: a screen too small to hold it gets a window that fits instead.
 local defaultSize = Vector2.new(475, 500)
 local minSize = Vector2.new(300, 285)
 
@@ -49,11 +50,14 @@ function windowSizing.fit(viewport: Vector2?): UDim2
     local availableX = math.min(viewport.X * maxOccupancy.X, viewport.X - marginFloor.X)
     local availableY = math.min(viewport.Y * maxOccupancy.Y, viewport.Y - marginFloor.Y)
 
-    local height = math.clamp(availableY, minSize.Y, defaultSize.Y)
+    -- the floor gives way to the screen: a viewport too small to hold it gets a smaller window
+    -- rather than one hanging off the edge, so the occupancy caps hold at every size
+    local height = math.min(math.clamp(availableY, minSize.Y, defaultSize.Y), availableY)
     local deficit = heightDeficit(height)
     local width = math.min(defaultSize.X + widthCompensation * deficit, availableX, height * maxAspectRatio)
 
-    return UDim2.fromOffset(math.round(math.max(width, minSize.X)), math.round(height))
+    -- floor, not round: rounding up can carry the result back past the cap it was just clamped to
+    return UDim2.fromOffset(math.floor(math.min(math.max(width, minSize.X), availableX)), math.floor(height))
 end
 
 return windowSizing

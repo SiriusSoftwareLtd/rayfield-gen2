@@ -62,15 +62,37 @@ return function()
             end
         end)
 
-        it("holds the floor and the aspect ceiling on a very short screen", function()
+        it("holds the aspect ceiling on a very short screen", function()
             local width, height = fit(1200, 240)
-            expect(height).to.equal(windowSizing.minSize.Y)
             expect(width <= height * 1.95).to.equal(true)
         end)
 
-        it("never drops below the minimum width", function()
-            local width = fit(300, 700)
+        it("keeps the minimum as a floor while the screen can afford it", function()
+            local width = fit(400, 700)
             expect(width >= windowSizing.minSize.X).to.equal(true)
+        end)
+
+        it("gives the floor up rather than overflow a screen too small for it", function()
+            -- both of these clear the plausibility check but cannot hold the minimum size
+            local narrowWidth, narrowHeight = fit(240, 700)
+            expect(narrowWidth <= 240).to.equal(true)
+            expect(narrowWidth < windowSizing.minSize.X).to.equal(true)
+            expect(narrowHeight <= 700).to.equal(true)
+
+            local shortWidth, shortHeight = fit(1200, 240)
+            expect(shortHeight <= 240).to.equal(true)
+            expect(shortHeight < windowSizing.minSize.Y).to.equal(true)
+            expect(shortWidth <= 1200).to.equal(true)
+        end)
+
+        it("holds the occupancy caps down to the smallest believed viewport", function()
+            for _, viewport in
+                { Vector2.new(200, 200), Vector2.new(240, 700), Vector2.new(1200, 240), Vector2.new(210, 380) }
+            do
+                local width, height = fit(viewport.X, viewport.Y)
+                expect(width <= viewport.X * 0.86).to.equal(true)
+                expect(height <= viewport.Y * 0.80).to.equal(true)
+            end
         end)
 
         it("returns whole pixels", function()

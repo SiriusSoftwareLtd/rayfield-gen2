@@ -1177,14 +1177,20 @@ function Window:_applyWindowSize()
     end
 
     local size = fitWindowSize()
-    if size == self.size then
-        return
-    end
+    local changed = size ~= self.size
     self.size = size
 
+    -- a window mid-animation is already tweening toward the old size, so bank the change and
+    -- let the reconcile apply it once the tween is done rather than fighting it
     if self.hidden or self.minimised or self.animating or self._revealing then
+        self._pendingResize = self._pendingResize or changed
         return
     end
+
+    if not changed and not self._pendingResize then
+        return
+    end
+    self._pendingResize = false
 
     self.main.Size = size
     self:_clampToScreen()

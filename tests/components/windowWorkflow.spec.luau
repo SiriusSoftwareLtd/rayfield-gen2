@@ -936,26 +936,66 @@ return function()
             return fitted
         end
 
-        -- a camera the specs can move, standing in for a screen that rotates or resizes
-        local function setViewport(x, y)
-            variables.workspace.CurrentCamera = {
-                ViewportSize = Vector2.new(x, y),
-                GetPropertyChangedSignal = function()
+        -- a signal the specs can actually fire, so the watcher gets exercised rather than
+        -- just constructed
+        local function makeSignal()
+            local handlers = {}
+            return {
+                Connect = function(_, handler)
+                    table.insert(handlers, handler)
                     return {
-                        Connect = function()
-                            return { Disconnect = function() end }
+                        Disconnect = function()
+                            local index = table.find(handlers, handler)
+                            if index then
+                                table.remove(handlers, index)
+                            end
                         end,
                     }
+                end,
+                fire = function()
+                    for _, handler in table.clone(handlers) do
+                        handler()
+                    end
+                end,
+                connected = function()
+                    return #handlers
                 end,
             }
         end
 
+        -- a camera the specs can move, standing in for a screen that rotates or resizes
+        local function makeCamera(x, y)
+            local changed = makeSignal()
+            return {
+                ViewportSize = Vector2.new(x, y),
+                changed = changed,
+                GetPropertyChangedSignal = function()
+                    return changed
+                end,
+            }
+        end
+
+        local function setViewport(x, y)
+            local camera = makeCamera(x, y)
+            variables.workspace.CurrentCamera = camera
+            return camera
+        end
+
+        local originalWorkspaceSignal
+        local cameraSwapped
+
         beforeEach(function()
             originalCamera = variables.workspace.CurrentCamera
+            originalWorkspaceSignal = variables.workspace.GetPropertyChangedSignal
+            cameraSwapped = makeSignal()
+            variables.workspace.GetPropertyChangedSignal = function()
+                return cameraSwapped
+            end
         end)
 
         afterEach(function()
             variables.workspace.CurrentCamera = originalCamera
+            variables.workspace.GetPropertyChangedSignal = originalWorkspaceSignal
             if fitted and not fitted.unloaded then
                 fitted:Unload()
             end
@@ -1029,6 +1069,61 @@ return function()
 
             expect(w.drag.drag.Position.X.Offset).to.equal(300)
             expect(w.drag.drag.Position.Y.Offset).to.equal(200 + w.size.Y.Offset / 2 + 15)
+        end)
+
+        it("resizes off the ViewportSize signal without being driven directly", function()
+            local camera = setViewport(1920, 1080)
+            local w = makeWindow()
+            w.hidden = false
+            expect(w.size.X.Offset).to.equal(475)
+
+            -- the watcher alone must carry this through, so nothing calls _applyWindowSize here
+            camera.ViewportSize = Vector2.new(844, 390)
+            camera.changed.fire()
+
+            expect(w.size.X.Offset > 475).to.equal(true)
+            expect(w.main.Size).to.equal(w.size)
+        end)
+
+        it("rebinds to a replacement camera and drops the old one", function()
+            local first = setViewport(1920, 1080)
+            local w = makeWindow()
+            w.hidden = false
+
+            local replacement = setViewport(844, 390)
+            cameraSwapped.fire() -- respawn, or the game swapping CurrentCamera
+
+            -- rebinding re-fits straight away, off the new camera
+            expect(w.size.X.Offset > 475).to.equal(true)
+
+            -- and the replacement drives it from here, while the dead camera does not
+            replacement.ViewportSize = Vector2.new(1920, 1080)
+            replacement.changed.fire()
+            expect(w.size.X.Offset).to.equal(475)
+
+            first.ViewportSize = Vector2.new(667, 375)
+            first.changed.fire()
+            expect(w.size.X.Offset).to.equal(475)
+            expect(first.changed.connected()).to.equal(0)
+        end)
+
+        it("applies a size banked during a reveal once the window settles", function()
+            setViewport(1920, 1080)
+            local w = makeWindow()
+            w.hidden = false
+            w:_applyWindowSize()
+            local before = w.main.Size
+
+            -- a rotation mid-reveal must not fight the tween, but must not be lost either
+            w._revealing = true
+            setViewport(844, 390)
+            w:_applyWindowSize()
+            expect(w.main.Size).to.equal(before)
+            expect(w.size).never.to.equal(before)
+
+            w._revealing = false
+            w:_applyWindowSize()
+            expect(w.main.Size).to.equal(w.size)
         end)
     end)
 end
