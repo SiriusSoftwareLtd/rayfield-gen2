@@ -491,7 +491,8 @@ function Toggle:_minWidth()
     if self.icon then
         w += 21 -- 16 icon + 5 gap
     end
-    w += functions.textWidth(self.window.theme.Font, 16, self.name)
+    -- measure what actually renders: the title shows the translated string
+    w += functions.textWidth(self.window.theme.Font, 16, locale.resolve(self.name))
     return w
 end
 

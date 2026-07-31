@@ -36,6 +36,10 @@ local iconGap = 12 -- icon to text
 local stackPadding = 8 -- gap between stacked toasts (lives inside each, so it collapses on exit)
 local MIN_WIDTH, MAX_WIDTH = 140, 320
 
+-- Roughly what a stack can show. Past this the oldest is retired early rather than left to
+-- march offscreen still running its own dwell loop.
+local maxLive = 6
+
 -- how far above its slot the pill starts, so it flies in from off the top of the screen
 local offscreenAbove = UDim2.new(0.5, 0, 0.5, -180)
 local offscreenBelow = UDim2.new(0.5, 0, 0.5, 180)
@@ -43,7 +47,7 @@ local centred = UDim2.new(0.5, 0, 0.5, 0)
 
 -- Auto duration from the text length, clamped to a sensible window (matches notifications).
 local function autoDuration(text)
-    return math.clamp(#text * 0.05 + 3, 3, 8)
+    return math.clamp(#text * 0.06 + 3, 3, 9)
 end
 
 -- Accept a bare asset id (number) or any ready image string (rbxassetid/rbxthumb/http).
@@ -96,7 +100,7 @@ function Toast.new(window, properties, container)
     self._iconSize = if hasAvatar then avatarSize else iconSize
     self._leftPad = if hasAvatar then avatarLeftPadding else leftPadding
     self._rightPad = if hasAvatar then avatarRightPadding else rightPadding
-    self._minWidth = math.max(self.minWidth or 0, MIN_WIDTH)
+    self._minWidth = math.clamp(self.minWidth or 0, MIN_WIDTH, MAX_WIDTH)
     local hasSubtitle = self.subtitle ~= nil and self.subtitle ~= ""
 
     -- Outer frame: the stack item. Invisible; only its height animates (open the slot on
@@ -255,6 +259,27 @@ function Toast.new(window, properties, container)
     self.window._toastCount = (self.window._toastCount or 0) + 1
     self.main.LayoutOrder = -self.window._toastCount
 
+    -- a callback that toasts in a loop would stack pills forever, so retire the oldest once
+    -- theres more than the stack can show. top and bottom stacks count separately
+    local stacks = self.window._liveToasts
+    if not stacks then
+        stacks = {}
+        self.window._liveToasts = stacks
+    end
+    local live = stacks[self.main.Parent]
+    if not live then
+        live = {}
+        stacks[self.main.Parent] = live
+    end
+    self._live = live
+    table.insert(live, self)
+    while #live > maxLive do
+        local oldest = table.remove(live, 1)
+        if oldest and oldest ~= self then
+            task.spawn(oldest._dismiss, oldest)
+        end
+    end
+
     self._connections = {
         self.window:Connect(self.body.MouseEnter, function()
             self._hovered = true
@@ -291,6 +316,19 @@ function Toast:_measure()
     local left = if self.iconLabel then self._leftPad + self._iconSize + iconGap else self._leftPad
     local width = math.clamp(left + textWidth + self._rightPad, self._minWidth, MAX_WIDTH)
 
+    -- past the cap the labels stop hugging: pin them to the text column and truncate, so long
+    -- text ends in an ellipsis instead of spilling past the pill edge
+    if left + textWidth + self._rightPad > MAX_WIDTH then
+        local column = MAX_WIDTH - left - self._rightPad
+        for _, label in { self.titleLabel, self.subtitleLabel } do
+            if label then
+                label.AutomaticSize = Enum.AutomaticSize.None
+                label.TextTruncate = Enum.TextTruncate.AtEnd
+                label.Size = UDim2.fromOffset(column, label.Size.Y.Offset)
+            end
+        end
+    end
+
     local textHeight = if self.subtitleLabel then 16 + 1 + 14 else 16
     local height = math.max(textHeight, if self.iconLabel then self._iconSize else 0) + 18
 
@@ -307,6 +345,9 @@ function Toast:_show()
     hapticEngine.notify()
 
     local width, height = self:_measure()
+    if self._dismissed or not self.main.Parent then
+        return -- evicted mid-measure; dont replay the entrance over the exit
+    end
     self.main.Size = UDim2.new(0, width, 0, 0)
 
     -- +stackPadding because the outer's top padding holds the inter-toast gap
@@ -352,6 +393,12 @@ function Toast:_dismiss()
         return
     end
     self._dismissed = true
+
+    local live = self._live
+    local index = live and table.find(live, self)
+    if live and index then
+        table.remove(live, index)
+    end
 
     if not self.main.Parent then
         return
