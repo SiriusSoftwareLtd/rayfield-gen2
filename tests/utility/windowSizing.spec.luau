@@ -119,5 +119,49 @@ return function()
             expect(width % 1).to.equal(0)
             expect(height % 1).to.equal(0)
         end)
+
+        it("keeps a hand-picked size instead of re-fitting it", function()
+            -- the whole point of the separate path: a size the screen would never pick for
+            -- itself survives, where fit would hand back the default for the same screen
+            local size = windowSizing.clampUserSize(Vector2.new(900, 640), Vector2.new(1920, 1080))
+            expect(size.X).to.equal(900)
+            expect(size.Y).to.equal(640)
+        end)
+
+        it("holds a hand-picked size to the same occupancy caps as the automatic fit", function()
+            for _, viewport in { Vector2.new(1920, 1080), Vector2.new(844, 390), Vector2.new(200, 200) } do
+                local size = windowSizing.clampUserSize(Vector2.new(9999, 9999), viewport)
+                expect(size.X <= viewport.X * 0.86).to.equal(true)
+                expect(size.Y <= viewport.Y * 0.70).to.equal(true)
+            end
+        end)
+
+        it("holds a hand-picked size to the minimum floor", function()
+            local size = windowSizing.clampUserSize(Vector2.new(10, 10), Vector2.new(1920, 1080))
+            expect(size.X).to.equal(windowSizing.minSize.X)
+            expect(size.Y).to.equal(windowSizing.minSize.Y)
+        end)
+
+        it("gives the floor up rather than overflow a screen too small for a hand-picked size", function()
+            local size = windowSizing.clampUserSize(Vector2.new(400, 400), Vector2.new(240, 700))
+            expect(size.X < windowSizing.minSize.X).to.equal(true)
+            expect(size.X <= 240 * 0.86).to.equal(true)
+        end)
+
+        it("leaves a hand-picked size alone when the viewport is missing or implausible", function()
+            -- a camera mid-init reports one of these, and clamping against it would pull a
+            -- window the user just dragged out back to the floor for the rest of the session
+            for _, viewport in { nil, Vector2.new(0, 0), Vector2.new(640, 120) } do
+                local size = windowSizing.clampUserSize(Vector2.new(900, 640), viewport)
+                expect(size.X).to.equal(900)
+                expect(size.Y).to.equal(640)
+            end
+        end)
+
+        it("returns whole pixels for a hand-picked size", function()
+            local size = windowSizing.clampUserSize(Vector2.new(823.4, 431.7), Vector2.new(1920, 1080))
+            expect(size.X % 1).to.equal(0)
+            expect(size.Y % 1).to.equal(0)
+        end)
     end)
 end

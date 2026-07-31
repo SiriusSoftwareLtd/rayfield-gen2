@@ -45,6 +45,30 @@ local function heightDeficit(height: number): number
     return math.clamp((defaultSize.Y - height) / (defaultSize.Y - minSize.Y), 0, 1)
 end
 
+-- Hold a size the user dragged out to what the screen can carry. Separate from `fit` because the
+-- two answer different questions: `fit` picks a size for a screen, this one keeps a size the user
+-- already picked. Running a manual size back through `fit` would just undo it.
+function windowSizing.clampUserSize(size: Vector2, viewport: Vector2?): Vector2
+    -- the floor first and always: a window under it breaks its own top bar, whatever the screen says
+    local width = math.max(math.floor(size.X), minSize.X)
+    local height = math.max(math.floor(size.Y), minSize.Y)
+
+    -- a viewport we dont believe cant be clamped against - a camera mid-init reports one, and
+    -- sizing off it would pull a window the user just dragged out back to the floor and leave
+    -- it there. hand the size back and let the caller's reconcile clamp it once the screen reports.
+    if not viewport or viewport.X < minPlausibleViewport or viewport.Y < minPlausibleViewport then
+        return Vector2.new(width, height)
+    end
+
+    local availableX = math.min(viewport.X * maxOccupancyX, viewport.X - marginFloorX)
+    local availableY = math.min(viewport.Y * maxOccupancyY, viewport.Y - marginFloorY)
+
+    -- the caps beat the floor, the same way `fit` gives the floor up rather than overflow a screen
+    -- too small to hold it. no aspect ceiling here: thats a heuristic for a size we choose, and
+    -- holding a dragged size to it would stop the grip dead halfway through a drag the user meant.
+    return Vector2.new(math.floor(math.min(width, availableX)), math.floor(math.min(height, availableY)))
+end
+
 function windowSizing.fit(viewport: Vector2?): UDim2
     if not viewport or viewport.X < minPlausibleViewport or viewport.Y < minPlausibleViewport then
         return UDim2.fromOffset(defaultSize.X, defaultSize.Y)

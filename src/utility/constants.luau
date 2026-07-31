@@ -59,6 +59,8 @@ constants.statAccents = {
 -- Named stacking layers for window furniture (assumes Global ZIndexBehavior)
 constants.zIndex = {
     bottomFade = 100,
+    -- the corner grip sits over the bottom fade, which would otherwise paint across it
+    resizeGrip = 150,
     -- bottom-right notification cards, above the bottom fade + drag so they aren't dimmed or
     -- pierced by them (they land over the window's lower-right corner)
     notification = 1500,
