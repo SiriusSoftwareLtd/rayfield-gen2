@@ -40,7 +40,7 @@ return function()
             for _, viewport in { Vector2.new(667, 375), Vector2.new(844, 390), Vector2.new(720, 360) } do
                 local width, height = fit(viewport.X, viewport.Y)
                 expect(width <= viewport.X * 0.86).to.equal(true)
-                expect(height <= viewport.Y * 0.80).to.equal(true)
+                expect(height <= viewport.Y * 0.70).to.equal(true)
             end
         end)
 
@@ -97,7 +97,7 @@ return function()
             do
                 local width, height = fit(viewport.X, viewport.Y)
                 expect(width <= viewport.X * 0.86).to.equal(true)
-                expect(height <= viewport.Y * 0.80).to.equal(true)
+                expect(height <= viewport.Y * 0.70).to.equal(true)
             end
         end)
 
