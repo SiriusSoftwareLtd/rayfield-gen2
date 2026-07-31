@@ -36,11 +36,24 @@ return function()
             expect(phoneWidth > windowSizing.defaultSize.X).to.equal(true)
         end)
 
+        it("caps the height at exactly 70% of the screen", function()
+            -- pinned, so lowering the cap fails here instead of sliding through the bounds
+            -- checks below. 360 lands a pixel under because 360 * 0.70 is not exact in floats.
+            local _, small = fit(800, 360)
+            expect(small).to.equal(251)
+            local _, medium = fit(844, 390)
+            expect(medium).to.equal(273)
+            local _, large = fit(955, 440)
+            expect(large).to.equal(308)
+            local _, windowed = fit(1280, 600)
+            expect(windowed).to.equal(420)
+        end)
+
         it("keeps a phone inside the occupancy caps", function()
             for _, viewport in { Vector2.new(667, 375), Vector2.new(844, 390), Vector2.new(720, 360) } do
                 local width, height = fit(viewport.X, viewport.Y)
                 expect(width <= viewport.X * 0.86).to.equal(true)
-                expect(height <= viewport.Y * 0.80).to.equal(true)
+                expect(height <= viewport.Y * 0.70).to.equal(true)
             end
         end)
 
@@ -97,7 +110,7 @@ return function()
             do
                 local width, height = fit(viewport.X, viewport.Y)
                 expect(width <= viewport.X * 0.86).to.equal(true)
-                expect(height <= viewport.Y * 0.80).to.equal(true)
+                expect(height <= viewport.Y * 0.70).to.equal(true)
             end
         end)
 
