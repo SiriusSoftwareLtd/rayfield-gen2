@@ -922,4 +922,113 @@ return function()
             expect(d.value[1]).to.equal("B")
         end)
     end)
+
+    describe("component window viewport fitting", function()
+        local variables = helpers.requireUtility("variables")
+        local originalCamera
+        local fitted
+
+        local function makeWindow()
+            fitted = Window.new({
+                name = "Fit Window",
+                configuration = { autoSave = false, autoLoad = false },
+            })
+            return fitted
+        end
+
+        -- a camera the specs can move, standing in for a screen that rotates or resizes
+        local function setViewport(x, y)
+            variables.workspace.CurrentCamera = {
+                ViewportSize = Vector2.new(x, y),
+                GetPropertyChangedSignal = function()
+                    return {
+                        Connect = function()
+                            return { Disconnect = function() end }
+                        end,
+                    }
+                end,
+            }
+        end
+
+        beforeEach(function()
+            originalCamera = variables.workspace.CurrentCamera
+        end)
+
+        afterEach(function()
+            variables.workspace.CurrentCamera = originalCamera
+            if fitted and not fitted.unloaded then
+                fitted:Unload()
+            end
+            fitted = nil
+        end)
+
+        it("sizes a new window from the current viewport", function()
+            setViewport(844, 390)
+            local w = makeWindow()
+            -- a short screen gives height up and earns a little width back for it
+            expect(w.size.Y.Offset < 500).to.equal(true)
+            expect(w.size.X.Offset > 475).to.equal(true)
+        end)
+
+        it("re-fits a live window when the viewport changes", function()
+            setViewport(1920, 1080)
+            local w = makeWindow()
+            w.hidden = false
+            expect(w.size.X.Offset).to.equal(475)
+
+            setViewport(844, 390)
+            w:_applyWindowSize()
+
+            expect(w.size.X.Offset > 475).to.equal(true)
+            expect(w.main.Size).to.equal(w.size)
+        end)
+
+        it("banks the new size without resizing a hidden window", function()
+            setViewport(1920, 1080)
+            local w = makeWindow()
+            local before = w.main.Size
+
+            setViewport(844, 390)
+            w:_applyWindowSize()
+
+            -- the size is taken, but a collapsed window must not be yanked open by a rotation
+            expect(w.size.X.Offset > 475).to.equal(true)
+            expect(w.main.Size).to.equal(before)
+        end)
+
+        it("pulls a dragged window back on screen after a shrink", function()
+            setViewport(1920, 1080)
+            local w = makeWindow()
+            w.screenGui.AbsoluteSize = Vector2.new(700, 500)
+            w.main.Position = UDim2.fromOffset(2000, 1500)
+
+            w:_clampToScreen()
+
+            expect(w.main.Position.X.Offset < 2000).to.equal(true)
+            expect(w.main.Position.Y.Offset < 1500).to.equal(true)
+        end)
+
+        it("leaves a centred window on scale positioning", function()
+            setViewport(1920, 1080)
+            local w = makeWindow()
+            w.screenGui.AbsoluteSize = Vector2.new(700, 500)
+            local centred = UDim2.new(0.5, 0, 0.5, 0)
+            w.main.Position = centred
+
+            w:_clampToScreen()
+
+            expect(w.main.Position).to.equal(centred)
+        end)
+
+        it("keeps the drag bar under the window's bottom edge", function()
+            setViewport(1920, 1080)
+            local w = makeWindow()
+            w.main.Position = UDim2.fromOffset(300, 200)
+
+            w:_syncDragBar()
+
+            expect(w.drag.drag.Position.X.Offset).to.equal(300)
+            expect(w.drag.drag.Position.Y.Offset).to.equal(200 + w.size.Y.Offset / 2 + 15)
+        end)
+    end)
 end

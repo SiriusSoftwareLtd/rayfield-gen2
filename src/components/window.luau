@@ -14,6 +14,7 @@ local constants = require(utility.constants)
 local locale = require(utility.locale)
 local log = require(utility.log)
 local hapticEngine = require(utility.HapticEngine)
+local windowSizing = require(utility.windowSizing)
 local chrome = require(script.Parent.chrome)
 local search = require(script.Parent.search)
 
@@ -42,24 +43,14 @@ local maxToastWidth = 320
 -- Standard element row height, shared by the compact button/toggle scaffold.
 local compactRowHeight = 41
 
--- Default window size, and the smallest we'll shrink it to on a tiny screen.
-local defaultWindowSize = Vector2.new(475, 500)
-local minWindowSize = Vector2.new(300, 320)
-local viewportMargin = 60 -- keep the window comfortably inset from the edges of a small screen
+-- How often the backstop re-checks the fit, for anything the viewport signal misses.
+local viewportReconcileInterval = 2
 
--- The default size, shrunk to fit small screens (a phone, or a small PC window) so the window
--- never overflows the viewport. Big screens keep the full size untouched; small ones clamp to
--- the usable area minus a margin, floored so it stays usable. Computed once at open - everything
--- downstream (the reveal target, drag clamp, collapse) reads self.size, so it all inherits this.
-local function fitWindowSize()
+-- The size the current screen calls for. Everything downstream (the reveal target, drag
+-- clamp, collapse) reads self.size, so it all inherits whatever this returns.
+local function fitWindowSize(): UDim2
     local camera = variables.workspace.CurrentCamera
-    local viewport = camera and camera.ViewportSize
-    if not viewport or viewport.X <= 0 or viewport.Y <= 0 then
-        return UDim2.fromOffset(defaultWindowSize.X, defaultWindowSize.Y) -- no camera yet: full size
-    end
-    local width = math.max(minWindowSize.X, math.min(defaultWindowSize.X, viewport.X - viewportMargin))
-    local height = math.max(minWindowSize.Y, math.min(defaultWindowSize.Y, viewport.Y - viewportMargin))
-    return UDim2.fromOffset(width, height)
+    return windowSizing.fit(camera and camera.ViewportSize)
 end
 
 -- Keys that drive a UIGradient and so want a ColorSequence. A dev may pass a plain Color3 for
@@ -613,6 +604,7 @@ function Window.new(properties)
     self:_bindKeybind()
     self:_bindMouseOverride()
     self:_bindTopbarDrag()
+    self:_watchViewport()
     self:_buildSettingsUI()
 
     self:_syncLiveAnimation()
@@ -1138,6 +1130,112 @@ function Window:ToggleMinimise()
             self.animating = false
         end)
     end
+end
+
+-- Park the drag bar under the window's bottom edge, matching whichever positioning the window
+-- itself uses so a centred window stays centred and a dragged one stays where it was left.
+function Window:_syncDragBar()
+    local bar = self.drag and self.drag.drag
+    if not bar then
+        return
+    end
+    local position = self.main.Position
+    local below = self.size.Y.Offset / 2 + 15
+    bar.Position = UDim2.new(position.X.Scale, position.X.Offset, position.Y.Scale, position.Y.Offset + below)
+end
+
+-- Pull a dragged window back on screen after a re-fit, the same way a drag clamps. A window
+-- parked near an edge would otherwise end up half off it when the viewport shrinks underneath.
+function Window:_clampToScreen()
+    if not self.settings or not self.settings.keepOnScreen then
+        return
+    end
+    local position = self.main.Position
+    -- untouched windows sit on scale and are centred, so theyre on screen by construction -
+    -- clamping would only freeze them to offsets and stop them recentring later
+    if position.X.Scale ~= 0 or position.Y.Scale ~= 0 then
+        return
+    end
+
+    local screen = self.screenGui.AbsoluteSize
+    local halfX, halfY = self.size.X.Offset / 2, self.size.Y.Offset / 2
+    local margin = 8
+    -- math.max in case the window is bigger than the screen
+    local x = math.clamp(position.X.Offset, halfX + margin, math.max(halfX + margin, screen.X - halfX - margin))
+    local y = math.clamp(position.Y.Offset, halfY + margin, math.max(halfY + margin, screen.Y - halfY - margin))
+    if x ~= position.X.Offset or y ~= position.Y.Offset then
+        self.main.Position = UDim2.fromOffset(x, y)
+    end
+end
+
+-- Take the size the current screen calls for. Only a live window is resized on the spot;
+-- hidden, minimised or mid-animation ones just bank the size and pick it up on their next
+-- show, so a rotation cant yank a collapsed pill back open.
+function Window:_applyWindowSize()
+    if self.unloaded then
+        return
+    end
+
+    local size = fitWindowSize()
+    if size == self.size then
+        return
+    end
+    self.size = size
+
+    if self.hidden or self.minimised or self.animating or self._revealing then
+        return
+    end
+
+    self.main.Size = size
+    self:_clampToScreen()
+    self:_syncDragBar()
+end
+
+-- Follow the screen. The property signal is the fast path, but CurrentCamera gets swapped
+-- (respawn, or a game replacing it) and a listener bound to the old camera dies silently, so
+-- rebind on the swap and keep a slow reconcile behind it as the backstop.
+function Window:_watchViewport()
+    local cameraConnection: RBXScriptConnection? = nil
+    local pending = false
+
+    local function request()
+        -- a rotation fires a burst of intermediate sizes, so settle on the last one
+        if pending then
+            return
+        end
+        pending = true
+        task.defer(function()
+            pending = false
+            self:_applyWindowSize()
+        end)
+    end
+
+    local function bind()
+        if cameraConnection then
+            self:Disconnect(cameraConnection)
+            cameraConnection = nil
+        end
+        local camera = variables.workspace.CurrentCamera
+        if camera then
+            cameraConnection = self:Connect(camera:GetPropertyChangedSignal("ViewportSize"), request)
+        end
+        request()
+    end
+
+    self:Connect(variables.workspace:GetPropertyChangedSignal("CurrentCamera"), bind)
+    bind()
+
+    -- Backstop for anything the signals miss. Heartbeat rather than a wait loop so it rides the
+    -- normal connection cleanup and cant spin if the scheduler hands back a wait that never yields.
+    local sinceReconcile = 0
+    self:Connect(variables.runService.Heartbeat, function(delta: number)
+        sinceReconcile += delta
+        if sinceReconcile < viewportReconcileInterval then
+            return
+        end
+        sinceReconcile = 0
+        self:_applyWindowSize()
+    end)
 end
 
 function Window:_bindKeybind()
