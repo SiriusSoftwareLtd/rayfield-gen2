@@ -22,28 +22,24 @@ local constants = require(utility.constants)
 local gripSize = 54
 local gripInset = 8
 
--- The bracket at rest, and how much it grows as the cursor moves into the corner. Each arm is
--- driven by its own axis, so approaching along the edge stretches only the arm you are moving
--- toward - the mark leans at the window rather than just swelling.
-local armThickness = 2
-local armRest = 18
-local armReach = 20
-local armStretch = 30
-local armPress = 30
+-- The corner mark: a rounded bracket, sliced so the curve holds its radius while the arms
+-- stretch. Its size is driven per axis by where the pointer sits in the grip, so it leans the
+-- way you are approaching from rather than just swelling.
+local markImage = "rbxassetid://86527207319523"
+local markSlice = Rect.new(51, 52, 51, 52)
+local markSliceScale = 0.5
+local markRest = 18
+local markReach = 20
+local markStretch = 30
+local markPress = 30
 
--- The curve where the two arms meet, matching the window's own corner rather than a mitre.
-local armRadius = 10
-
--- Transparency rather than fixed greys: the bracket has to read the same on every theme, and
--- a light one would swallow a grey picked against the dark default.
-local restTransparency = 0.6
-local reachTransparency = 0.35
-local pressTransparency = 0.15
+local restColor = Color3.fromRGB(90, 90, 98)
+local reachColor = Color3.fromRGB(125, 125, 135)
+local pressColor = Color3.fromRGB(150, 150, 160)
 
 -- How tightly the window follows the cursor: the fraction of the remaining gap closed per
 -- second, as a rate rather than a per-frame step, so the glide is the same at 30fps and 240.
--- Loose enough that the window reads as easing into place rather than pinned to the pointer.
-local followRate = 15
+local followRate = 26
 
 -- Two clicks inside this window snap the size back to the one the screen calls for.
 local doubleClickWindow = 0.32
@@ -62,8 +58,7 @@ function Resize.new(window)
         window = assert(window, "Missing argument #1 (Window expected)"),
     }, Resize)
 
-    -- TextButton over ImageButton: nothing to load, and it takes touch the same way the drag
-    -- grab does. Parented to the window itself so it rides every move, resize and reveal.
+    -- Parented to the window itself, so it rides every move, resize and reveal.
     self.grip = self.window:Create("TextButton", {
         Name = "ResizeGrip",
         BackgroundTransparency = 1,
@@ -78,47 +73,22 @@ function Resize.new(window)
         Parent = self.window.main,
     })
 
-    -- A rounded corner bracket, drawn rather than loaded: a stroked, rounded rectangle twice the
-    -- size of the box that clips it, pinned to the same corner. Everything but the corner itself
-    -- and the two arms leading into it falls outside the clip, so what is left is the curve. An
-    -- image would have to be uploaded, moderated, and re-tinted for every theme; this re-tints
-    -- for free and the curve holds its radius at any arm length, which a slice scale would not.
-    self.armBox = self.window:Create("Frame", {
-        Name = "Bracket",
+    -- 9-sliced, so the curve keeps its radius however far the arms are stretched.
+    self.mark = self.window:Create("ImageLabel", {
+        Name = "Mark",
         BackgroundTransparency = 1,
-        ClipsDescendants = true,
         AnchorPoint = Vector2.new(1, 1),
         Position = UDim2.fromScale(1, 1),
-        Size = UDim2.fromOffset(armRest, armRest),
-        ZIndex = constants.zIndex.resizeGrip,
+        Size = UDim2.fromOffset(markRest, markRest),
+        Image = markImage,
+        ImageColor3 = restColor,
+        ScaleType = Enum.ScaleType.Slice,
+        SliceCenter = markSlice,
+        SliceScale = markSliceScale,
+        ZIndex = constants.zIndex.resizeGrip + 1,
 
         Parent = self.grip,
     })
-
-    -- inset by the thickness, because a stroke is drawn outward from the edge it follows and
-    -- would otherwise be the first thing the clip takes
-    self.bracket = self.window:Create("Frame", {
-        BackgroundTransparency = 1,
-        AnchorPoint = Vector2.new(1, 1),
-        Position = UDim2.new(1, -armThickness, 1, -armThickness),
-        Size = UDim2.fromScale(2, 2),
-        ZIndex = constants.zIndex.resizeGrip,
-
-        Parent = self.armBox,
-    })
-
-    self.window:Create("UICorner", {
-        CornerRadius = UDim.new(0, armRadius),
-
-        Parent = self.bracket,
-    })
-
-    self.bracketStroke = self.window:Create("UIStroke", {
-        Thickness = armThickness,
-        Transparency = restTransparency,
-
-        Parent = self.bracket,
-    }, { Color = "TitlingColor" })
 
     local resizing = false
     local hovering = false
@@ -167,31 +137,36 @@ function Resize.new(window)
         return y + insetOffset
     end
 
-    -- How far into the grip the pointer is, per axis, 0 at the outer edge and 1 in the corner.
+    -- How far the pointer sits from the corner, per axis, 0 in the corner itself and 1 at the
+    -- grip's far edge.
     local function reach(): Vector2
         local position, size = self.grip.AbsolutePosition, self.grip.AbsoluteSize
         local at = pointer or variables.userInputService:GetMouseLocation()
+        -- measured out from the corner, so the mark is at its smallest where the corner itself
+        -- is and reaches furthest as the pointer comes in from the window
         local x = (at.X - position.X) / math.max(size.X, 1)
         local y = (resolveY(at.Y, position.Y, size.Y) - position.Y) / math.max(size.Y, 1)
-        return Vector2.new(math.clamp(x, 0, 1), math.clamp(y, 0, 1))
+        return Vector2.new(1 - math.clamp(x, 0, 1), 1 - math.clamp(y, 0, 1))
     end
 
-    local function setArms(horizontal: number, vertical: number, transparency: number, duration: number)
-        tween(self.armBox, { Size = UDim2.fromOffset(horizontal, vertical) }, duration)
-        tween(self.bracketStroke, { Transparency = transparency }, duration)
+    local function setMark(horizontal: number, vertical: number, color: Color3, duration: number)
+        tween(self.mark, {
+            Size = UDim2.fromOffset(horizontal, vertical),
+            ImageColor3 = color,
+        }, duration)
     end
 
-    local function leanArms(duration: number)
+    local function leanMark(duration: number)
         local into = reach()
-        setArms(armReach + into.X * armStretch, armReach + into.Y * armStretch, reachTransparency, duration)
+        setMark(markReach + into.X * markStretch, markReach + into.Y * markStretch, reachColor, duration)
     end
 
-    local function pressArms()
-        setArms(armPress, armPress, pressTransparency, 0.12)
+    local function pressMark()
+        setMark(markPress, markPress, pressColor, 0.12)
     end
 
-    local function restArms()
-        setArms(armRest, armRest, restTransparency, 0.18)
+    local function restMark()
+        setMark(markRest, markRest, restColor, 0.18)
     end
 
     -- The size the screen can carry, held to whole pixels the same way the window is.
@@ -244,7 +219,7 @@ function Resize.new(window)
         startPointer = at
         startSize = currentSize()
         target = startSize
-        pressArms()
+        pressMark()
         startFollowing()
     end
 
@@ -255,9 +230,9 @@ function Resize.new(window)
         resizing = false
 
         if hovering then
-            leanArms(0.18)
+            leanMark(0.18)
         else
-            restArms()
+            restMark()
         end
     end
 
@@ -291,7 +266,7 @@ function Resize.new(window)
             resizing = false
             resetOnSettle = true
             target = self.window:_fittedSize()
-            restArms()
+            restMark()
             startFollowing()
             return
         end
@@ -303,7 +278,7 @@ function Resize.new(window)
     self.window:Connect(self.grip.MouseEnter, function()
         hovering = true
         if not resizing and self.window:_interactive() then
-            leanArms(0.18)
+            leanMark(0.18)
         end
     end)
 
@@ -311,7 +286,7 @@ function Resize.new(window)
         hovering = false
         pointer = nil
         if not resizing then
-            restArms()
+            restMark()
         end
     end)
 
@@ -332,7 +307,7 @@ function Resize.new(window)
             else nil
 
         if self.window:_interactive() then
-            leanArms(0.14)
+            leanMark(0.14)
         end
     end)
 

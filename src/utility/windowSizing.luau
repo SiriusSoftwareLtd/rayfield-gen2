@@ -41,8 +41,15 @@ local minPlausibleViewport = 200
 -- clear of the screen edge without arguing with a size the user chose deliberately.
 local manualMargin = 40
 
+-- The floor for a hand-dragged window, above the one the automatic fit will drop to on a small
+-- screen. There the whole screen is small and a cramped window is still the best on offer; here
+-- there is room, so the floor is the width the top bar and the widest element layout need to
+-- draw properly rather than the least the library can survive.
+local manualMinSize = Vector2.new(380, 320)
+
 windowSizing.defaultSize = defaultSize
 windowSizing.minSize = minSize
+windowSizing.manualMinSize = manualMinSize
 
 -- How much height we had to give up, 0 on a screen tall enough and 1 once pinned to the floor.
 local function heightDeficit(height: number): number
@@ -54,8 +61,8 @@ end
 -- already picked. Running a manual size back through `fit` would just undo it.
 function windowSizing.clampUserSize(size: Vector2, viewport: Vector2?): Vector2
     -- the floor first and always: a window under it breaks its own top bar, whatever the screen says
-    local width = math.max(math.floor(size.X), minSize.X)
-    local height = math.max(math.floor(size.Y), minSize.Y)
+    local width = math.max(math.floor(size.X), manualMinSize.X)
+    local height = math.max(math.floor(size.Y), manualMinSize.Y)
 
     -- a viewport we dont believe cant be clamped against - a camera mid-init reports one, and
     -- sizing off it would pull a window the user just dragged out back to the floor and leave

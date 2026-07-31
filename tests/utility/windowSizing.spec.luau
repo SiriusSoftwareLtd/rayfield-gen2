@@ -143,15 +143,18 @@ return function()
             expect(desktop.Y > 1080 * 0.7).to.equal(true)
         end)
 
-        it("holds a hand-picked size to the minimum floor", function()
+        it("holds a hand-picked size to a floor of its own, above the automatic one", function()
+            -- the automatic floor is what a small screen has to live with; there is room here,
+            -- so a hand-dragged window stops where its own layout stops drawing properly
             local size = windowSizing.clampUserSize(Vector2.new(10, 10), Vector2.new(1920, 1080))
-            expect(size.X).to.equal(windowSizing.minSize.X)
-            expect(size.Y).to.equal(windowSizing.minSize.Y)
+            expect(size.X).to.equal(windowSizing.manualMinSize.X)
+            expect(size.Y).to.equal(windowSizing.manualMinSize.Y)
+            expect(windowSizing.manualMinSize.X > windowSizing.minSize.X).to.equal(true)
         end)
 
         it("gives the floor up rather than overflow a screen too small for a hand-picked size", function()
             local size = windowSizing.clampUserSize(Vector2.new(400, 400), Vector2.new(240, 700))
-            expect(size.X < windowSizing.minSize.X).to.equal(true)
+            expect(size.X < windowSizing.manualMinSize.X).to.equal(true)
             expect(size.X).to.equal(200)
         end)
 

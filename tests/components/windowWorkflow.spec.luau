@@ -1853,8 +1853,8 @@ return function()
             moveTo(0, 0)
             settle()
 
-            expect(w.size.X.Offset).to.equal(sizing.minSize.X)
-            expect(w.size.Y.Offset).to.equal(sizing.minSize.Y)
+            expect(w.size.X.Offset).to.equal(sizing.manualMinSize.X)
+            expect(w.size.Y.Offset).to.equal(sizing.manualMinSize.Y)
         end)
 
         it("stops resizing once the grip is released", function()
@@ -1953,22 +1953,24 @@ return function()
 
         it("leans the bracket toward the corner and settles it again", function()
             local w = makeWindow()
-            local arm = w.resize.armBox
+            local mark = w.resize.mark
             w.resize.grip.AbsolutePosition = Vector2.new(400, 400)
             w.resize.grip.AbsoluteSize = Vector2.new(54, 54)
 
+            -- close to the far edge of the grip first, then right into the corner: the mark is
+            -- longest reaching out from the window and shortest at the corner itself
             mouse = Vector2.new(410, 410)
             w.resize.grip.MouseEnter:Fire()
-            local entered = arm.Size.X.Offset
+            local entered = mark.Size.X.Offset
 
             -- further into the corner is a longer arm, not just a brighter one
             mouse = Vector2.new(450, 440)
             w.resize.grip.InputChanged:Fire({ UserInputType = { Name = "MouseMovement" } })
-            local near = arm.Size.X.Offset
-            expect(near > entered).to.equal(true)
+            local near = mark.Size.X.Offset
+            expect(near < entered).to.equal(true)
 
             w.resize.grip.MouseLeave:Fire()
-            expect(arm.Size.X.Offset < near).to.equal(true)
+            expect(mark.Size.X.Offset).to.equal(18)
         end)
 
         it("releases a grab when the client loses focus", function()
