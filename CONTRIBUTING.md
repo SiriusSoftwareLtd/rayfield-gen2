@@ -19,12 +19,6 @@ Do not install separate versions of Rojo, Lune, Darklua, StyLua, Selene, luau-ls
 
 On Windows, inspect `%USERPROFILE%\.rokit\tool-storage` when troubleshooting the Rokit-managed CLI tools instead of relying on system-wide installs.
 
-Install the Rojo 7.7.0 Studio plugin so its protocol version matches the pinned CLI:
-
-```bash
-rojo plugin install
-```
-
 An older Rojo Studio plugin may not be able to connect to the 7.7.0 server.
 
 ## Set up a clean checkout
@@ -59,7 +53,14 @@ git switch -c <issue-number>-<short-description>
 
 For example: `git switch -c 42-fix-dropdown-focus`.
 
-To open the project in Studio, start Rojo from the repository root:
+To open the project in Studio, install the Rojo 7.7.0 Studio plugin so its protocol version matches the pinned CLI:
+
+```bash
+rojo plugin install
+```
+
+Then start Rojo from the repository root:
+
 
 ```bash
 rojo serve default.project.json
