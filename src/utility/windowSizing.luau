@@ -37,6 +37,10 @@ local maxAspectRatio = 1.95
 -- default and let the caller's reconcile correct it once the screen reports properly.
 local minPlausibleViewport = 200
 
+-- What a hand-dragged window leaves around itself. Enough to keep the corners and the shadow
+-- clear of the screen edge without arguing with a size the user chose deliberately.
+local manualMargin = 40
+
 windowSizing.defaultSize = defaultSize
 windowSizing.minSize = minSize
 
@@ -60,12 +64,16 @@ function windowSizing.clampUserSize(size: Vector2, viewport: Vector2?): Vector2
         return Vector2.new(width, height)
     end
 
-    local availableX = math.min(viewport.X * maxOccupancyX, viewport.X - marginFloorX)
-    local availableY = math.min(viewport.Y * maxOccupancyY, viewport.Y - marginFloorY)
+    -- the screen less a margin, rather than the occupancy caps `fit` works to. those caps say a
+    -- window we size ourselves should read as sitting on the screen instead of filling it, which
+    -- is a judgement about a size the user did not ask for - having dragged the corner out, they
+    -- are entitled to the screen. same reason theres no aspect ceiling here: holding a dragged
+    -- size to one would stop the grip dead halfway through a drag that was meant.
+    local availableX = viewport.X - manualMargin
+    local availableY = viewport.Y - manualMargin
 
-    -- the caps beat the floor, the same way `fit` gives the floor up rather than overflow a screen
-    -- too small to hold it. no aspect ceiling here: thats a heuristic for a size we choose, and
-    -- holding a dragged size to it would stop the grip dead halfway through a drag the user meant.
+    -- the screen beats the floor, the same way `fit` gives the floor up rather than overflow a
+    -- screen too small to hold it
     return Vector2.new(math.floor(math.min(width, availableX)), math.floor(math.min(height, availableY)))
 end
 

@@ -128,12 +128,19 @@ return function()
             expect(size.Y).to.equal(640)
         end)
 
-        it("holds a hand-picked size to the same occupancy caps as the automatic fit", function()
+        it("lets a hand-picked size have the screen, less a margin", function()
+            -- the occupancy caps are a judgement about a size we choose for a screen; a size
+            -- dragged out by hand is entitled to the screen it was dragged across
             for _, viewport in { Vector2.new(1920, 1080), Vector2.new(844, 390), Vector2.new(200, 200) } do
                 local size = windowSizing.clampUserSize(Vector2.new(9999, 9999), viewport)
-                expect(size.X <= viewport.X * 0.86).to.equal(true)
-                expect(size.Y <= viewport.Y * 0.70).to.equal(true)
+                expect(size.X).to.equal(viewport.X - 40)
+                expect(size.Y).to.equal(viewport.Y - 40)
             end
+
+            -- pinned against the automatic caps, so a change back to them fails here
+            local desktop = windowSizing.clampUserSize(Vector2.new(9999, 9999), Vector2.new(1920, 1080))
+            expect(desktop.X > 1920 * 0.86).to.equal(true)
+            expect(desktop.Y > 1080 * 0.7).to.equal(true)
         end)
 
         it("holds a hand-picked size to the minimum floor", function()
@@ -145,7 +152,7 @@ return function()
         it("gives the floor up rather than overflow a screen too small for a hand-picked size", function()
             local size = windowSizing.clampUserSize(Vector2.new(400, 400), Vector2.new(240, 700))
             expect(size.X < windowSizing.minSize.X).to.equal(true)
-            expect(size.X <= 240 * 0.86).to.equal(true)
+            expect(size.X).to.equal(200)
         end)
 
         it("leaves a hand-picked size alone when the viewport is missing or implausible", function()

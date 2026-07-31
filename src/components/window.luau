@@ -301,7 +301,10 @@ function Window.new(properties)
         Parent = self.main,
     })
 
-    self:Create("UICorner", {
+    -- kept as authored, so the height can be re-derived from it at any window size
+    self.bottomFadeSize = self.bottomFade.Size
+
+    self.bottomFadeCorner = self:Create("UICorner", {
         Parent = self.bottomFade,
     }, { CornerRadius = "CornerRoundness" })
 
@@ -1202,6 +1205,17 @@ end
 -- Take the size the current screen calls for. Only a live window is resized on the spot;
 -- hidden, minimised or mid-animation ones just bank the size and pick it up on their next
 -- show, so a rotation cant yank a collapsed pill back open.
+-- The bounds a hand-picked size is held to, and the size the screen would pick for itself.
+-- The grip works in these to know where a drag has to stop before it moves anything.
+function Window:_boundUserSize(size: Vector2): Vector2
+    return fitUserSize(size)
+end
+
+function Window:_fittedSize(): Vector2
+    local fitted = fitWindowSize()
+    return Vector2.new(fitted.X.Offset, fitted.Y.Offset)
+end
+
 -- Take a size the user dragged out of the corner grip. Held to the same bounds the automatic
 -- sizing works to, then remembered so the viewport reconcile keeps it instead of fitting over
 -- the top of it. Returns the size actually applied, which is what the grip has to follow.
@@ -1218,8 +1232,27 @@ function Window:_applyUserSize(size: Vector2): Vector2
         self.main.Size = self.size
     end
 
+    self:_syncBottomFade()
     self:_syncDragBar()
     return applied
+end
+
+-- The bottom fade's height is written as a negative scale over an offset, so it gets shorter as
+-- the window gets taller: 54px at the default height, 24px by 820. Roblox clamps a corner radius
+-- to half the shorter side, so once the fade falls under twice the window's radius its corners
+-- round tighter than the window's own and the squarer ones underneath cut across the curve as a
+-- dark line along the base. Holding the fade at that height keeps both curves identical.
+function Window:_syncBottomFade()
+    if not self.bottomFade then
+        return
+    end
+
+    -- measured against the size as authored, not as last written: reading back a height this
+    -- has already flattened to an offset would lose the scale and freeze the fade at it
+    local radius = if self.bottomFadeCorner then self.bottomFadeCorner.CornerRadius.Offset else 0
+    local authored = self.bottomFadeSize
+    local intended = authored.Y.Offset + authored.Y.Scale * self.size.Y.Offset
+    self.bottomFade.Size = UDim2.new(authored.X.Scale, authored.X.Offset, 0, math.max(radius * 2, intended))
 end
 
 -- Drop back to the size the screen calls for, as if the window had never been resized by hand.
@@ -1260,6 +1293,7 @@ function Window:_applyWindowSize()
     self._pendingResize = false
 
     self.main.Size = size
+    self:_syncBottomFade()
     self:_clampToScreen()
     self:_syncDragBar()
 end
@@ -1536,9 +1570,10 @@ function Window:_buildSettingsUI()
         description = "Shows a grip in the bottom-right corner that drags the window's size.",
         value = self.settings.resizable,
         callback = function(state)
-            self.settings.resizable = state
             if self.resize then
                 self.resize:SetEnabled(state)
+            else
+                self.settings.resizable = state
             end
             self:SaveSettings()
         end,
