@@ -31,9 +31,11 @@ jobs:
       release_tag: ${{ steps.resolve.outputs.release_tag }}
       should_release: ${{ steps.resolve.outputs.should_release }}
     steps:
+      # same commit the build job uses, so the version can never come from a main that
+      # moved after the trigger (or from the wrong branch on a manual dispatch)
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
-          ref: main
+          ref: ${{ github.sha }}
 
       # version.txt is the single source of truth. We only cut a version the first
       # time it appears, so re-pushing main never re-clobbers a build that already shipped.
@@ -157,7 +159,16 @@ jobs:
         run: |
           set -euo pipefail
 
-          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            # forced rebuild: --clobber below only swaps assets and never moves the tag, so
+            # refuse unless the existing tag already points at the commit we just built
+            TAG_COMMIT="$(gh api "repos/$GH_REPO/commits/$RELEASE_TAG" --jq .sha)"
+            if [ "$TAG_COMMIT" != "$TARGET_COMMIT" ]; then
+              echo "Tag $RELEASE_TAG points at $TAG_COMMIT but this build is $TARGET_COMMIT; refusing to replace its assets." >&2
+              echo "Dispatch from the tagged commit, or retag first." >&2
+              exit 1
+            fi
+          else
             {
               printf 'The `%s` release of Rayfield Gen2.\n\n' "$RELEASE_TAG"
               printf '    local Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2"))()\n\n'
