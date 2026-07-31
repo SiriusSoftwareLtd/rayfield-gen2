@@ -31,6 +31,9 @@ local armReach = 20
 local armStretch = 30
 local armPress = 30
 
+-- The curve where the two arms meet, matching the window's own corner rather than a mitre.
+local armRadius = 10
+
 -- Transparency rather than fixed greys: the bracket has to read the same on every theme, and
 -- a light one would swallow a grey picked against the dark default.
 local restTransparency = 0.6
@@ -39,7 +42,8 @@ local pressTransparency = 0.15
 
 -- How tightly the window follows the cursor: the fraction of the remaining gap closed per
 -- second, as a rate rather than a per-frame step, so the glide is the same at 30fps and 240.
-local followRate = 26
+-- Loose enough that the window reads as easing into place rather than pinned to the pointer.
+local followRate = 15
 
 -- Two clicks inside this window snap the size back to the one the screen calls for.
 local doubleClickWindow = 0.32
@@ -74,33 +78,47 @@ function Resize.new(window)
         Parent = self.window.main,
     })
 
-    -- Two rounded arms meeting at the corner. Drawn rather than an image so it re-tints with
-    -- the theme for free and stretches without a slice scale to keep honest.
-    local function arm(horizontal: boolean)
-        local bar = self.window:Create("Frame", {
-            AnchorPoint = Vector2.new(1, 1),
-            Position = UDim2.fromScale(1, 1),
-            Size = if horizontal
-                then UDim2.fromOffset(armRest, armThickness)
-                else UDim2.fromOffset(armThickness, armRest),
-            BorderSizePixel = 0,
-            BackgroundTransparency = restTransparency,
-            ZIndex = constants.zIndex.resizeGrip,
+    -- A rounded corner bracket, drawn rather than loaded: a stroked, rounded rectangle twice the
+    -- size of the box that clips it, pinned to the same corner. Everything but the corner itself
+    -- and the two arms leading into it falls outside the clip, so what is left is the curve. An
+    -- image would have to be uploaded, moderated, and re-tinted for every theme; this re-tints
+    -- for free and the curve holds its radius at any arm length, which a slice scale would not.
+    self.armBox = self.window:Create("Frame", {
+        Name = "Bracket",
+        BackgroundTransparency = 1,
+        ClipsDescendants = true,
+        AnchorPoint = Vector2.new(1, 1),
+        Position = UDim2.fromScale(1, 1),
+        Size = UDim2.fromOffset(armRest, armRest),
+        ZIndex = constants.zIndex.resizeGrip,
 
-            Parent = self.grip,
-        }, { BackgroundColor3 = "TitlingColor" })
+        Parent = self.grip,
+    })
 
-        self.window:Create("UICorner", {
-            CornerRadius = UDim.new(1, 0),
+    -- inset by the thickness, because a stroke is drawn outward from the edge it follows and
+    -- would otherwise be the first thing the clip takes
+    self.bracket = self.window:Create("Frame", {
+        BackgroundTransparency = 1,
+        AnchorPoint = Vector2.new(1, 1),
+        Position = UDim2.new(1, -armThickness, 1, -armThickness),
+        Size = UDim2.fromScale(2, 2),
+        ZIndex = constants.zIndex.resizeGrip,
 
-            Parent = bar,
-        })
+        Parent = self.armBox,
+    })
 
-        return bar
-    end
+    self.window:Create("UICorner", {
+        CornerRadius = UDim.new(0, armRadius),
 
-    self.horizontalArm = arm(true)
-    self.verticalArm = arm(false)
+        Parent = self.bracket,
+    })
+
+    self.bracketStroke = self.window:Create("UIStroke", {
+        Thickness = armThickness,
+        Transparency = restTransparency,
+
+        Parent = self.bracket,
+    }, { Color = "TitlingColor" })
 
     local resizing = false
     local hovering = false
@@ -159,14 +177,8 @@ function Resize.new(window)
     end
 
     local function setArms(horizontal: number, vertical: number, transparency: number, duration: number)
-        tween(self.horizontalArm, {
-            Size = UDim2.fromOffset(horizontal, armThickness),
-            BackgroundTransparency = transparency,
-        }, duration)
-        tween(self.verticalArm, {
-            Size = UDim2.fromOffset(armThickness, vertical),
-            BackgroundTransparency = transparency,
-        }, duration)
+        tween(self.armBox, { Size = UDim2.fromOffset(horizontal, vertical) }, duration)
+        tween(self.bracketStroke, { Transparency = transparency }, duration)
     end
 
     local function leanArms(duration: number)

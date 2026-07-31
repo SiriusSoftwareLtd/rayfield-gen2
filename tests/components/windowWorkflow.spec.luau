@@ -1953,7 +1953,7 @@ return function()
 
         it("leans the bracket toward the corner and settles it again", function()
             local w = makeWindow()
-            local arm = w.resize.horizontalArm
+            local arm = w.resize.armBox
             w.resize.grip.AbsolutePosition = Vector2.new(400, 400)
             w.resize.grip.AbsoluteSize = Vector2.new(54, 54)
 

@@ -17,6 +17,7 @@ local variables = require(utility.variables)
 local functions = require(utility.functions)
 local odometer = require(utility.odometer)
 local moveable = require(utility.moveable)
+local reflow = require(utility.reflow)
 local locale = require(utility.locale)
 local hapticEngine = require(utility.HapticEngine)
 
@@ -47,12 +48,21 @@ local tweenInfo = TweenInfo.new(0.45, Enum.EasingStyle.Exponential, Enum.EasingD
 local heldInfo = TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 local followInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
+-- The geometry the wide layout is drawn to. Named rather than repeated as numbers, because the
+-- width below which the layout stops fitting is the sum of them, and a threshold that has to be
+-- kept in step with them by hand is one that drifts out of step.
+local titleInset = 20 -- left padding before the title block
+local titleWidth = 170 -- the title/value column
+local titleTrackGap = 8 -- the least room worth leaving between the two
+local trackWidth = 222 -- the track itself
+local trackInset = 15 -- right padding after the track
+
 -- Below this element width we reflow to the stacked layout (title/value on top, full-width
--- track under it) so the slider stays usable in a narrow column or small window instead of
--- overlapping. Sits well below a full-width slider (~435) - including the slightly narrower
--- width it has before the window's intro grow finishes - and well above a grid column (~180),
--- so those two cases land cleanly on either side and open/close transients never straddle it.
-local narrowWidth = 300
+-- track under it). It is exactly what the wide layout needs, so a full-width slider in a default
+-- window (435) sits on the wide side of it by a hair and anything narrower stacks rather than
+-- drawing the track through the title, which is what a hand-resized window used to do the moment
+-- it came off its opening size.
+local narrowWidth = titleInset + titleWidth + titleTrackGap + trackWidth + trackInset
 
 function Slider.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
@@ -130,7 +140,7 @@ function Slider.new(tab, properties)
     self.track = self.window:Create("Frame", {
         AnchorPoint = Vector2.new(1, 0.5),
         Position = UDim2.new(1, -15, 0.5, 0),
-        Size = UDim2.fromOffset(222, 14),
+        Size = UDim2.fromOffset(trackWidth, 14),
         BorderSizePixel = 0,
         BackgroundTransparency = 1, -- In = 0
 
@@ -418,12 +428,11 @@ end
 -- Set the element height, keeping the width alone when a horizontal group owns it
 -- (_widthManaged): there the stack freezes us to _minWidth and wraps, so we must not
 -- stomp the X it set. Standalone we take the usual full width.
-function Slider:_setMainHeight(height)
-    if self._widthManaged then
-        self.main.Size = UDim2.new(self.main.Size.X.Scale, self.main.Size.X.Offset, 0, height)
-    else
-        self.main.Size = UDim2.new(1, -20, 0, height)
-    end
+function Slider:_setMainHeight(height, animate)
+    local size = if self._widthManaged
+        then UDim2.new(self.main.Size.X.Scale, self.main.Size.X.Offset, 0, height)
+        else UDim2.new(1, -20, 0, height)
+    reflow.morph(self.main, { Size = size }, animate)
 end
 
 -- wide: title over value on the left, fixed track on the right.
@@ -441,36 +450,49 @@ function Slider:_applyLayout()
     if self._layoutMode == mode then
         return
     end
+    local settled = self._layoutMode ~= nil
     self._layoutMode = mode
 
-    if mode == "narrow" then
-        self:_setMainHeight(70)
+    -- the first pass builds the layout, so it lands at once; every pass after that is a live
+    -- swap under a window being resized, and is watched
+    local animate = settled and not self.window.hidden and not self.window.animating
 
-        self.container.AnchorPoint = Vector2.new(0, 0)
-        self.container.Position = UDim2.new(0, 20, 0, 14)
-        self.container.Size = UDim2.new(1, -40, 0, 16)
+    if mode == "narrow" then
+        self:_setMainHeight(70, animate)
+
+        reflow.morph(self.container, {
+            AnchorPoint = Vector2.new(0, 0),
+            Position = UDim2.new(0, titleInset, 0, 14),
+            Size = UDim2.new(1, -titleInset * 2, 0, 16),
+        }, animate)
         self.containerLayout.FillDirection = Enum.FillDirection.Horizontal
         self.titleFlex.FlexMode = Enum.UIFlexMode.Fill -- title grows, value hugs the right
         self.valueHost.AutomaticSize = Enum.AutomaticSize.X
         self.valueHost.Size = UDim2.new(0, 0, 0, 16)
 
-        self.track.AnchorPoint = Vector2.new(0.5, 1)
-        self.track.Position = UDim2.new(0.5, 0, 1, -14)
-        self.track.Size = UDim2.new(1, -30, 0, 14)
+        reflow.morph(self.track, {
+            AnchorPoint = Vector2.new(0.5, 1),
+            Position = UDim2.new(0.5, 0, 1, -14),
+            Size = UDim2.new(1, -30, 0, 14),
+        }, animate)
     else
-        self:_setMainHeight(65)
+        self:_setMainHeight(65, animate)
 
-        self.container.AnchorPoint = Vector2.new(0, 0.5)
-        self.container.Position = UDim2.new(0, 20, 0.5, 0)
-        self.container.Size = UDim2.new(0, 170, 0, 33)
+        reflow.morph(self.container, {
+            AnchorPoint = Vector2.new(0, 0.5),
+            Position = UDim2.new(0, titleInset, 0.5, 0),
+            Size = UDim2.new(0, titleWidth, 0, 33),
+        }, animate)
         self.containerLayout.FillDirection = Enum.FillDirection.Vertical
         self.titleFlex.FlexMode = Enum.UIFlexMode.None
         self.valueHost.AutomaticSize = Enum.AutomaticSize.None
         self.valueHost.Size = UDim2.new(1, 0, 0, 16)
 
-        self.track.AnchorPoint = Vector2.new(1, 0.5)
-        self.track.Position = UDim2.new(1, -15, 0.5, 0)
-        self.track.Size = UDim2.new(0, 222, 0, 14)
+        reflow.morph(self.track, {
+            AnchorPoint = Vector2.new(1, 0.5),
+            Position = UDim2.new(1, -trackInset, 0.5, 0),
+            Size = UDim2.new(0, trackWidth, 0, 14),
+        }, animate)
     end
 end
 
