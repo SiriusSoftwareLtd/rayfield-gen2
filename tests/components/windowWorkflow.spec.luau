@@ -4,6 +4,7 @@ return function()
     local Window = helpers.requireComponent("window")
 
     describe("component window workflows", function()
+        local locale = helpers.requireUtility("locale")
         local window
 
         local function makeWindow(properties)
@@ -24,6 +25,11 @@ return function()
                 window:Unload()
             end
             window = nil
+
+            -- the locale module is shared state; drop the test locale so it can't leak
+            locale.strings["zz-test"] = nil
+            locale.translator = nil
+            locale.setActive("en")
         end)
 
         it("constructs tabs, tags, flags, and common controls", function()
@@ -591,7 +597,288 @@ return function()
             expect(w:Popup({ title = "Late" })).never.to.be.ok()
         end)
 
+        it("clears keybind recording when its tab is removed and keeps the toggle key alive", function()
+            local w = makeWindow()
+            w:Show()
+            local tab = w:CreateTab({ name = "Main" })
+            local keybind = tab:CreateKeybind({ name = "Hotkey", value = Enum.KeyCode.H })
+
+            keybind.box.MouseButton1Click:Fire()
+            expect(keybind.recording).to.equal(true)
+            expect(w._recordingKeybind).to.equal(keybind)
+
+            tab:Remove()
+            expect(w._recordingKeybind).to.equal(nil)
+
+            -- the menu toggle key must still work now nothing is mid-rebind
+            local toggle = { UserInputType = Enum.UserInputType.Keyboard, KeyCode = w.settings.toggleKeybind }
+            helpers.services.UserInputService.InputBegan:Fire(toggle, false)
+            expect(w.hidden).to.equal(true)
+            helpers.services.UserInputService.InputBegan:Fire(toggle, false)
+            expect(w.hidden).to.equal(false)
+        end)
+
+        it("stops keybind recording when the window hides", function()
+            local w = makeWindow()
+            w:Show()
+            local tab = w:CreateTab({ name = "Main" })
+            local keybind = tab:CreateKeybind({ name = "Hotkey", value = Enum.KeyCode.H })
+
+            keybind.box.MouseButton1Click:Fire()
+            expect(keybind.recording).to.equal(true)
+
+            w:Hide()
+            expect(keybind.recording).to.equal(false)
+            expect(w._recordingKeybind).to.equal(nil)
+        end)
+
+        it("reclaims an element's hover connections when its tab is removed", function()
+            local w = makeWindow()
+            local before = #w.connections
+
+            local tab = w:CreateTab({ name = "Doomed" })
+            tab:CreateButton({ name = "Hover Button" })
+            expect(#w.connections > before).to.equal(true)
+
+            tab:Remove()
+            expect(#w.connections).to.equal(before)
+        end)
+
+        it("repaints themed instances on ChangeTheme", function()
+            local w = makeWindow()
+            local frost = helpers.requireTheme("frost")
+
+            expect(w.windowStroke.Color).never.to.equal(frost.SurfaceStroke)
+            w:ChangeTheme("frost")
+            expect(w.windowStroke.Color).to.equal(frost.SurfaceStroke)
+        end)
+
+        it("settles the window stroke through show and hide", function()
+            local w = makeWindow()
+            expect(w.windowStroke.Transparency).to.equal(1)
+
+            w:Show()
+            expect(w.windowStroke.Transparency).to.equal(0.95)
+
+            w:Hide()
+            expect(w.windowStroke.Transparency).to.equal(1)
+        end)
+
+        it("filters elements by the search query and restores them on close", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local alpha = tab:CreateButton({ name = "Alpha Strike" })
+            local beta = tab:CreateToggle({ name = "Beta Mode" })
+            w:Show()
+
+            w.searchAction.interact.MouseButton1Click:Fire()
+            expect(w._searching).to.equal(true)
+
+            w.searchInput.Text = "alpha"
+            w.searchInput:GetPropertyChangedSignal("Text"):Fire()
+            expect(alpha.main.Visible).to.equal(true)
+            expect(beta.main.Visible).to.equal(false)
+            expect(w.searchEmpty.Visible).to.equal(false)
+
+            w.searchInput.Text = "zzz"
+            w.searchInput:GetPropertyChangedSignal("Text"):Fire()
+            expect(alpha.main.Visible).to.equal(false)
+            expect(beta.main.Visible).to.equal(false)
+            expect(w.searchEmpty.Visible).to.equal(true)
+
+            w.searchAction.interact.MouseButton1Click:Fire()
+            expect(w._searching).to.equal(false)
+            expect(alpha.main.Visible).to.equal(true)
+            expect(beta.main.Visible).to.equal(true)
+            expect(alpha.main.Parent).to.equal(tab.tabPage)
+        end)
+
+        it("rejects a malformed slider range with a clear error", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            expect(function()
+                tab:CreateSlider({ name = "Broken", range = { 50 } })
+            end).to.throw("A slider range needs two numbers")
+        end)
+
+        it("requires a name or an icon on a tab", function()
+            local w = makeWindow()
+            expect(function()
+                w:CreateTab({})
+            end).to.throw("A tab needs a name or an icon")
+        end)
+
+        it("refuses new tabs on an unloaded window", function()
+            local w = makeWindow()
+            w:Unload()
+            expect(function()
+                w:CreateTab({ name = "Late" })
+            end).to.throw("Cannot create a tab on an unloaded window")
+        end)
+
+        describe("popups", function()
+            it("closes one popup per Escape press, topmost first", function()
+                local w = makeWindow()
+                local first = w:Popup({ title = "First" })
+                local second = w:Popup({ title = "Second" })
+
+                local escape = { UserInputType = Enum.UserInputType.Keyboard, KeyCode = Enum.KeyCode.Escape }
+                helpers.services.UserInputService.InputBegan:Fire(escape, false)
+                expect(second._closed).to.equal(true)
+                expect(first._closed).to.equal(false)
+
+                -- the same press must not fall through to the popup underneath
+                helpers.services.UserInputService.InputBegan:Fire(escape, false)
+                expect(first._closed).to.equal(false)
+
+                helpers.services.UserInputService.InputBegan:Fire({
+                    UserInputType = Enum.UserInputType.Keyboard,
+                    KeyCode = Enum.KeyCode.Escape,
+                }, false)
+                expect(first._closed).to.equal(true)
+            end)
+
+            it("runs an option's callback and closes on click", function()
+                local w = makeWindow()
+                local ran = false
+                local popup = w:Popup({
+                    title = "Confirm",
+                    options = {
+                        {
+                            text = "Accept",
+                            callback = function()
+                                ran = true
+                            end,
+                        },
+                    },
+                })
+
+                local interact
+                for _, instance in popup.screenGui:GetDescendants() do
+                    if instance.ClassName == "TextButton" then
+                        interact = instance
+                    end
+                end
+                expect(interact).to.be.ok()
+
+                interact.MouseButton1Click:Fire()
+                expect(ran).to.equal(true)
+                expect(popup._closed).to.equal(true)
+            end)
+        end)
+
+        describe("callback guards", function()
+            local logModule = helpers.requireUtility("log")
+            local warned
+            local originalWarn
+
+            beforeEach(function()
+                warned = {}
+                originalWarn = logModule.warn
+                logModule.warn = function(...)
+                    local parts = {}
+                    for _, part in { ... } do
+                        table.insert(parts, tostring(part))
+                    end
+                    table.insert(warned, table.concat(parts, " "))
+                end
+            end)
+
+            afterEach(function()
+                logModule.warn = originalWarn
+            end)
+
+            local function sawWarning(fragment)
+                for _, line in warned do
+                    if line:find(fragment, 1, true) then
+                        return true
+                    end
+                end
+                return false
+            end
+
+            it("keeps a toggle working after its callback throws", function()
+                local w = makeWindow()
+                local tab = w:CreateTab({ name = "Main" })
+                local calls = 0
+                local toggle = tab:CreateToggle({
+                    name = "Grumpy",
+                    value = false,
+                    callback = function(value)
+                        calls += 1
+                        if value then
+                            error("boom")
+                        end
+                    end,
+                })
+
+                toggle:Set(true) -- the throw must stay inside the guard
+                expect(toggle.value).to.equal(true)
+                expect(toggle._errored).to.equal(false) -- flash already settled under instant tweens
+                expect(sawWarning("Grumpy")).to.equal(true)
+
+                toggle:Set(false)
+                expect(toggle.value).to.equal(false)
+                expect(calls).to.equal(2)
+            end)
+
+            it("returns nil and warns for a dropdown in a row group", function()
+                local w = makeWindow()
+                local tab = w:CreateTab({ name = "Main" })
+                local row = tab:CreateGroup({ direction = "row" })
+
+                expect(row:CreateDropdown({ name = "Nope", options = { "A" } })).to.equal(nil)
+                expect(sawWarning("a row only holds compact elements")).to.equal(true)
+            end)
+        end)
+
+        describe("toast stacking", function()
+            -- park each toast's dwell mid-flight so the stack actually accumulates; the shim's
+            -- task.wait normally returns straight away and a toast retires inside its constructor
+            local originalWait = task.wait
+
+            afterEach(function()
+                task.wait = originalWait
+            end)
+
+            it("retires the oldest toast once the stack passes its cap", function()
+                local w = makeWindow()
+                task.wait = coroutine.yield
+                local toasts = {}
+                for index = 1, 7 do
+                    toasts[index] = w:Toast({ title = "Toast " .. index, duration = 60 })
+                end
+                task.wait = originalWait
+
+                expect(toasts[1]._dismissed).to.equal(true) -- 7th arrival evicts the 1st (maxLive 6)
+                expect(toasts[2]._dismissed).to.equal(false)
+                expect(toasts[7]._dismissed).to.equal(false)
+            end)
+
+            it("caps a requested minWidth at the toast maximum", function()
+                local w = makeWindow()
+                local toast = w:Toast({ title = "Wide", minWidth = 400, duration = 0 })
+                expect(toast._minWidth).to.equal(320)
+                expect(toast.main.Size.X.Offset).to.equal(320)
+            end)
+
+            it("truncates a long title and pins its width at the cap", function()
+                local w = makeWindow()
+                local toast = w:Toast({ title = string.rep("Really Long Toast Title ", 6), duration = 0 })
+                expect(toast.main.Size.X.Offset).to.equal(320)
+                expect(toast.titleLabel.TextTruncate).to.equal(Enum.TextTruncate.AtEnd)
+                expect(toast.titleLabel.AutomaticSize).to.equal(Enum.AutomaticSize.None)
+                expect(toast.titleLabel.Size.X.Offset).to.equal(320 - 18 - 18)
+            end)
+        end)
+
         describe("toast position", function()
+            local originalWait = task.wait
+
+            afterEach(function()
+                task.wait = originalWait
+            end)
+
             local function findLayout(container)
                 for _, child in container:GetChildren() do
                     if child:IsA("UIListLayout") then
@@ -638,9 +925,24 @@ return function()
 
             it("assigns descending LayoutOrder within the position container", function()
                 local w = makeWindow()
-                w:Toast({ title = "First", position = "Bottom", duration = 1 })
-                w:Toast({ title = "Second", position = "Bottom", duration = 1 })
-                expect(w._toastCount >= 2).to.equal(true)
+                local originalWait = task.wait
+                task.wait = coroutine.yield -- keep all three alive so the frames are readable
+                local first = w:Toast({ title = "First", position = "Bottom", duration = 60 })
+                local second = w:Toast({ title = "Second", position = "Bottom", duration = 60 })
+                local third = w:Toast({ title = "Third", position = "Bottom", duration = 60 })
+                task.wait = originalWait
+
+                expect(first.main.LayoutOrder > second.main.LayoutOrder).to.equal(true)
+                expect(second.main.LayoutOrder > third.main.LayoutOrder).to.equal(true)
+                expect(first.main.Parent).to.equal(w._toastsBottom)
+                expect(third.main.Parent).to.equal(w._toastsBottom)
+            end)
+
+            it("accepts a lowercase bottom position", function()
+                local w = makeWindow()
+                w:Toast({ Position = "bottom", title = "Low", duration = 1 })
+                expect(w._toastsBottom).to.be.ok()
+                expect(w._toastsTop).never.to.be.ok()
             end)
         end)
     end)
@@ -653,18 +955,14 @@ return function()
 
         local windows
         local files
-        local blobs
         local originals
 
         beforeEach(function()
             windows = {}
             files = {}
-            blobs = {}
-            local nextBlob = 0
 
             originals = {
                 fileSystemManager = variables.fileSystemManager,
-                httpService = variables.httpService,
                 ensureDir = filesystem.ensureDir,
                 writefile = filesystem.writefile,
                 readfile = filesystem.readfile,
@@ -676,26 +974,6 @@ return function()
             variables.fileSystemManager = {
                 getPath = function(_, childPath)
                     return "Root/" .. childPath
-                end,
-            }
-            -- a JSON stand-in that round-trips real tables: encode parks the table under a
-            -- token, the token is what lands on disk, decode reads it back.
-            variables.httpService = {
-                GenerateGUID = function()
-                    return "00000000-0000-4000-8000-000000000000"
-                end,
-                JSONEncode = function(_, data)
-                    nextBlob += 1
-                    local token = "blob-" .. nextBlob
-                    blobs[token] = data
-                    return token
-                end,
-                JSONDecode = function(_, text)
-                    local stored = blobs[text]
-                    if stored == nil then
-                        error("no blob for " .. tostring(text))
-                    end
-                    return stored
                 end,
             }
 
@@ -731,13 +1009,16 @@ return function()
                 end
             end
             variables.fileSystemManager = originals.fileSystemManager
-            variables.httpService = originals.httpService
             filesystem.ensureDir = originals.ensureDir
             filesystem.writefile = originals.writefile
             filesystem.readfile = originals.readfile
             filesystem.isfile = originals.isfile
             filesystem.delfile = originals.delfile
             filesystem.listfiles = originals.listfiles
+
+            -- the drag specs steer the shared input mocks; put them back
+            helpers.services.UserInputService._setMouseLocation(Vector2.new(120, 80))
+            helpers.services.GuiService._setGuiInset(Vector2.new(0, 0))
         end)
 
         local function newWindow(autoLoad)
@@ -753,6 +1034,13 @@ return function()
             })
             table.insert(windows, w)
             return w
+        end
+
+        -- what actually landed on disk, through the real JSON shim
+        local function decodeConfig(w)
+            local _, fullPath = w:GetPath()
+            expect(type(files[fullPath])).to.equal("string")
+            return variables.httpService:JSONDecode(files[fullPath])
         end
 
         it("autosaves a change and autoLoads it into a fresh window with an explicit flag", function()
@@ -920,6 +1208,204 @@ return function()
             d:Refresh({ "A", "B", "C" })
             expect(#d.value).to.equal(1)
             expect(d.value[1]).to.equal("B")
+        end)
+
+        it("keeps a flipped value on disk after its tab is torn down", function()
+            -- session 1 seeds the file
+            local w1 = newWindow(false)
+            local tab1 = w1:CreateTab({ name = "Main" })
+            tab1:CreateToggle({ name = "Auto Farm", flag = "autoFarm", value = false }):Set(false)
+            tab1:CreateSlider({ name = "Speed", flag = "speed", range = { 0, 100 }, increment = 1, value = 0 }):Set(10)
+
+            -- session 2 loads, flips the toggle, loses its tab, then another autosave lands
+            local w2 = newWindow(true)
+            local farmTab = w2:CreateTab({ name = "Farm" })
+            local toggle = farmTab:CreateToggle({ name = "Auto Farm", flag = "autoFarm", value = false })
+            local otherTab = w2:CreateTab({ name = "Other" })
+            local slider =
+                otherTab:CreateSlider({ name = "Speed", flag = "speed", range = { 0, 100 }, increment = 1, value = 0 })
+            w2:Show()
+
+            toggle:Set(true)
+            farmTab:Remove()
+            slider:Set(25) -- this autosave must carry the flip forward, not revert it
+
+            local decoded = decodeConfig(w2)
+            expect(decoded.autoFarm).to.equal(true)
+            expect(decoded.speed).to.equal(25)
+        end)
+
+        it("promotes a named config's unbuilt flags into the default file", function()
+            local w1 = newWindow(false)
+            local tab1 = w1:CreateTab({ name = "Main" })
+            tab1:CreateToggle({ name = "Ghost", flag = "ghost", value = false }):Set(true)
+            expect(w1:Save("A")).to.equal(true)
+
+            -- a fresh session whose UI never builds the ghost element
+            local w2 = newWindow(false)
+            local tab2 = w2:CreateTab({ name = "Main" })
+            tab2:CreateToggle({ name = "Other", flag = "other", value = false })
+            expect(w2:_applyNamedConfig("A")).to.equal(true)
+
+            local decoded = decodeConfig(w2)
+            expect(decoded.ghost).to.equal(true)
+            expect(decoded.other).to.equal(false)
+        end)
+
+        it("round trips every element type through real JSON", function()
+            local w1 = newWindow(false)
+            local tab1 = w1:CreateTab({ name = "Main" })
+            tab1:CreateToggle({ name = "Flag Toggle", flag = "toggle", value = false }):Set(true)
+            tab1:CreateSlider({ name = "Speed", flag = "slider", range = { 0, 1 }, increment = 0.01, value = 0 })
+                :Set(0.5)
+            tab1:CreateDropdown({
+                name = "Ultimates",
+                flag = "drop",
+                multiSelect = true,
+                options = { "A", "B", "C" },
+                value = {},
+            }):Set({ "A", "C" })
+            tab1:CreateKeybind({ name = "Hotkey", flag = "bind", value = Enum.KeyCode.H }):Set(Enum.KeyCode.J)
+            local color = tab1:CreateColorPicker({ name = "Accent", flag = "color", value = Color3.fromRGB(255, 0, 0) })
+            color:Set(Color3.fromRGB(51, 102, 153))
+            color:SetAlpha(0.8)
+
+            -- the on-disk string is real JSON in the shapes _serialize promises
+            local decoded = decodeConfig(w1)
+            expect(decoded.toggle).to.equal(true)
+            expect(decoded.slider).to.equal(0.5)
+            expect(decoded.bind[1]).to.equal("Enum.KeyCode")
+            expect(decoded.bind[2]).to.equal(Enum.KeyCode.J.Value)
+            expect(decoded.color).to.equal("336699cc")
+
+            -- a fresh window restores every value exactly
+            local w2 = newWindow(true)
+            local tab2 = w2:CreateTab({ name = "Main" })
+            local toggle = tab2:CreateToggle({ name = "Flag Toggle", flag = "toggle", value = false })
+            local slider =
+                tab2:CreateSlider({ name = "Speed", flag = "slider", range = { 0, 1 }, increment = 0.01, value = 0 })
+            local drop = tab2:CreateDropdown({
+                name = "Ultimates",
+                flag = "drop",
+                multiSelect = true,
+                options = { "A", "B", "C" },
+                value = {},
+            })
+            local bind = tab2:CreateKeybind({ name = "Hotkey", flag = "bind", value = Enum.KeyCode.H })
+            local color2 =
+                tab2:CreateColorPicker({ name = "Accent", flag = "color", value = Color3.fromRGB(255, 0, 0) })
+            w2:Show()
+
+            expect(toggle.value).to.equal(true)
+            expect(slider.value).to.equal(0.5)
+            expect(#drop.value).to.equal(2)
+            expect(table.find(drop.value, "A")).to.be.ok()
+            expect(table.find(drop.value, "C")).to.be.ok()
+            expect(bind.value).to.equal(Enum.KeyCode.J)
+            expect(color2.value).to.equal(Color3.fromRGB(51, 102, 153))
+            expect(color2.alpha).to.equal(0.8)
+        end)
+
+        it("restores a pending dropdown selection when its option is added", function()
+            local w = newWindow(false)
+            local tab = w:CreateTab({ name = "Main" })
+            local picks = 0
+            local d = tab:CreateDropdown({
+                name = "Late Options",
+                flag = "late",
+                options = {},
+                callback = function(value)
+                    if value == "X" then
+                        picks += 1
+                    end
+                end,
+            })
+
+            d:Set("X") -- intent lands before any option exists
+            expect(#d.value).to.equal(0)
+
+            d:Add("X")
+            expect(d.value[1]).to.equal("X")
+            expect(picks).to.equal(1)
+
+            d:Add("X") -- a duplicate add must not re-fire the selection
+            expect(picks).to.equal(1)
+
+            local decoded = decodeConfig(w)
+            expect(decoded.late[1]).to.equal("X")
+        end)
+
+        it("reverts a NaN numeric commit without persisting", function()
+            local w = newWindow(false)
+            local tab = w:CreateTab({ name = "Main" })
+            local input = tab:CreateInput({ name = "Amount", flag = "amount", value = "10", numeric = true })
+            table.clear(files) -- only the commit below could write
+
+            input.input.Text = "-1^0.5" -- (-1)^0.5 is nan
+            input.input.FocusLost:Fire()
+
+            expect(input.value).to.equal("10")
+            expect(input.input.Text).to.equal("10")
+            expect(next(files)).to.equal(nil)
+        end)
+
+        it("follows the mouse through a drag and persists on release", function()
+            -- nonzero inset so the mouse-to-track math is exercised against real conditions
+            helpers.services.GuiService._setGuiInset(Vector2.new(0, 58))
+
+            local w = newWindow(false)
+            local tab = w:CreateTab({ name = "Main" })
+            local seen = {}
+            local slider = tab:CreateSlider({
+                name = "Drag",
+                flag = "drag",
+                range = { 0, 100 },
+                increment = 1,
+                value = 0,
+                callback = function(value)
+                    table.insert(seen, value)
+                end,
+            })
+            slider.track.AbsolutePosition = Vector2.new(100, 300)
+            slider.track.AbsoluteSize = Vector2.new(200, 14)
+
+            helpers.services.UserInputService._setMouseLocation(Vector2.new(150, 80))
+            slider.interact.InputBegan:Fire({ UserInputType = Enum.UserInputType.MouseButton1 })
+            expect(slider.dragging).to.equal(true)
+            expect(slider.value).to.equal(25) -- (150 - 100) / 200 of the range
+
+            helpers.services.UserInputService._setMouseLocation(Vector2.new(200, 80))
+            helpers.services.RunService.RenderStepped:Fire()
+            expect(slider.value).to.equal(50)
+            expect(seen[1]).to.equal(25)
+            expect(seen[2]).to.equal(50)
+
+            helpers.services.UserInputService.InputEnded:Fire({ UserInputType = Enum.UserInputType.MouseButton1 })
+            expect(slider.dragging).to.equal(false)
+
+            -- released: the per-frame follow is gone
+            helpers.services.UserInputService._setMouseLocation(Vector2.new(100, 80))
+            helpers.services.RunService.RenderStepped:Fire()
+            expect(slider.value).to.equal(50)
+
+            local decoded = decodeConfig(w)
+            expect(decoded.drag).to.equal(50)
+        end)
+
+        it("ends a drag when the window loses focus", function()
+            local w = newWindow(false)
+            local tab = w:CreateTab({ name = "Main" })
+            local slider =
+                tab:CreateSlider({ name = "Drag", flag = "drag", range = { 0, 100 }, increment = 1, value = 0 })
+            slider.track.AbsolutePosition = Vector2.new(100, 300)
+            slider.track.AbsoluteSize = Vector2.new(200, 14)
+
+            helpers.services.UserInputService._setMouseLocation(Vector2.new(150, 80))
+            slider.interact.InputBegan:Fire({ UserInputType = Enum.UserInputType.MouseButton1 })
+            expect(slider.dragging).to.equal(true)
+
+            helpers.services.UserInputService.WindowFocusReleased:Fire()
+            expect(slider.dragging).to.equal(false)
         end)
     end)
 
