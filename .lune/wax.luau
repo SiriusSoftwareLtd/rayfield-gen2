@@ -143,7 +143,7 @@ f.insert,(typeof or type)do local B={'and','break','do','else','elseif','end','f
 ,B do A[D]=true end end w=w or function(B,C)for D,E in g(B)do if E==C then return D end end return end local function B(
 C,D,...)local E,F={...},z(C)if not w(E,F)then error(p('LuaEncode: Incorrect type for `%s`: `%s` expected, got `%s`',D,x(
 E,', '),F),0)end return C end local C do local D={['"']='\\"',['\\']='\\\\',['\a']='\\a',['\b']='\\b',['\t']='\\t',['\n'
-]='\\n',['\v']='\\v',['\f']='\\f',['\r']='\\r'}for E=0,255 do local F=q(E)if not D[F]and(E<32 or E>126)then D[F]='\\'..E
+]='\\n',['\v']='\\v',['\f']='\\f',['\r']='\\r'}for E=0,255 do local F=q(E)if not D[F]and(E<32 or E>126)then D[F]=p('\\%03d',E)
 end end function C(E)return'"'..r(E,'[%z\\"\1-\31\127-\255]',D)..'"'end end local function D(E)local F=''for G in v(E,
 '%](=*)%]')do if#G>=#F then F=G..'='end end return'--['..F..'['..E..']'..F..']'end local E do local function F(G)local H
 ,I=j(k.FindService,k,G.ClassName)if H and I then return true end return false end function E(G)local H=G if not H then
@@ -293,8 +293,8 @@ local EnvName = "${EnvName}"
 -- ++++++++ RUNTIME IMPL BELOW ++++++++ --
 
 -- Localizing certain libraries and built-ins for runtime efficiency
-local string, task, setmetatable, error, next, table, unpack, coroutine, script, type, require, pcall, tostring, tonumber, _VERSION =
-      string, task, setmetatable, error, next, table, unpack, coroutine, script, type, require, pcall, tostring, tonumber, _VERSION
+local string, task, setmetatable, error, next, table, unpack, coroutine, script, type, require, pcall, xpcall, tostring, tonumber, _VERSION =
+      string, task, setmetatable, error, next, table, unpack, coroutine, script, type, require, pcall, xpcall, tostring, tonumber, _VERSION
 
 local table_insert = table.insert
 local table_remove = table.remove
@@ -612,44 +612,66 @@ local function LoadScript(scriptRef)
 
     local Closure = ScriptClosures[scriptRef]
 
-    local function FormatError(originalErrorMessage)
-        originalErrorMessage = tostring(originalErrorMessage)
+    -- Grabs the stack while it's still live; pcall alone would discard it. Guarded,
+    -- since some executors sandbox `debug` away entirely
+    local function CatchError(originalErrorMessage)
+        local Traceback
+        local TracebackSuccess, TracebackResult = pcall(function()
+            return debug.traceback(nil, 2)
+        end)
+        if TracebackSuccess then
+            Traceback = TracebackResult
+        end
+
+        return {Message = originalErrorMessage, Traceback = Traceback}
+    end
+
+    local function FormatError(caughtError)
+        local originalErrorMessage = tostring(caughtError.Message)
 
         local VirtualFullName = scriptRef:GetFullName()
 
         -- Check for vanilla/Roblox format
         local OriginalErrorLine, BaseErrorMessage = string_match(originalErrorMessage, "[^:]+:(%d+): (.+)")
 
+        local FormattedMessage
         if not OriginalErrorLine or not LineOffsets then
-            return VirtualFullName .. ":*: " .. (BaseErrorMessage or originalErrorMessage)
+            FormattedMessage = VirtualFullName .. ":*: " .. (BaseErrorMessage or originalErrorMessage)
+        else
+            OriginalErrorLine = tonumber(OriginalErrorLine)
+
+            local RefId = ScriptClosureRefIds[scriptRef]
+            local LineOffset = LineOffsets[RefId]
+
+            local RealErrorLine = OriginalErrorLine - LineOffset + 1
+            if RealErrorLine < 0 then
+                RealErrorLine = "?"
+            end
+
+            FormattedMessage = VirtualFullName .. ":" .. RealErrorLine .. ": " .. BaseErrorMessage
         end
 
-        OriginalErrorLine = tonumber(OriginalErrorLine)
-
-        local RefId = ScriptClosureRefIds[scriptRef]
-        local LineOffset = LineOffsets[RefId]
-
-        local RealErrorLine = OriginalErrorLine - LineOffset + 1
-        if RealErrorLine < 0 then
-            RealErrorLine = "?"
+        local Traceback = caughtError.Traceback
+        if Traceback and Traceback ~= "" then
+            FormattedMessage = FormattedMessage .. "\n" .. Traceback
         end
 
-        return VirtualFullName .. ":" .. RealErrorLine .. ": " .. BaseErrorMessage
+        return FormattedMessage
     end
 
     -- If it's a BaseScript, we'll just run it directly!
     if ScriptClassName == "LocalScript" or ScriptClassName == "Script" then
-        local RunSuccess, ErrorMessage = pcall(Closure)
+        local RunSuccess, CaughtError = xpcall(Closure, CatchError)
         if not RunSuccess then
-            error(FormatError(ErrorMessage), 0)
+            error(FormatError(CaughtError), 0)
         end
     else
-        local PCallReturn = {pcall(Closure)}
+        local PCallReturn = {xpcall(Closure, CatchError)}
 
         local RunSuccess = table_remove(PCallReturn, 1)
         if not RunSuccess then
-            local ErrorMessage = table_remove(PCallReturn, 1)
-            error(FormatError(ErrorMessage), 0)
+            local CaughtError = table_remove(PCallReturn, 1)
+            error(FormatError(CaughtError), 0)
         end
 
         StoredModuleValues[scriptRef] = PCallReturn
@@ -793,7 +815,7 @@ end return ah end function ae.SplitFilePath(af:string)return ae.SplitStringByPat
 ae.LineCount(af:string):number local ag=1 for ah in string.gmatch(af,'\n')do ag+=1 end return ag end function ae.Replace
 (af:string,ag:{[string]:string}):string return string.gsub(af,'${([A-Za-z_][A-Za-z0-9_]*)}',ag)end do local af={['"']=
 '\\"',['\\']='\\\\',['\a']='\\a',['\b']='\\b',['\t']='\\t',['\n']='\\n',['\v']='\\v',['\f']='\\f',['\r']='\\r'}for ag=0,
-255 do local ah=string.char(ag)if not af[ah]and(ag<32 or ag>126)then af[ah]='\\'..ag end end function ae.
+255 do local ah=string.char(ag)if not af[ah]and(ag<32 or ag>126)then af[ah]=string.format('\\%03d',ag)end end function ae.
 SerializeStringData(ag:string):string local ah=string.gsub(ag,'[%z\\"\1-\31\127-\255]',af)return ah end end return ae
 end)()end,[14]=function()local aa,ab,ac=a(14)local ad return(function(...)type OptionsInput={[string]:{string|number|
 boolean|nil}}type OptionsOutput={[string]:string|number|boolean|nil}local ae,af=ac'@lune/process',ac'Log'local function
