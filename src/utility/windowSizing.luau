@@ -51,13 +51,15 @@ function windowSizing.fit(viewport: Vector2?): UDim2
     local availableY = math.min(viewport.Y * maxOccupancy.Y, viewport.Y - marginFloor.Y)
 
     -- the floor gives way to the screen: a viewport too small to hold it gets a smaller window
-    -- rather than one hanging off the edge, so the occupancy caps hold at every size
-    local height = math.min(math.clamp(availableY, minSize.Y, defaultSize.Y), availableY)
+    -- rather than one hanging off the edge, so the occupancy caps hold at every size. settle the
+    -- height to whole pixels first, so the aspect cap is measured against the height we ship
+    -- rather than a fraction that rounds away underneath it.
+    local height = math.floor(math.min(math.clamp(availableY, minSize.Y, defaultSize.Y), availableY))
     local deficit = heightDeficit(height)
     local width = math.min(defaultSize.X + widthCompensation * deficit, availableX, height * maxAspectRatio)
 
     -- floor, not round: rounding up can carry the result back past the cap it was just clamped to
-    return UDim2.fromOffset(math.floor(math.min(math.max(width, minSize.X), availableX)), math.floor(height))
+    return UDim2.fromOffset(math.floor(math.min(math.max(width, minSize.X), availableX)), height)
 end
 
 return windowSizing

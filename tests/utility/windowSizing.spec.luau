@@ -62,9 +62,15 @@ return function()
             end
         end)
 
-        it("holds the aspect ceiling on a very short screen", function()
-            local width, height = fit(1200, 240)
-            expect(width <= height * 1.95).to.equal(true)
+        it("holds the aspect ceiling against the height it actually ships", function()
+            -- the cap has to be measured off the whole-pixel height, not the fraction it came
+            -- from, or the shipped width can sit a pixel over it
+            for _, viewport in
+                { Vector2.new(1200, 240), Vector2.new(400, 201), Vector2.new(640, 260), Vector2.new(900, 300) }
+            do
+                local width, height = fit(viewport.X, viewport.Y)
+                expect(width <= height * 1.95).to.equal(true)
+            end
         end)
 
         it("keeps the minimum as a floor while the screen can afford it", function()
