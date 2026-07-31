@@ -3,7 +3,7 @@
 [tools]
 lune = "lune-org/lune@0.8.9"
 darklua = "seaofvoices/darklua@0.18.0"
-rojo = "rojo-rbx/rojo@7.6.1"
+rojo = "rojo-rbx/rojo@7.7.0"
 StyLua = "JohnnyMorganz/StyLua@2.5.2"
 selene = "Kampfkarren/selene@0.31.0"
 luau-lsp = "JohnnyMorganz/luau-lsp@1.68.1"
