@@ -1146,15 +1146,16 @@ end
 
 -- Pull a dragged window back on screen after a re-fit, the same way a drag clamps. A window
 -- parked near an edge would otherwise end up half off it when the viewport shrinks underneath.
-function Window:_clampToScreen()
+-- Where a position ends up once the current size has to fit on the current screen. Returns it
+-- unchanged when theres nothing to do, so callers can compare.
+function Window:_clampedPosition(position: UDim2): UDim2
     if not self.settings or not self.settings.keepOnScreen then
-        return
+        return position
     end
-    local position = self.main.Position
     -- untouched windows sit on scale and are centred, so theyre on screen by construction -
     -- clamping would only freeze them to offsets and stop them recentring later
     if position.X.Scale ~= 0 or position.Y.Scale ~= 0 then
-        return
+        return position
     end
 
     local screen = self.screenGui.AbsoluteSize
@@ -1163,9 +1164,14 @@ function Window:_clampToScreen()
     -- math.max in case the window is bigger than the screen
     local x = math.clamp(position.X.Offset, halfX + margin, math.max(halfX + margin, screen.X - halfX - margin))
     local y = math.clamp(position.Y.Offset, halfY + margin, math.max(halfY + margin, screen.Y - halfY - margin))
-    if x ~= position.X.Offset or y ~= position.Y.Offset then
-        self.main.Position = UDim2.fromOffset(x, y)
+    if x == position.X.Offset and y == position.Y.Offset then
+        return position
     end
+    return UDim2.fromOffset(x, y)
+end
+
+function Window:_clampToScreen()
+    self.main.Position = self:_clampedPosition(self.main.Position)
 end
 
 -- Take the size the current screen calls for. Only a live window is resized on the spot;
@@ -1683,7 +1689,9 @@ function Window:Show()
 end
 
 function Window:_quickRestore()
-    local target = self._restorePosition or UDim2.new(0.5, 0, 0.5, 0)
+    -- the screen can have changed while we were hidden, so where it sat may no longer fit
+    local target = self:_clampedPosition(self._restorePosition or UDim2.new(0.5, 0, 0.5, 0))
+    self._restorePosition = target
 
     local growInfo = TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut)
     local cornerInfo = TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut)

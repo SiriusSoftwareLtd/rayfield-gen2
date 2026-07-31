@@ -1060,6 +1060,26 @@ return function()
             expect(w.main.Position).to.equal(centred)
         end)
 
+        it("clamps a restore target that no longer fits the screen", function()
+            setViewport(1920, 1080)
+            local w = makeWindow()
+            w.hidden = false
+            w.screenGui.AbsoluteSize = Vector2.new(1920, 1080)
+            -- parked near the right edge, then hidden, so this is where Show grows back to
+            w.main.Position = UDim2.fromOffset(1700, 900)
+            w._restorePosition = w.main.Position
+
+            -- the screen shrinks under it while it is away
+            w.screenGui.AbsoluteSize = Vector2.new(700, 500)
+            setViewport(700, 500)
+            w:_applyWindowSize()
+
+            local target = w:_clampedPosition(w._restorePosition)
+            expect(target.X.Offset < 1700).to.equal(true)
+            expect(target.X.Offset + w.size.X.Offset / 2 <= 700).to.equal(true)
+            expect(target.Y.Offset + w.size.Y.Offset / 2 <= 500).to.equal(true)
+        end)
+
         it("keeps the drag bar under the window's bottom edge", function()
             setViewport(1920, 1080)
             local w = makeWindow()
