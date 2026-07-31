@@ -20,6 +20,7 @@ HOOKS_DIR ?= .githooks
 
 SRC_DIR ?= src
 TESTS_DIR ?= tests
+EXAMPLE_FILE ?= example.client.luau
 TEST_SPECS_DIR ?= tests/components tests/integration tests/runner tests/utility
 SCRIPTS_DIR ?= scripts
 PROJECT_FILE ?= default.project.json
@@ -35,6 +36,10 @@ GLOBAL_TYPES ?= globalTypes.d.luau
 # pinned so a luau-lsp push cant change what typecheck means. bump it deliberately.
 LUAU_LSP_REF ?= e27c8b37024818c0a3d60f341ae0aba87e6d58d1
 GLOBAL_TYPES_URL ?= https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/$(LUAU_LSP_REF)/scripts/globalTypes.d.luau
+# records which ref the local defs came from, so bumping the pin refreshes them
+GLOBAL_TYPES_STAMP ?= $(GLOBAL_TYPES).ref
+# lines prepended to the bundle after the build (the release stamps a 2 line header)
+BUNDLE_HEADER_LINES ?= 0
 COVERAGE_THRESHOLD ?= 70
 
 .PHONY: help install hooks ci check test test-verbose coverage coverage-baseline testez-model test-place format format-check lint typecheck build bundle serve sourcemap-watch dev clean
@@ -101,28 +106,35 @@ $(TESTEZ_MODEL):
 	$(CURL) -fsSL -o "$(TESTEZ_MODEL)" "$(TESTEZ_MODEL_URL)"
 
 format:
-	$(STYLUA) --syntax Luau $(SRC_DIR) $(TESTS_DIR) $(SCRIPTS_DIR)
+	$(STYLUA) --syntax Luau $(SRC_DIR) $(TESTS_DIR) $(SCRIPTS_DIR) $(EXAMPLE_FILE)
 
 format-check:
-	$(STYLUA) --syntax Luau --check $(SRC_DIR) $(TESTS_DIR) $(SCRIPTS_DIR)
+	$(STYLUA) --syntax Luau --check $(SRC_DIR) $(TESTS_DIR) $(SCRIPTS_DIR) $(EXAMPLE_FILE)
 
 lint:
 	$(SELENE) generate-roblox-std
-	$(SELENE) $(SRC_DIR) $(TESTS_DIR)
+	$(SELENE) $(SRC_DIR) $(TESTS_DIR) $(EXAMPLE_FILE)
+
+# a stale stamp makes the defs phony so they redownload, not just when the file is missing
+ifneq ($(strip $(file <$(GLOBAL_TYPES_STAMP))),$(LUAU_LSP_REF))
+.PHONY: $(GLOBAL_TYPES)
+endif
 
 $(GLOBAL_TYPES):
 	$(CURL) -fsSL -o "$(GLOBAL_TYPES)" "$(GLOBAL_TYPES_URL)"
+	echo $(LUAU_LSP_REF) > "$(GLOBAL_TYPES_STAMP)"
 
 typecheck: $(GLOBAL_TYPES)
 	$(ROJO) sourcemap $(PROJECT_FILE) -o $(SOURCEMAP)
-	$(LUAU_LSP) analyze --sourcemap=$(SOURCEMAP) --defs=$(GLOBAL_TYPES) --no-strict-dm-types $(SRC_DIR) $(TEST_SPECS_DIR)
+	$(LUAU_LSP) analyze --sourcemap=$(SOURCEMAP) --defs=$(GLOBAL_TYPES) --no-strict-dm-types $(SRC_DIR) $(TEST_SPECS_DIR) $(EXAMPLE_FILE)
 
 build:
 	$(ROJO) build $(PROJECT_FILE) -o "$(PLACE_FILE)"
 
+# unminified so wax keeps its line offsets and crash reports point at real source lines
 bundle:
 	$(MKDIR) "$(dir $(BUNDLE_FILE))"
-	$(LUNE) run wax bundle output="$(BUNDLE_FILE)" input="$(WAX_PROJECT)" minify=true
+	$(LUNE) run wax bundle output="$(BUNDLE_FILE)" input="$(WAX_PROJECT)" minify=false env-name=Rayfield extra-offset-lines=$(BUNDLE_HEADER_LINES)
 
 serve:
 	$(ROJO) serve $(PROJECT_FILE)
@@ -134,4 +146,4 @@ dev:
 	$(MAKE) -j2 sourcemap-watch serve
 
 clean:
-	$(GIT) clean -fdX -- build coverage $(SOURCEMAP) roblox.yml $(GLOBAL_TYPES) "$(PLACE_FILE)" "$(TEST_PLACE_FILE)"
+	$(GIT) clean -fdX -- build coverage $(SOURCEMAP) roblox.yml $(GLOBAL_TYPES) $(GLOBAL_TYPES_STAMP) "$(PLACE_FILE)" "$(TEST_PLACE_FILE)"

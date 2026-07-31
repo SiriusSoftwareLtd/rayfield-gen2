@@ -118,7 +118,9 @@ local function fetchAvatar(userId: number): string?
                 break
             end
         end
-        task.wait(0.3)
+        if attempt < 4 then
+            task.wait(0.3)
+        end
     end
     if not cdnUrl then
         return nil
@@ -126,6 +128,11 @@ local function fetchAvatar(userId: number): string?
 
     return cacheFile(avatarPath(userId), cdnUrl)
 end
+
+-- one fetch pipeline per user, and a miss is remembered for the session so the same
+-- broken avatar doesnt re-burn the retry loop on every call
+local pendingAvatars: { [number]: { AvatarCallback } } = {}
+local failedAvatars: { [number]: boolean } = {}
 
 -- onSettled(failed) fires once every background download has finished, with the count that never
 -- cached (a genuine failure), so callers can surface it without spamming per-icon.
@@ -214,11 +221,36 @@ function imageCache.avatar(userId: unknown, onReady: AvatarCallback?): string
         end
     end
 
+    -- this user already failed this session; dont spend another retry loop on them
+    if failedAvatars[userId] then
+        return ""
+    end
+
+    -- a fetch already in flight for this user takes our callback along instead of
+    -- racing a duplicate pipeline
+    local waiting = pendingAvatars[userId]
+    if waiting then
+        if onReady then
+            table.insert(waiting, onReady)
+        end
+        return ""
+    end
+
     if onReady then
+        pendingAvatars[userId] = { onReady }
         task.spawn(function()
             local uri = fetchAvatar(userId)
-            if uri then
-                onReady(uri)
+            local callbacks = pendingAvatars[userId]
+            pendingAvatars[userId] = nil
+            if not uri then
+                failedAvatars[userId] = true
+                return
+            end
+            if callbacks then
+                for _, callback in callbacks do
+                    -- one bad callback must not starve the rest
+                    pcall(callback, uri)
+                end
             end
         end)
     end

@@ -156,6 +156,35 @@ return function()
             expect(calls).to.equal(33)
         end)
 
+        it("shares one in-flight download between concurrent callers", function()
+            local calls = 0
+            local resume
+            resolver = assetResolver.new(true, "https://example.invalid/asset?id=%d")
+            network.getRequestFn = function()
+                return function()
+                    calls += 1
+                    resume = coroutine.running()
+                    coroutine.yield()
+                    return { StatusCode = 200, Body = "shared-body" }
+                end
+            end
+
+            local first, second
+            task.spawn(function()
+                first = resolver:getAssetContentFromUrl("https://example.invalid/raw", "key")
+            end)
+            task.spawn(function()
+                second = resolver:getAssetContentFromUrl("https://example.invalid/raw", "key")
+            end)
+            expect(calls).to.equal(1) -- the second caller waits instead of downloading again
+
+            coroutine.resume(resume)
+
+            expect(first).to.equal("shared-body")
+            expect(second).to.equal("shared-body")
+            expect(calls).to.equal(1)
+        end)
+
         it("bypasses the session cache when forced", function()
             local calls = 0
             resolver = assetResolver.new(true, "https://example.invalid/asset?id=%d")

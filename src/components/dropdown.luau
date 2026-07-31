@@ -987,6 +987,15 @@ function Dropdown:_destroyOption(data)
     self.window:DestroySubtree(data.frame)
 end
 
+-- re-derive the visible selection from the full intent: an option that loads now (or
+-- comes back) re-selects, one that's genuinely gone drops out. self.value only ever holds
+-- real options, so the saved config never carries a stale selection across sessions.
+function Dropdown:_deriveSelection()
+    local previous = self.value
+    self.value = intersectWithOptions(self._desiredValue or self.value, self.options)
+    return not sameSelection(self.value, previous)
+end
+
 function Dropdown:Refresh(newOptions)
     self.options = dedupStrings(newOptions or {})
 
@@ -995,12 +1004,7 @@ function Dropdown:Refresh(newOptions)
     end
     table.clear(self._optionFrames)
 
-    -- re-derive the visible selection from the full intent: an option that loads now (or
-    -- comes back) re-selects, one that's genuinely gone drops out. self.value only ever holds
-    -- real options, so the saved config never carries a stale selection across sessions.
-    local previous = self.value
-    self.value = intersectWithOptions(self._desiredValue or self.value, self.options)
-    local selectionChanged = not sameSelection(self.value, previous)
+    local selectionChanged = self:_deriveSelection()
 
     for _, opt in self.options do
         local data = self._buildOption(opt)
@@ -1035,6 +1039,9 @@ function Dropdown:Add(option)
     local data = self._buildOption(option)
     table.insert(self._optionFrames, data)
 
+    -- the new option may satisfy pending intent from an earlier Set or config load
+    local selectionChanged = self:_deriveSelection()
+
     if self._isOpen then
         self._renderOptionState(data, true)
     end
@@ -1042,6 +1049,13 @@ function Dropdown:Add(option)
     -- reconcile with any active search rather than showing an option the query excludes,
     -- and resize for the new row (also refreshes corners)
     self:_applyFilter(if self._searchOpen then self.searchInput.Text else "")
+
+    -- the visible selection changed (the pending option arrived): tell the dev and save it
+    if selectionChanged then
+        self._updateSelectedLabel()
+        self.window:_runGuarded(self, self.callback, self:_callbackValue())
+        self.window:_persist(self)
+    end
 end
 
 function Dropdown:Remove(option)
@@ -1060,10 +1074,18 @@ function Dropdown:Remove(option)
         end
     end
 
+    -- drop the removed option from the pending intent too, but leave intent for options
+    -- that just aren't present right now so they can still restore later
+    if self._desiredValue then
+        local desiredIdx = table.find(self._desiredValue, option)
+        if desiredIdx then
+            table.remove(self._desiredValue, desiredIdx)
+        end
+    end
+
     local valueIdx = table.find(self.value, option)
     if valueIdx then
         table.remove(self.value, valueIdx)
-        self._desiredValue = table.clone(self.value)
         self._updateSelectedLabel()
         -- removing a selected option changes the selection; surface and save that
         self.window:_runGuarded(self, self.callback, self:_callbackValue())

@@ -22,10 +22,15 @@ local hapticEngine = require(utility.HapticEngine)
 
 -- Decimal places implied by an increment (0.1 -> 1, 0.25 -> 2, 1 -> 0). Used so
 -- the readout formats mid-roll floats to the same precision as landed values.
+-- Checks against the nearest whole number at each scale so float error can't
+-- inflate the count (0.07 * 10 is 0.7000000000000001, still 2 decimals).
 local function decimalsOf(step)
     local decimals = 0
-    while step % 1 ~= 0 and decimals < 6 do
-        step = step * 10
+    while decimals < 6 do
+        local scaled = step * 10 ^ decimals
+        if math.abs(scaled - math.round(scaled)) < 1e-9 then
+            break
+        end
         decimals += 1
     end
     return decimals
@@ -69,6 +74,12 @@ function Slider.new(tab, properties)
         dragging = false,
         minimal = properties.minimal or properties.Minimal or false, -- track only, no name/value
     }, Slider)
+
+    -- catch a malformed range up front, before the clamp/snap math throws something cryptic
+    assert(
+        typeof(self.range) == "table" and typeof(self.range[1]) == "number" and typeof(self.range[2]) == "number",
+        "A slider range needs two numbers, like { 0, 100 }."
+    )
 
     -- keep range ascending and increment positive so the clamp/snap math stays sane
     if self.range[1] > self.range[2] then
@@ -250,19 +261,17 @@ function Slider.new(tab, properties)
 
     self.window:ConnectFor(self, variables.userInputService.InputEnded, function(input)
         if
-            (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch)
-            and self.dragging
+            input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch
         then
-            self.dragging = false
-            self:_setHeld(false)
-
-            if self._dragConnection then
-                self._dragConnection:Disconnect()
-                self._dragConnection = nil
-            end
-
-            self.window:_persist(self)
+            self:_endDrag()
         end
+    end)
+
+    -- releasing the button outside the Roblox window never fires InputEnded, so treat
+    -- losing focus as letting go too - otherwise the slider sticks to the cursor forever
+    self.window:ConnectFor(self, variables.userInputService.WindowFocusReleased, function()
+        self:_endDrag()
     end)
 
     if self.description and not self.minimal then
@@ -505,6 +514,22 @@ function Slider:_updateFromMouse()
     end
 end
 
+-- shared release path: InputEnded and window focus loss both land here
+function Slider:_endDrag()
+    if not self.dragging then
+        return
+    end
+    self.dragging = false
+    self:_setHeld(false)
+
+    if self._dragConnection then
+        self._dragConnection:Disconnect()
+        self._dragConnection = nil
+    end
+
+    self.window:_persist(self)
+end
+
 function Slider:_setHeld(held)
     if held then
         variables.tweenService
@@ -590,7 +615,8 @@ function Slider:_minWidth()
     if self.icon then
         w += 22 -- 16 icon + 6 gap
     end
-    w += functions.textWidth(self.window.theme.Font, 16, self.name)
+    -- measure what actually renders: the title shows the translated string
+    w += functions.textWidth(self.window.theme.Font, 16, locale.resolve(self.name))
     w += 12 -- gap before the value
     w += functions.textWidth(self.window.theme.Font, 15, self:_format(self.value))
     return math.max(w, 160)

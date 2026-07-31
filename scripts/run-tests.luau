@@ -1,6 +1,7 @@
 local fs = require("@lune/fs")
 local process = require("@lune/process")
 local roblox = require("@lune/roblox")
+local serde = require("@lune/serde")
 
 local root = process.cwd:gsub("\\", "/"):gsub("/$", "")
 local testsRoot = root .. "/tests"
@@ -241,23 +242,120 @@ local function readLongBracketEnd(line, index, equals)
     return nil
 end
 
-local function delimiterDeltaFromCode(code)
-    local delta = 0
-    for index = 1, #code do
-        local char = code:sub(index, index)
-        if char == "{" or char == "(" or char == "[" then
-            delta += 1
-        elseif char == "}" or char == ")" or char == "]" then
-            delta -= 1
-        end
-    end
-    return delta
+-- tokens that put a following `if` in expression position (x = if a then b else c),
+-- where it has no matching end and must not count as a block opener
+local expressionPrevTokens = {
+    ["="] = true,
+    ["("] = true,
+    [","] = true,
+    ["{"] = true,
+    ["["] = true,
+    ["."] = true,
+    ["+"] = true,
+    ["-"] = true,
+    ["*"] = true,
+    ["/"] = true,
+    ["%"] = true,
+    ["^"] = true,
+    ["#"] = true,
+    ["<"] = true,
+    [">"] = true,
+    ["~"] = true,
+    ["return"] = true,
+    ["and"] = true,
+    ["or"] = true,
+    ["not"] = true,
+}
+
+local function makeLexerState()
+    return {
+        depth = 0,
+        functionStack = {},
+        longBracket = nil,
+        pendingFunction = nil,
+        -- "then" or "do" while an if/elseif/for/while header is still open
+        pendingHeader = nil,
+        prevToken = nil,
+    }
 end
 
-local function delimiterDelta(line, lexerState)
-    local code = {}
+-- scans one line, updating bracket depth and the function context stack. strings,
+-- comments and long brackets are skipped so keywords inside them dont count.
+-- when a `function` keyword's parameter list closes we push a context recording the
+-- bracket depth its body statements sit at, and count the body's inner blocks
+-- (if/for/while/do/repeat, nested functions handled by their own context) so only
+-- the function's own `end` pops it.
+local function scanLine(line, lexerState)
+    local stack = lexerState.functionStack
     local index = 1
     local quote = nil
+
+    local function openBracket(char)
+        lexerState.depth += 1
+        local pending = lexerState.pendingFunction
+        if pending and char == "(" and not pending.parenDepth then
+            pending.parenDepth = lexerState.depth
+        end
+        lexerState.prevToken = char
+    end
+
+    local function closeBracket(char)
+        local pending = lexerState.pendingFunction
+        if pending and char == ")" and pending.parenDepth == lexerState.depth then
+            -- parameter list closed; body statements sit at the depth outside it
+            lexerState.pendingFunction = nil
+            lexerState.depth -= 1
+            table.insert(stack, { depth = lexerState.depth, blocks = 0 })
+        else
+            lexerState.depth = math.max(lexerState.depth - 1, 0)
+        end
+        lexerState.prevToken = char
+    end
+
+    local function handleWord(word)
+        local top = stack[#stack]
+        if word == "function" then
+            lexerState.pendingFunction = {}
+        elseif word == "do" or word == "repeat" then
+            if word == "do" and lexerState.pendingHeader == "do" then
+                lexerState.pendingHeader = nil
+            end
+            if top then
+                top.blocks += 1
+            end
+        elseif word == "then" then
+            if lexerState.pendingHeader == "then" then
+                lexerState.pendingHeader = nil
+            end
+        elseif word == "while" or word == "for" then
+            lexerState.pendingHeader = "do"
+        elseif word == "if" or word == "elseif" then
+            lexerState.pendingHeader = "then"
+            -- statements only sit at the context depth, so an `if` deeper down
+            -- (table entries, call arguments) is always an expression
+            if
+                word == "if"
+                and top
+                and lexerState.depth == top.depth
+                and not expressionPrevTokens[lexerState.prevToken or ""]
+            then
+                top.blocks += 1
+            end
+        elseif word == "end" then
+            if top then
+                if top.blocks > 0 then
+                    top.blocks -= 1
+                else
+                    table.remove(stack)
+                end
+            end
+        elseif word == "until" then
+            if top and top.blocks > 0 then
+                top.blocks -= 1
+            end
+        end
+        lexerState.prevToken = word
+    end
 
     while index <= #line do
         local char = line:sub(index, index)
@@ -293,6 +391,7 @@ local function delimiterDelta(line, lexerState)
             end
         elseif char == '"' or char == "'" or char == "`" then
             quote = char
+            lexerState.prevToken = "<string>"
             index += 1
         elseif char == "[" then
             local equals, afterStart = readLongBracketStart(line, index)
@@ -301,32 +400,46 @@ local function delimiterDelta(line, lexerState)
                     kind = "string",
                     equals = equals,
                 }
+                lexerState.prevToken = "<string>"
                 index = afterStart
             else
-                table.insert(code, char)
+                openBracket("[")
                 index += 1
             end
+        elseif char:match("[%a_]") then
+            local word = line:match("^[%a_][%w_]*", index)
+            handleWord(word)
+            index += #word
+        elseif char == "{" or char == "(" then
+            openBracket(char)
+            index += 1
+        elseif char == "}" or char == ")" or char == "]" then
+            closeBracket(char)
+            index += 1
+        elseif char:match("%s") then
+            index += 1
         else
-            table.insert(code, char)
+            lexerState.prevToken = char
             index += 1
         end
     end
-
-    return delimiterDeltaFromCode(table.concat(code))
 end
 
 local function startsContinuation(text)
-    return text:match("^or%s") or text:match("^and%s") or text:match("^%.%.") or text:match("^[,:%+%*/%%]")
+    -- comment lines are excluded before this runs, so a leading `-` is a wrapped subtraction
+    return text:match("^or%s") or text:match("^and%s") or text:match("^%.") or text:match("^[,:%+%-%*/%%]")
 end
 
 local function endsContinuation(text)
+    -- `x = if cond` continues onto the next line, but a one-liner with its else is complete
+    local openIfExpression = text:match("=%s*if%s") ~= nil and text:match("%f[%w]else%f[%W]") == nil
     return text:match("=%s*$")
         or text:match("%.%.%s*$")
         or text:match("[,%+%-%*/%%]%s*$")
         or text:match("[<>=~]=%s*$")
         or text:match("^return%s*$")
         or text == "elseif"
-        or text:match("=%s*if%s")
+        or openIfExpression
 end
 
 local function isContinuationOnly(text)
@@ -343,8 +456,14 @@ local function isContinuationOnly(text)
         or text == "%"
 end
 
-local function isCoverableLine(line, depth, inBlockComment, previousContinuation)
-    if depth ~= 0 or inBlockComment or previousContinuation then
+-- a line is coverable when it starts a statement: at the current statement depth
+-- (top level, or directly inside the innermost open function body), outside long
+-- brackets, and not continuing the previous line. hits are injected before the
+-- line, so a single-line callback (`f(function() work() end)`) can only credit its
+-- registration line; injecting mid-line isnt possible, and thats the one place a
+-- registration still counts as coverage without the callback running.
+local function isCoverableLine(line, atStatementDepth, inBlockComment, previousContinuation)
+    if not atStatementDepth or inBlockComment or previousContinuation then
         return false
     end
 
@@ -398,15 +517,22 @@ local function instrumentSource(relativePath, source)
     }
     coverage.files[relativePath] = fileCoverage
 
-    local depth = 0
-    local lexerState = {}
+    local lexerState = makeLexerState()
     local previousContinuation = false
     local output = { "local script = _G.__RAYFIELD_CURRENT_SCRIPT" }
+
+    local function statementDepth()
+        local top = lexerState.functionStack[#lexerState.functionStack]
+        return if top then top.depth else 0
+    end
 
     for lineNumber, line in splitLines(source) do
         local startsInLongBracket = lexerState.longBracket ~= nil
         local text = line:match("^%s*(.-)%s*$")
-        local coverable = isCoverableLine(line, depth, startsInLongBracket, previousContinuation)
+        local atStatementDepth = lexerState.depth == statementDepth()
+        -- an unresolved if/for/while header means this line is still its condition
+        local continuing = previousContinuation or lexerState.pendingHeader ~= nil
+        local coverable = isCoverableLine(line, atStatementDepth, startsInLongBracket, continuing)
 
         if coverable then
             fileCoverage.coverable[lineNumber] = true
@@ -415,12 +541,11 @@ local function instrumentSource(relativePath, source)
 
         table.insert(output, line)
 
-        depth += delimiterDelta(line, lexerState)
-        if depth < 0 then
-            depth = 0
-        end
+        scanLine(line, lexerState)
 
-        previousContinuation = not lexerState.longBracket and depth == 0 and endsContinuation(text)
+        previousContinuation = not lexerState.longBracket
+            and lexerState.depth == statementDepth()
+            and endsContinuation(text)
     end
 
     if lexerState.longBracket then
@@ -686,31 +811,25 @@ local function makeSignal()
     return signal
 end
 
+-- like Roblox, spawn/defer/delay take a function or a thread to resume
+local function resumeTask(callback, ...)
+    local thread = if type(callback) == "thread" then callback else coroutine.create(callback)
+    local ok, err = coroutine.resume(thread, ...)
+    if not ok then
+        error(err, 0)
+    end
+    return thread
+end
+
 task = {
     wait = function()
         return 1
     end,
     delay = function(_, callback, ...)
-        local args = table.pack(...)
-        local thread = coroutine.create(function()
-            callback(table.unpack(args, 1, args.n))
-        end)
-        local ok, err = coroutine.resume(thread)
-        if not ok then
-            error(err, 0)
-        end
-        return thread
+        return resumeTask(callback, ...)
     end,
     spawn = function(callback, ...)
-        local args = table.pack(...)
-        local thread = coroutine.create(function()
-            callback(table.unpack(args, 1, args.n))
-        end)
-        local ok, err = coroutine.resume(thread)
-        if not ok then
-            error(err, 0)
-        end
-        return thread
+        return resumeTask(callback, ...)
     end,
 }
 task.defer = task.spawn
@@ -953,6 +1072,12 @@ local function propertySignalForService(service, property)
     return signal
 end
 
+-- mutable input state so drag/pointer specs can steer the mocks; call the
+-- underscore setters with a dot
+local mockMouseLocation = Vector2.new(120, 80)
+local mockMouseButtonPressed = false
+local mockGuiInset = Vector2.new(0, 0)
+
 local services = {
     CoreGui = makeFolder("CoreGui"),
     Workspace = makeFolder("Workspace"),
@@ -964,16 +1089,25 @@ local services = {
         MouseBehavior = Enum.MouseBehavior.Default,
         MouseIconEnabled = true,
         GetMouseLocation = function()
-            return Vector2.new(120, 80)
+            return mockMouseLocation
         end,
         IsMouseButtonPressed = function()
-            return false
+            return mockMouseButtonPressed
+        end,
+        _setMouseLocation = function(value)
+            mockMouseLocation = value
+        end,
+        _setMouseButtonPressed = function(value)
+            mockMouseButtonPressed = value
         end,
         GetPropertyChangedSignal = propertySignalForService,
     },
     GuiService = {
         GetGuiInset = function()
-            return Vector2.new(0, 0)
+            return mockGuiInset
+        end,
+        _setGuiInset = function(value)
+            mockGuiInset = value
         end,
     },
     TweenService = {
@@ -1008,11 +1142,13 @@ local services = {
         GenerateGUID = function()
             return "00000000-0000-4000-8000-000000000000"
         end,
-        JSONDecode = function()
-            error("HttpService:JSONDecode is not available in the unit test shim")
+        -- real JSON via serde so specs exercise the actual on-disk shape.
+        -- like Roblox, encoding a function or other non-JSON value errors.
+        JSONDecode = function(_, value)
+            return serde.decode("json", value)
         end,
-        JSONEncode = function()
-            error("HttpService:JSONEncode is not available in the unit test shim")
+        JSONEncode = function(_, value)
+            return serde.encode("json", value)
         end,
     },
 }
@@ -1119,6 +1255,23 @@ local function makeTo(actual, negate)
                 string.format("expected %s to equal %s", tostring(actual), tostring(expected)),
                 negate
             )
+        end,
+        throw = function(pattern)
+            local ok, err = pcall(actual)
+            if pattern == nil then
+                assertCondition(not ok, "expected function to throw", negate)
+            else
+                local threwMatching = not ok and string.find(tostring(err), pattern) ~= nil
+                assertCondition(
+                    threwMatching,
+                    string.format(
+                        "expected function to throw an error matching %q, got %s",
+                        tostring(pattern),
+                        if ok then "no error" else tostring(err)
+                    ),
+                    negate
+                )
+            end
         end,
         be = {
             ok = function()
@@ -1319,18 +1472,36 @@ local function runTest(suite, test)
     end
 end
 
+-- a failed beforeAll skips the suite, but its tests still count as failures so
+-- the N/M totals stay honest; afterAll is skipped too since setup never finished
+local function failSkippedTests(suite, reason)
+    for _, test in suite.tests do
+        local nameWithSuites = testName(suite, test.name)
+        results.testsRan += 1
+        recordFailure(nameWithSuites, reason)
+        warn("[FAIL] " .. nameWithSuites .. " (" .. reason .. ")")
+    end
+
+    for _, child in suite.children do
+        failSkippedTests(child, reason)
+    end
+end
+
 local function runSuite(suite)
     recordRegistrationErrors(suite)
 
     local beforeAllOk = runHookList(suite, suite.beforeAll, "beforeAll")
-    if beforeAllOk then
-        for _, test in suite.tests do
-            runTest(suite, test)
-        end
+    if not beforeAllOk then
+        failSkippedTests(suite, "skipped: beforeAll failed")
+        return
+    end
 
-        for _, child in suite.children do
-            runSuite(child)
-        end
+    for _, test in suite.tests do
+        runTest(suite, test)
+    end
+
+    for _, child in suite.children do
+        runSuite(child)
     end
 
     runHookList(suite, suite.afterAll, "afterAll")
@@ -1357,19 +1528,33 @@ if #specs == 0 then
 end
 
 for _, specPath in specs do
-    local spec = require(specPath)
-    assert(type(spec) == "function", specPath .. " must return a function")
+    -- a spec file that fails to load is a failed suite, not a dead run
+    local loadOk, spec = xpcall(function()
+        return require(specPath)
+    end, debug.traceback)
 
-    local rootSuite = createSuite(nil, nil)
-    currentSuite = rootSuite
-    local ok, err = xpcall(spec, debug.traceback)
-    currentSuite = nil
-
-    if not ok then
-        table.insert(rootSuite.registrationErrors, err)
+    if loadOk and type(spec) ~= "function" then
+        loadOk = false
+        spec = specPath .. " must return a function"
     end
 
-    runSuite(rootSuite)
+    if not loadOk then
+        local name = specPath .. " > load"
+        recordFailure(name, spec)
+        warn("[FAIL] " .. name)
+        warn(tostring(spec))
+    else
+        local rootSuite = createSuite(nil, nil)
+        currentSuite = rootSuite
+        local ok, err = xpcall(spec, debug.traceback)
+        currentSuite = nil
+
+        if not ok then
+            table.insert(rootSuite.registrationErrors, err)
+        end
+
+        runSuite(rootSuite)
+    end
 end
 
 local function jsonEscape(value)
@@ -1394,7 +1579,8 @@ local function fileCoverageSummary(relativePath)
     end
 
     table.sort(uncovered)
-    local percent = if coverableLines == 0 then 100 else (coveredLines / coverableLines) * 100
+    -- nil, not 100: a file with no coverable lines has no coverage to report
+    local percent = if coverableLines == 0 then nil else (coveredLines / coverableLines) * 100
     return {
         path = relativePath,
         coveredLines = coveredLines,
@@ -1454,10 +1640,14 @@ local function writeCoverageReports()
     table.insert(jsonLines, '  "files": [')
 
     for index, row in rows do
-        table.insert(
-            textLines,
-            string.format("  %s: %.2f%% (%d/%d)", row.path, row.lineCoverage, row.coveredLines, row.coverableLines)
-        )
+        if row.lineCoverage then
+            table.insert(
+                textLines,
+                string.format("  %s: %.2f%% (%d/%d)", row.path, row.lineCoverage, row.coveredLines, row.coverableLines)
+            )
+        else
+            table.insert(textLines, string.format("  %s: no coverable lines", row.path))
+        end
         if #row.uncoveredLines > 0 then
             table.insert(textLines, "    uncovered: " .. table.concat(row.uncoveredLines, ", "))
         end
@@ -1469,7 +1659,12 @@ local function writeCoverageReports()
 
         table.insert(jsonLines, "    {")
         table.insert(jsonLines, string.format('      "path": "%s",', jsonEscape(row.path)))
-        table.insert(jsonLines, string.format('      "lineCoverage": %.2f,', row.lineCoverage))
+        table.insert(
+            jsonLines,
+            if row.lineCoverage
+                then string.format('      "lineCoverage": %.2f,', row.lineCoverage)
+                else '      "lineCoverage": null,'
+        )
         table.insert(jsonLines, string.format('      "coveredLines": %d,', row.coveredLines))
         table.insert(jsonLines, string.format('      "coverableLines": %d,', row.coverableLines))
         table.insert(jsonLines, string.format('      "uncoveredLines": [%s]', table.concat(uncoveredText, ", ")))
@@ -1543,7 +1738,12 @@ local function writeCoverageBaseline(summary)
         for index, row in summary.rows do
             table.insert(jsonLines, "    {")
             table.insert(jsonLines, string.format('      "path": "%s",', jsonEscape(row.path)))
-            table.insert(jsonLines, string.format('      "lineCoverage": %.2f,', row.lineCoverage))
+            table.insert(
+                jsonLines,
+                if row.lineCoverage
+                    then string.format('      "lineCoverage": %.2f,', row.lineCoverage)
+                    else '      "lineCoverage": null,'
+            )
             table.insert(jsonLines, string.format('      "coveredLines": %d,', row.coveredLines))
             table.insert(jsonLines, string.format('      "coverableLines": %d', row.coverableLines))
             table.insert(jsonLines, "    }" .. if index == #summary.rows then "" else ",")
@@ -1587,6 +1787,18 @@ if results.failureCount > 0 then
 end
 
 if updateCoverageBaseline then
+    -- the baseline ratchets down to the configured floor, never through it
+    if coverageSummary.lineCoverage + coverageEpsilon < coverageThreshold then
+        warn(
+            string.format(
+                "Refusing to update the coverage baseline: %.2f%% is below the %.2f%% threshold floor.",
+                coverageSummary.lineCoverage,
+                coverageThreshold
+            )
+        )
+        process.exit(1)
+    end
+
     writeCoverageBaseline(coverageSummary)
     process.exit(0)
 end

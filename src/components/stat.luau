@@ -52,19 +52,25 @@ local function formatValue(value)
     if typeof(value) ~= "number" then
         return tostring(value)
     end
-    local s = tostring(math.floor(math.abs(value)))
+    -- round (matching formatChange) and format without exponent notation so huge
+    -- values don't render as "1e+20"
+    local rounded = math.round(math.abs(value))
+    local s = string.format("%.0f", rounded)
     local result = s:reverse():gsub("%d%d%d", "%0,"):reverse()
     if result:sub(1, 1) == "," then
         result = result:sub(2)
     end
-    return if value < 0 then "-" .. result else result
+    -- no "-0": a negative that rounds to zero shows plain 0
+    return if value < 0 and rounded ~= 0 then "-" .. result else result
 end
 
 local function formatChange(delta)
-    if delta > 0 then
-        return "+" .. formatValue(math.round(delta))
-    elseif delta < 0 then
-        return formatValue(math.round(delta))
+    -- sign follows the rounded value, so a delta that rounds to zero shows plain 0
+    local rounded = math.round(delta)
+    if rounded > 0 then
+        return "+" .. formatValue(rounded)
+    elseif rounded < 0 then
+        return formatValue(rounded)
     else
         return "0"
     end

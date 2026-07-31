@@ -7,6 +7,12 @@ COVERAGE_THRESHOLD=${COVERAGE_THRESHOLD:-70}
 
 cd "$REPO_ROOT"
 
+# the gate below checks the worktree, so flag when staged copies differ; a green run
+# on unstaged fixes says nothing about what this commit contains
+if ! git diff --quiet -- src tests scripts example.client.luau Makefile selene.toml stylua.toml; then
+    echo "pre-commit: gated files have unstaged changes; this gate ran against the worktree, not what is being committed."
+fi
+
 if command -v "$MAKE_CMD" >/dev/null 2>&1; then
     echo "pre-commit: running $MAKE_CMD check"
     "$MAKE_CMD" check
@@ -17,18 +23,20 @@ else
     # no make on this machine (typical Windows setup); run the same gate directly
     echo "pre-commit: make not found, running the gate directly"
 
-    stylua --syntax Luau --check src tests scripts
+    stylua --syntax Luau --check src tests scripts example.client.luau
     selene generate-roblox-std >/dev/null
-    selene src tests
+    selene src tests example.client.luau
     rojo sourcemap default.project.json -o sourcemap.json
-    # same pin as the Makefile, so the hook and CI cant typecheck against different defs
+    # same pin as the Makefile, so the hook and CI cant typecheck against different defs.
+    # the .ref stamp forces a redownload when the pin moves
     LUAU_LSP_REF=$(sed -n 's/^LUAU_LSP_REF ?= //p' Makefile)
-    if [ ! -f globalTypes.d.luau ]; then
+    if [ ! -f globalTypes.d.luau ] || [ "$(cat globalTypes.d.luau.ref 2>/dev/null)" != "$LUAU_LSP_REF" ]; then
         curl -fsSL -o globalTypes.d.luau \
             "https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/${LUAU_LSP_REF}/scripts/globalTypes.d.luau"
+        printf '%s\n' "$LUAU_LSP_REF" > globalTypes.d.luau.ref
     fi
     luau-lsp analyze --sourcemap=sourcemap.json --defs=globalTypes.d.luau --no-strict-dm-types \
-        src tests/components tests/integration tests/runner tests/utility
+        src tests/components tests/integration tests/runner tests/utility example.client.luau
     lune run scripts/run-tests.luau -- --coverage-threshold="$COVERAGE_THRESHOLD"
     lune run scripts/run-tests.luau -- --coverage-threshold="$COVERAGE_THRESHOLD" --update-coverage-baseline
 fi

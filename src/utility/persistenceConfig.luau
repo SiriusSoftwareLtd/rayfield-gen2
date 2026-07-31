@@ -35,12 +35,21 @@ type ConfigWindow = {
     _loadedConfigPath: string?,
 }
 
-function persistenceConfig.getPath(window: ConfigWindow, name: unknown?): (string, string)
+function persistenceConfig.getPath(window: ConfigWindow, name: unknown?): (string?, string?)
     return paths.getConfigPath(window, name)
 end
 
 function persistenceConfig.save(window: ConfigWindow, name: unknown?): boolean
     local dir, fullPath = persistenceConfig.getPath(window, name)
+    if not dir or not fullPath then
+        log.warn("Rayfield: configuration name '" .. tostring(name) .. "' has no usable characters")
+        return false
+    end
+
+    -- no file API on this executor: nowhere to save, degrade as quietly as load does
+    if typeof(filesystem.writefile) ~= "function" then
+        return false
+    end
 
     local flags: { [string]: unknown } = {}
     for flag, control in window.controls do
@@ -85,6 +94,14 @@ function persistenceConfig.save(window: ConfigWindow, name: unknown?): boolean
         return false
     end
 
+    -- the file we just wrote is now the truth, so later carry-forwards use current values,
+    -- not the ones from load time; without this an element torn down after a change would
+    -- have its old value written back by the next autosave
+    if window._loadedConfigPath == nil or window._loadedConfigPath == fullPath then
+        window._loadedConfig = flags
+        window._loadedConfigPath = fullPath
+    end
+
     return true
 end
 
@@ -127,6 +144,10 @@ end
 
 function persistenceConfig.load(window: ConfigWindow, name: unknown?): boolean
     local dir, fullPath = persistenceConfig.getPath(window, name)
+    if not dir or not fullPath then
+        log.warn("Rayfield: configuration name '" .. tostring(name) .. "' has no usable characters")
+        return false
+    end
 
     -- no file API on this executor: nothing to load, degrade quietly
     if typeof(filesystem.isfile) ~= "function" then
@@ -206,6 +227,10 @@ function persistenceConfig.list(window: ConfigWindow): { string }
     local dir = persistenceConfig.getPath(window)
 
     local names: { string } = {}
+    -- the no-name path always resolves; the guard just narrows the type
+    if not dir then
+        return names
+    end
     local ok, files = pcall(filesystem.listfiles, dir)
     if not ok or type(files) ~= "table" then
         return names
@@ -233,6 +258,9 @@ function persistenceConfig.delete(window: ConfigWindow, name: unknown): boolean
     end
 
     local _, fullPath = persistenceConfig.getPath(window, name)
+    if not fullPath then
+        return false
+    end
     if typeof(filesystem.isfile) ~= "function" or not filesystem.isfile(fullPath) then
         return false
     end

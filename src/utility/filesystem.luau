@@ -14,7 +14,17 @@ local services = require(script.Parent.services)
 local filesystem = {}
 
 local isStudio = services.getService("RunService"):IsStudio()
-local hasNativeFS = not isStudio and typeof(writefile) == "function"
+-- writefile alone isnt proof of a full file API; every one of these gets called
+-- unconditionally somewhere, so a partial set must fall through to no filesystem at all
+local hasNativeFS = not isStudio
+    and typeof(writefile) == "function"
+    and typeof(readfile) == "function"
+    and typeof(isfile) == "function"
+    and typeof(isfolder) == "function"
+    and typeof(makefolder) == "function"
+    and typeof(listfiles) == "function"
+    and typeof(delfile) == "function"
+    and typeof(delfolder) == "function"
 
 if hasNativeFS then
     -- Native executor environment - wrap globals directly
@@ -27,8 +37,12 @@ if hasNativeFS then
         return readfile(path)
     end
 
-    function filesystem.appendfile(path: string, content: string)
-        appendfile(path, content)
+    -- appendfile is missing on several executors, so only wrap it when its real;
+    -- the shared fallback below covers the rest
+    if typeof(appendfile) == "function" then
+        function filesystem.appendfile(path: string, content: string)
+            appendfile(path, content)
+        end
     end
 
     function filesystem.isfile(path: string): boolean
@@ -132,20 +146,6 @@ elseif isStudio then
         return stringFile.Value
     end
 
-    function filesystem.appendfile(path: string, content: string)
-        local parts = splitPath(path)
-        assert(#parts > 0, "Invalid path")
-
-        local parent = resolveParent(parts, false)
-        assert(parent, "File not found: " .. path)
-
-        local file = parent:FindFirstChild(parts[#parts])
-        local stringFile = fileFromInstance(file)
-        assert(stringFile, "File not found: " .. path)
-
-        stringFile.Value = stringFile.Value .. content
-    end
-
     function filesystem.isfile(path: string): boolean
         local parts = splitPath(path)
         if #parts == 0 then
@@ -240,6 +240,15 @@ elseif isStudio then
         assert(folder and folder:IsA("Folder"), "Folder not found: " .. path)
 
         folder:Destroy()
+    end
+end
+
+-- append built from read + write, shared by the studio sim and executors without
+-- appendfile. creates the file when its missing, same as the native global does
+if filesystem.writefile and not filesystem.appendfile then
+    function filesystem.appendfile(path: string, content: string)
+        local existing = if filesystem.isfile(path) then filesystem.readfile(path) else nil
+        filesystem.writefile(path, if existing then existing .. content else content)
     end
 end
 

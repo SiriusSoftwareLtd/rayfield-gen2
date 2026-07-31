@@ -284,6 +284,23 @@ return function()
             expect(files["Fonts/SpecFont/manifest.json"]).never.to.be.ok()
         end)
 
+        it("refetches cached face files whose signature no longer checks out", function()
+            local manager = makeManager(true)
+            manager._debug = false
+            files["Fonts/123.json"] = "stored-manifest"
+            -- a crash mid-write left a truncated face on disk
+            files["Fonts/SpecFont/Regular.ttf"] = "not-a-font"
+            manager.assetResolver.resolve = function(_, id)
+                return tonumber(id) or 456
+            end
+            manager.assetResolver.getAssetContentFromId = function()
+                return fontBinary
+            end
+
+            expect(manager:loadFont(123)).never.to.equal(fallback)
+            expect(files["Fonts/SpecFont/Regular.ttf"]).to.equal(fontBinary)
+        end)
+
         it("accepts every font signature we know", function()
             for _, signature in { "\0\1\0\0", "OTTO", "true", "ttcf", "wOFF", "wOF2" } do
                 local manager = makeManager(true)

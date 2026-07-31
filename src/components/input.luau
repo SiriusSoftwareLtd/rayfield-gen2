@@ -232,7 +232,7 @@ function Input:_commit(text, silent)
     text = tostring(text)
     if self.numeric then
         local n = parseExp(text)
-        if not n or n == math.huge or n == -math.huge then
+        if not n or n ~= n or n == math.huge or n == -math.huge then
             -- invalid or non-finite number: revert the textbox to the previous value
             if self.input.Text ~= self.value then
                 self.input.Text = self.value

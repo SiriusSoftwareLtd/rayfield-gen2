@@ -274,6 +274,10 @@ end
 -- Show a slot as a static char; hide its reel twin.
 function odometer:_putStatic(index, char)
     local label = self:_static(index)
+    if not label.Visible then
+        -- reveal only fades visible statics, so a hidden cell may carry a stale level
+        label.TextTransparency = self.transparency
+    end
     label.Text = char
     label.Visible = true
     label.LayoutOrder = -index

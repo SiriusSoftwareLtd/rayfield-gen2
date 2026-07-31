@@ -7,6 +7,20 @@ return function()
     local constants = requireUtility("constants")
 
     describe("utility.imageCache", function()
+        local pathUtility = requireUtility("path")
+
+        -- the module's manifest is one entry per unique icon id
+        local manifestSize = 0
+        do
+            local seen = {}
+            for _, id in constants.icons do
+                if not seen[id] then
+                    seen[id] = true
+                    manifestSize += 1
+                end
+            end
+        end
+
         local originalFilesystem
         local originalGetCustomAsset
         local originalAssetResolver
@@ -117,7 +131,7 @@ return function()
             end)
 
             expect(ok).to.equal(false)
-            expect(missing).to.be.ok()
+            expect(missing).to.equal(manifestSize) -- nothing was on disk, every icon downloaded
             expect(settled).to.equal(0)
             expect(cachedIds[constants.icons.close]).to.equal(true)
             expect(imageCache.rewrites[constants.icons.close]).to.be.ok()
@@ -138,7 +152,7 @@ return function()
 
             -- a throw used to strand the pending counter, so settle never fired
             expect(ok).to.equal(false)
-            expect(missing).to.be.ok()
+            expect(missing).to.equal(manifestSize)
             expect(settled).to.equal(0)
         end)
 
@@ -171,7 +185,10 @@ return function()
                 return path:match("avatar_42%.png$") ~= nil
             end
 
-            expect(imageCache.avatar(42)).to.be.ok()
+            -- the exact custom-asset uri, not just anything ("" is the failure value)
+            local expected = "asset://"
+                .. pathUtility.join(variables.fileSystemManager:getAssetsFolder(), "avatar_42.png")
+            expect(imageCache.avatar(42)).to.equal(expected)
             expect(imageCache.avatar("42")).to.equal("")
         end)
 
@@ -251,6 +268,56 @@ return function()
                 readyUri = uri
             end)).to.equal("")
             expect(readyUri).to.equal("not-called")
+        end)
+
+        it("remembers failed avatar fetches instead of retrying every call", function()
+            getfenv().getcustomasset = function(path)
+                return "asset://" .. path
+            end
+            local requests = 0
+            variables.assetResolver.getAssetContentFromUrl = function()
+                requests += 1
+                return nil
+            end
+
+            expect(imageCache.avatar(555, function() end)).to.equal("")
+            expect(requests).to.equal(4)
+
+            -- the miss is cached for the session, so this must not re-burn the retry loop
+            expect(imageCache.avatar(555, function() end)).to.equal("")
+            expect(requests).to.equal(4)
+        end)
+
+        it("shares one in-flight fetch between concurrent calls for a user", function()
+            getfenv().getcustomasset = function(path)
+                return "asset://" .. path
+            end
+            local requests = 0
+            local yielded = false
+            local resume
+            variables.assetResolver.getAssetContentFromUrl = function(_, url)
+                requests += 1
+                if not yielded then
+                    yielded = true
+                    resume = coroutine.running()
+                    coroutine.yield()
+                end
+                return "\137PNG\r\n\26\nbody:" .. tostring(url)
+            end
+
+            local readyCount = 0
+            expect(imageCache.avatar(321, function()
+                readyCount += 1
+            end)).to.equal("")
+            expect(imageCache.avatar(321, function()
+                readyCount += 1
+            end)).to.equal("")
+            expect(requests).to.equal(1) -- the second call joined the first pipeline
+
+            coroutine.resume(resume)
+
+            expect(readyCount).to.equal(2)
+            expect(requests).to.equal(2) -- one thumbnail lookup, one cdn download
         end)
     end)
 end

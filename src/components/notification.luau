@@ -272,8 +272,8 @@ function Notification:_show()
     -- is fully transparent until the grow tween starts, so there's no flicker.
     -- +stackPadding because the outer's top padding holds the inter-card gap.
     local target = self:_measure() + stackPadding
-    if not self.main.Parent then
-        return
+    if self._dismissed or not self.main.Parent then
+        return -- evicted mid-measure; dont replay the entrance over the exit
     end
 
     hapticEngine.notify()

@@ -706,6 +706,7 @@ function Window:_refreshElementThemes()
 end
 
 function Window:CreateTab(properties)
+    assert(not self.unloaded, "Cannot create a tab on an unloaded window.")
     local newTab = require(script.Parent.tab).new(self, properties)
 
     table.insert(self.tabs, newTab)
@@ -737,6 +738,7 @@ function Window:CreateTab(properties)
 end
 
 function Window:CreateTag(properties)
+    assert(not self.unloaded, "Cannot create a tag on an unloaded window.")
     local newTag = require(script.Parent.tag).new(self, properties)
     table.insert(self.tags, newTag)
     return newTag
@@ -862,8 +864,11 @@ function Window:Toast(properties)
         return
     end
 
-    local position = (properties or {}).position or "Top"
-    local isTop = position == "Top"
+    -- both casings and any case for the value, like every other toast property
+    properties = if typeof(properties) == "table" then properties else {}
+    local position = properties.position or properties.Position or "Top"
+    local isTop = typeof(position) ~= "string" or position:lower() ~= "bottom"
+    properties.position = if isTop then "Top" else "Bottom"
     local containerKey = if isTop then "_toastsTop" else "_toastsBottom"
     local container = self[containerKey]
 
@@ -919,6 +924,12 @@ function Window:Hide()
         search.close(self, { showTabs = false, jumpTo = self.selectedTab and self.selectedTab.tabPage })
     end
 
+    -- a keybind left recording would capture the next keypress against an invisible UI and
+    -- eat the toggle key
+    if self._recordingKeybind then
+        self._recordingKeybind:_stopRecording()
+    end
+
     self.animating = true
     self._revealing = true
     self.hidden = true
@@ -959,6 +970,7 @@ function Window:Hide()
     -- fade the window's own chrome out; main keeps its own background/gradient/corner the
     -- whole time, it just reshapes underneath - there's nothing to hand off to
     variables.tweenService:Create(self.windowShadow, fadeInfo, { Transparency = 1 }):Play()
+    variables.tweenService:Create(self.windowStroke, fadeInfo, { Transparency = 1 }):Play()
     variables.tweenService:Create(self.bottomFade, fadeInfo, { BackgroundTransparency = 1 }):Play()
 
     if self.title then
@@ -1050,6 +1062,7 @@ function Window:ToggleMinimise()
 
         variables.tweenService:Create(self.main, sizeInfo, { Size = self.size }):Play()
         variables.tweenService:Create(self.windowShadow, fadeInfo, { Transparency = 0.6 }):Play()
+        variables.tweenService:Create(self.windowStroke, fadeInfo, { Transparency = 0.95 }):Play()
         variables.tweenService:Create(self.bottomFade, fadeInfo, { BackgroundTransparency = 0 }):Play()
 
         variables.tweenService
@@ -1112,6 +1125,7 @@ function Window:ToggleMinimise()
         end)
 
         variables.tweenService:Create(self.windowShadow, fadeInfo, { Transparency = 1 }):Play()
+        variables.tweenService:Create(self.windowStroke, fadeInfo, { Transparency = 1 }):Play()
         variables.tweenService:Create(self.bottomFade, fadeInfo, { BackgroundTransparency = 1 }):Play()
         variables.tweenService:Create(self.main, sizeInfo, { Size = UDim2.fromOffset(self.size.X.Offset, 66) }):Play()
 
@@ -1712,6 +1726,7 @@ function Window:_quickRestore()
         self.elements.Visible = true
 
         variables.tweenService:Create(self.windowShadow, fadeInfo, { Transparency = 0.6 }):Play()
+        variables.tweenService:Create(self.windowStroke, fadeInfo, { Transparency = 0.95 }):Play()
         variables.tweenService:Create(self.bottomFade, fadeInfo, { BackgroundTransparency = 0 }):Play()
 
         if self.topbarIcon then
@@ -1794,6 +1809,13 @@ function Window:_firstShow()
         :Play()
     variables.tweenService
         :Create(
+            self.windowStroke,
+            TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
+            { Transparency = 0.95 }
+        )
+        :Play()
+    variables.tweenService
+        :Create(
             self.bottomFade,
             TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
             { BackgroundTransparency = 0 }
@@ -1868,6 +1890,9 @@ function Window:_firstShow()
 
     task.wait(1)
 
+    -- the fit can change between construction and now (a late camera banks a new size), so
+    -- re-derive the bar's spot rather than trusting the construction-time position
+    self:_syncDragBar()
     self.drag.drag.Visible = true
     variables.tweenService
         :Create(
@@ -1928,6 +1953,10 @@ function Window:_applyNamedConfig(name)
     if not self:Load(name) then
         return false
     end
+    -- promotion means the default file becomes this config, unbuilt elements included; repoint
+    -- the carry-forward so Save doesnt drop flags for elements that havent registered yet
+    local _, defaultPath = persistence.getPath(self)
+    self._loadedConfigPath = defaultPath
     self:Save()
     return true
 end
@@ -2156,7 +2185,7 @@ function Window:_wireElementHover(element)
     local info = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
     local theme = self.theme
 
-    self:Connect(element.main.MouseEnter, function()
+    self:ConnectFor(element, element.main.MouseEnter, function()
         if not self:_interactive() then
             return -- window still revealing/hiding: dont light up mid-animation
         end
@@ -2173,7 +2202,7 @@ function Window:_wireElementHover(element)
         end
     end)
 
-    self:Connect(element.main.MouseLeave, function()
+    self:ConnectFor(element, element.main.MouseLeave, function()
         variables.tweenService
             :Create(
                 element.stroke,

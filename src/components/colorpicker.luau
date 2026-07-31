@@ -1105,6 +1105,9 @@ function ColorPicker:_close()
     if self.hexInput:IsFocused() then
         self.hexInput:ReleaseFocus()
     end
+    if self.alphaInput:IsFocused() then
+        self.alphaInput:ReleaseFocus()
+    end
 
     self:_applyPickerVisibility(false, true)
     self:_renderInvisible(true)
