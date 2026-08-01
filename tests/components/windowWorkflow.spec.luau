@@ -2003,6 +2003,81 @@ return function()
             expect(w.size).to.equal(held)
         end)
 
+        it("travels a row child that was wrapped onto another line", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local row = tab:CreateGroup({ direction = "row" })
+            local first = row:CreateButton({ name = "First" })
+            local child = row:CreateButton({ name = "Second" })
+
+            -- the layout owns the position of what it lays out, so each row child rides inside a
+            -- slot it can be animated within, and the slot carries the order
+            expect(child._slot).to.be.ok()
+            expect(child.main.Parent).to.equal(child._slot)
+            expect(first._slot.LayoutOrder).to.equal(first.main.LayoutOrder)
+
+            row.main.AbsolutePosition = Vector2.new(100, 100)
+            child._slot.AbsolutePosition = Vector2.new(400, 100)
+            row:_slideIntoPlace(child)
+            expect(child.main.Position).to.equal(UDim2.fromOffset(0, 0))
+
+            -- wrapped: to the start of another line, so it has travelled sideways as well as down
+            child._slot.AbsolutePosition = Vector2.new(110, 160)
+            row:_slideIntoPlace(child)
+            expect(child._slotAt).to.equal(Vector2.new(10, 60))
+        end)
+
+        it("leaves a row child alone for everything that is not a wrap", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local row = tab:CreateGroup({ direction = "row" })
+            local child = row:CreateButton({ name = "Only" })
+
+            row.main.AbsolutePosition = Vector2.new(100, 100)
+            child._slot.AbsolutePosition = Vector2.new(400, 100)
+            row:_slideIntoPlace(child)
+
+            -- THE regression this guards: the window moves under the group every frame it is
+            -- resized, so a slot's screen position never stops changing. Measured against the
+            -- group, none of that moved anything, and none of it may start an animation.
+            row.main.AbsolutePosition = Vector2.new(60, 20)
+            child._slot.AbsolutePosition = Vector2.new(360, 20)
+            row:_slideIntoPlace(child)
+            expect(child.main.Position).to.equal(UDim2.fromOffset(0, 0))
+
+            -- a line above growing pushes this one straight down, with no sideways travel. That
+            -- is that line's news, not this child's.
+            child._slot.AbsolutePosition = Vector2.new(360, 60)
+            row:_slideIntoPlace(child)
+            expect(child.main.Position).to.equal(UDim2.fromOffset(0, 0))
+
+            -- and the widths being re-shared slides it sideways without changing line
+            child._slot.AbsolutePosition = Vector2.new(300, 60)
+            row:_slideIntoPlace(child)
+            expect(child.main.Position).to.equal(UDim2.fromOffset(0, 0))
+
+            -- nothing happens for a child that never got a slot either
+            child._slot = nil
+            row:_slideIntoPlace(child)
+            expect(child.main.Position).to.equal(UDim2.fromOffset(0, 0))
+        end)
+
+        it("holds a row child still while the window is not on screen", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local row = tab:CreateGroup({ direction = "row" })
+            local child = row:CreateButton({ name = "Only" })
+
+            row.main.AbsolutePosition = Vector2.new(100, 100)
+            child._slot.AbsolutePosition = Vector2.new(400, 100)
+            row:_slideIntoPlace(child)
+
+            w.hidden = true
+            child._slot.AbsolutePosition = Vector2.new(110, 160)
+            row:_slideIntoPlace(child)
+            expect(child.main.Position).to.equal(UDim2.fromOffset(0, 0))
+        end)
+
         it("stacks a slider once the wide layout stops fitting, and holds a band at the edge", function()
             local w = makeWindow()
             w.hasShownOnce = true
@@ -2019,6 +2094,8 @@ return function()
             slider:_applyLayout()
             expect(slider._layoutMode).to.equal("wide")
             expect(slider.track.AnchorPoint).to.equal(Vector2.new(1, 0.5))
+            -- the track is the part of the reflow that travels, and nothing lays it out but this
+            expect(slider.track.Position).to.equal(UDim2.new(1, -15, 0.5, 0))
 
             -- narrower than the title block, the track, the padding either side and the gap
             -- between them: the track drops under the title rather than being drawn through it
