@@ -1814,6 +1814,113 @@ return function()
             plain:_deserialize("ff0000")
             expect(plain.value).to.equal(Color3.fromRGB(255, 0, 0))
         end)
+
+        it("loads a config saved before the picker was a gradient as the whole gradient", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+
+            local function gradientPicker()
+                return tab:CreateColorPicker({
+                    name = "Fill",
+                    gradient = true,
+                    color = ColorSequence.new({
+                        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
+                        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
+                    }),
+                    forgetState = true,
+                })
+            end
+
+            -- six characters, from before the alpha byte was written
+            local short = gradientPicker()
+            short:_selectStop(2)
+            short:_deserialize("ff0000")
+            expect(#short.stops).to.equal(2)
+            expect(short.stops[1].color).to.equal(Color3.fromRGB(255, 0, 0))
+            expect(short.stops[2].color).to.equal(Color3.fromRGB(255, 0, 0))
+
+            -- eight, with the alpha byte, which has to land as well
+            local long = gradientPicker()
+            long:_selectStop(2)
+            long:_deserialize("0000ff80")
+            expect(long.stops[1].color).to.equal(Color3.fromRGB(0, 0, 255))
+            expect(long.stops[2].color).to.equal(Color3.fromRGB(0, 0, 255))
+            expect(math.abs(long.alpha - 0.5) < 0.01).to.equal(true)
+        end)
+
+        it("drags a stop packed tight against its neighbours", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local picker = tab:CreateColorPicker({
+                name = "Fill",
+                gradient = true,
+                -- a legal sequence is free to sit its keypoints closer together than the margin
+                color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+                    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 0)),
+                    ColorSequenceKeypoint.new(0.505, Color3.fromRGB(0, 0, 255)),
+                    ColorSequenceKeypoint.new(0.51, Color3.fromRGB(255, 255, 0)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
+                }),
+                forgetState = true,
+            })
+
+            picker.strip.AbsolutePosition = Vector2.new(100, 200)
+            picker.strip.AbsoluteSize = Vector2.new(200, 26)
+
+            local uis = helpers.services.UserInputService
+            local mouse, pressed = uis.GetMouseLocation, uis.IsMouseButtonPressed
+            uis.GetMouseLocation = function()
+                return Vector2.new(0, 213)
+            end
+            uis.IsMouseButtonPressed = function()
+                return true
+            end
+
+            -- dragged hard against the stop below it, in a gap narrower than twice the margin
+            picker:_beginStopDrag(3, { UserInputType = Enum.UserInputType.MouseButton1 })
+            helpers.services.RunService.RenderStepped:Fire(1 / 60)
+
+            expect(picker.stops[3].time > picker.stops[2].time).to.equal(true)
+            expect(picker.stops[3].time < picker.stops[4].time).to.equal(true)
+
+            picker:_endStopDrag()
+            uis.GetMouseLocation, uis.IsMouseButtonPressed = mouse, pressed
+        end)
+
+        it("keeps rebuilt stop handles visible while the card is open", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local picker = tab:CreateColorPicker({
+                name = "Fill",
+                gradient = true,
+                color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
+                }),
+                forgetState = true,
+            })
+
+            picker:_open()
+
+            -- adding and removing both rebuild every handle, and the fade only runs on open
+            picker:_addStop()
+            for _, handle in picker.stopHandles do
+                expect(handle.frame.BackgroundTransparency).to.equal(0)
+            end
+
+            picker:_selectStop(2)
+            picker:_removeStop()
+            for _, handle in picker.stopHandles do
+                expect(handle.frame.BackgroundTransparency).to.equal(0)
+            end
+
+            picker:_close()
+            picker:_addStop()
+            for _, handle in picker.stopHandles do
+                expect(handle.frame.BackgroundTransparency).to.equal(1)
+            end
+        end)
     end)
 
     describe("component window viewport fitting", function()

@@ -57,6 +57,10 @@ local stripBlock = stripHeight + stripGap
 local stopSize = 16
 local stopButton = 26
 local stopButtonGap = 10
+-- Room kept between a dragged stop and each of its neighbours, so two never land on the same
+-- time. Only ever as much as a third of the gap they are being dragged inside of.
+local stopMargin = 0.01
+
 local minStops = 2
 local maxStops = 20 -- what a ColorSequence itself allows
 
@@ -716,7 +720,10 @@ function ColorPicker:_rebuildStopHandles()
             Size = UDim2.fromOffset(stopSize, stopSize),
             BorderSizePixel = 0,
             BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-            BackgroundTransparency = 1, -- Open = 0
+            -- an open picker rebuilds its handles whenever a stop is added, removed or Set, and
+            -- the fade only runs on open and close, so a new handle built hidden would stay
+            -- hidden until the card was closed and opened again
+            BackgroundTransparency = if self._isOpen then 0 else 1,
             ZIndex = 4,
 
             Parent = self.strip,
@@ -730,7 +737,7 @@ function ColorPicker:_rebuildStopHandles()
         local stroke = self.window:Create("UIStroke", {
             Color = Color3.fromRGB(255, 255, 255),
             Thickness = 2,
-            Transparency = 1, -- selected = 0, otherwise 0.6
+            Transparency = if self._isOpen then 0.6 else 1, -- selected = 0
 
             Parent = handle,
         })
@@ -1255,7 +1262,7 @@ function ColorPicker:_addStop(time)
                 break
             end
         end
-        time = math.clamp(time, 0.01, 0.99)
+        time = math.clamp(time, stopMargin, 1 - stopMargin)
     else
         time = (self.stops[at - 1].time + self.stops[at].time) / 2
     end
@@ -1320,7 +1327,12 @@ function ColorPicker:_beginStopDrag(index, input)
 
         local at = (self:_pointerX(self._stopInput) - self.strip.AbsolutePosition.X) / width
         local before, after = self.stops[index - 1].time, self.stops[index + 1].time
-        self.stops[index].time = math.clamp(at, before + 0.01, after - 0.01)
+
+        -- the gap either side has to hold the margin before the margin can be asked for. A
+        -- sequence is free to put its keypoints closer together than this, and a fixed margin on
+        -- a gap smaller than twice it hands clamp a minimum above its maximum, which throws.
+        local margin = math.min(stopMargin, (after - before) / 3)
+        self.stops[index].time = math.clamp(at, before + margin, after - margin)
         self:_renderStops()
     end)
 end
@@ -1821,7 +1833,18 @@ function ColorPicker:_deserialize(raw)
         self:SetAlpha((tonumber(hex:sub(7, 8), 16) or 255) / 255, true)
         hex = hex:sub(1, 6)
     end
-    self:Set(Color3.fromHex(hex))
+
+    local flat = Color3.fromHex(hex)
+
+    -- a flat colour saved before this picker was a gradient is the whole gradient, the same way
+    -- one passed at build is. Set means the selected stop in gradient mode, which would load an
+    -- old config as a ramp between the saved colour and whatever the other end happened to be.
+    if self.gradient then
+        self:Set(sequenceFromStops({ { time = 0, color = flat }, { time = 1, color = flat } }))
+        return
+    end
+
+    self:Set(flat)
 end
 
 function ColorPicker:_setShown(shown, animate)
