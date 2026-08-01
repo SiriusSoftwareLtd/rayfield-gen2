@@ -268,10 +268,15 @@ function Resize.new(window)
         held = nil
         touching = false
 
+        -- read, not cleared: the glide carries on after the button is up and still has to
+        -- write. beginResize is what clears it, for the next grab.
+        local wasCommitted = committed
+
         -- a press that stayed put is a click, and two of those in quick succession are the
-        -- reset. One that travelled was a resize, and must not arm it.
+        -- reset. One that travelled was a resize, and must not arm it, including one that
+        -- wandered out and came back: the distance at the end says nothing about where it went.
         local travelled = if at and pressedAt then (at - pressedAt).Magnitude else math.huge
-        lastClick = if travelled <= stillDistance then os.clock() else -math.huge
+        lastClick = if not wasCommitted and travelled <= stillDistance then os.clock() else -math.huge
 
         if hovering then
             leanMark(0.18)

@@ -2032,6 +2032,31 @@ return function()
             expect(w._userSize).to.equal(nil)
         end)
 
+        it("does not arm the reset from a drag that came back to where it started", function()
+            local w = makeWindow()
+
+            moveTo(400, 300)
+            grab()
+            moveTo(700, 600) -- out
+            settle()
+            moveTo(402, 302) -- and back, near enough to look like a press that never moved
+            settle()
+            release()
+
+            local size = w.size
+
+            -- this was a resize, so the grab after it is another resize and not the second half
+            -- of a double click. Judging it on where the pointer finished said otherwise.
+            grab()
+            moveTo(900, 800)
+            settle()
+            release()
+            settle()
+
+            expect(w._userSize).never.to.equal(nil)
+            expect(w.size).never.to.equal(size)
+        end)
+
         it("keeps a mouse resize away from touches on a device carrying both", function()
             local w = makeWindow()
 
