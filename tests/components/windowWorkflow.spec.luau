@@ -1594,7 +1594,7 @@ return function()
             expect(drop.list.ScrollBarImageTransparency).to.equal(1)
         end)
 
-        it("selects and clears a multi-select list in one go", function()
+        it("selects and clears only what the search is showing", function()
             local w = makeWindow()
             local tab = w:CreateTab({ name = "Main" })
             local handed
@@ -1610,23 +1610,84 @@ return function()
 
             expect(drop.actions).to.be.ok()
 
-            drop.value = drop:_visibleOptions()
-            drop:_afterBulkChange()
-            expect(#drop.value).to.equal(3)
-            expect(#handed).to.equal(3)
-
-            drop.value = {}
-            drop:_afterBulkChange()
-            expect(#drop.value).to.equal(0)
-
-            -- a filtered list only offers what it is showing: selecting all must not quietly
-            -- take the options the search is hiding
+            -- Beta picked, then filtered out of sight
+            drop:Set({ "Beta" })
             drop:_applyFilter("al")
             expect(#drop:_visibleOptions()).to.equal(1)
+
+            -- selecting all adds what is shown and leaves the hidden pick alone. Taking the
+            -- visible list wholesale would quietly unselect Beta, which is worse than not
+            -- being able to bulk select at all.
+            drop.actions:FindFirstChild("Select all")
+            local selectAll, clear
+            for _, child in drop.actions:GetChildren() do
+                if child.Text == "Select all" then
+                    selectAll = child
+                elseif child.Text == "Clear" then
+                    clear = child
+                end
+            end
+            expect(selectAll).to.be.ok()
+
+            selectAll.MouseButton1Click:Fire()
+            expect(#drop.value).to.equal(2)
+            expect(table.find(drop.value, "Beta")).to.be.ok()
+            expect(table.find(drop.value, "Alpha")).to.be.ok()
+
+            -- clearing takes away only what is shown, for the same reason
+            clear.MouseButton1Click:Fire()
+            expect(#drop.value).to.equal(1)
+            expect(drop.value[1]).to.equal("Beta")
+            expect(#handed).to.equal(1)
 
             -- and a single-choice card has nothing to select all of
             local single = tab:CreateDropdown({ name = "One", options = { "A", "B" }, forgetState = true })
             expect(single.actions).to.equal(nil)
+        end)
+
+        it("keeps a bulk change through a later refresh", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local drop = tab:CreateDropdown({
+                name = "Choice",
+                options = { "Alpha", "Beta", "Gamma" },
+                multiSelect = true,
+                value = { "Alpha" },
+                forgetState = true,
+            })
+
+            drop.value = drop:_visibleOptions()
+            drop:_afterBulkChange()
+            expect(#drop.value).to.equal(3)
+
+            -- Refresh rebuilds the selection from the remembered intent, so a bulk change that
+            -- did not record itself there would be undone by the next one
+            drop:Refresh({ "Alpha", "Beta", "Gamma" })
+            expect(#drop.value).to.equal(3)
+        end)
+
+        it("watches the window height the scroll hint is measured against", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local drop = tab:CreateDropdown({
+                name = "Choice",
+                options = { "Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta" },
+                forgetState = true,
+            })
+
+            drop._isOpen = true
+            drop.list.AbsoluteCanvasSize = Vector2.new(300, 260)
+            drop.list.CanvasPosition = Vector2.new(0, 0)
+
+            -- the card opens on a tween, so the list is still its collapsed height when _open
+            -- asks. The height arriving late is what has to bring the hint with it.
+            drop.list.AbsoluteWindowSize = Vector2.new(300, 0)
+            drop:_syncScrollHint()
+            expect(drop.list.ScrollBarImageTransparency).to.equal(1)
+
+            drop.list.AbsoluteWindowSize = Vector2.new(300, 160)
+            drop.list:GetPropertyChangedSignal("AbsoluteWindowSize"):Fire()
+            expect(drop.list.ScrollBarImageTransparency < 1).to.equal(true)
         end)
 
         it("brings an opened dropdown back inside the page it opened past", function()

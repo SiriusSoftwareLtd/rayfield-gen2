@@ -366,6 +366,13 @@ function Dropdown.new(tab, properties)
         self:_syncScrollHint()
     end)
 
+    -- the card opens on a tween, so the list is still its collapsed height when _open asks. Its
+    -- window height is the other half of "is there more below", and without watching it the
+    -- scrollbar stays hidden until something else happens to trigger a sync.
+    self.window:ConnectFor(self, self.list:GetPropertyChangedSignal("AbsoluteWindowSize"), function()
+        self:_syncScrollHint()
+    end)
+
     self.listLayout = self.window:Create("UIListLayout", {
         Padding = UDim.new(0, 5),
         SortOrder = Enum.SortOrder.LayoutOrder,
@@ -955,16 +962,33 @@ function Dropdown:_buildActions()
         return button
     end
 
+    -- Both act on what the search is showing and leave the rest of the selection alone. Taking
+    -- the visible list wholesale would drop every hidden pick, so a filter would quietly unselect
+    -- what it was hiding, which is worse than not being able to select at all.
     action("Select all", 1, function()
-        self.value = self:_visibleOptions()
+        local shown = self:_visibleOptions()
+        for _, name in shown do
+            if not table.find(self.value, name) then
+                table.insert(self.value, name)
+            end
+        end
     end)
     action("Clear", 2, function()
-        self.value = {}
+        local shown = self:_visibleOptions()
+        for index = #self.value, 1, -1 do
+            if table.find(shown, self.value[index]) then
+                table.remove(self.value, index)
+            end
+        end
     end)
 end
 
 -- The tail every bulk action shares: repaint the rows, say what is selected, tell the dev, save.
 function Dropdown:_afterBulkChange()
+    -- the selection the player just made is the intent now, the same as a click on a row. Without
+    -- this a later Refresh rebuilds from the old intent and undoes the whole bulk change.
+    self._desiredValue = table.clone(self.value)
+
     for _, data in self._optionFrames do
         self._renderOptionState(data, true)
     end
