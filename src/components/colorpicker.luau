@@ -60,6 +60,12 @@ local stopButtonGap = 6
 local minStops = 2
 local maxStops = 20 -- what a ColorSequence itself allows
 
+-- How far off the strip a stop has to be dragged before letting go of it takes it away, and how
+-- far either side of the strip still counts as dropping onto it. Far enough apart that neither
+-- happens by accident on the way to the other.
+local dropTolerance = 26
+local discardDistance = 44
+
 -- Per-mode geometry for the bits that move between layouts. map + hue + alpha stay top-left in
 -- both. "open" rects are where the preview morphs to and where the hex + alpha fields sit;
 -- "height" is the card's open height. Built against the top the controls actually start at, so a
@@ -607,8 +613,15 @@ function ColorPicker:_buildStops()
     self.addStop, self.addStopLabel = button("+", 20 + stopButton + stopButtonGap, "AddStop")
     self.removeStop, self.removeStopLabel = button("-", 20, "RemoveStop")
 
-    self.window:ConnectFor(self, self.addStop.MouseButton1Click, function()
-        self:_addStop()
+    -- click to drop one in the widest gap, or drag out of the button and place it by hand. The
+    -- click is what makes the button discoverable; the drag is what makes it worth using.
+    self.window:ConnectFor(self, self.addStop.InputBegan, function(input)
+        if
+            input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch
+        then
+            self:_beginAddDrag(input.UserInputType == Enum.UserInputType.MouseButton1)
+        end
     end)
     self.window:ConnectFor(self, self.removeStop.MouseButton1Click, function()
         self:_removeStop()
@@ -1033,6 +1046,16 @@ function ColorPicker:_buildPicker()
         Parent = self.alphaBox,
     }, { TextColor3 = "ContentColor", FontFace = "Font", PlaceholderColor3 = "PlaceholderColor" })
 
+    self.window:ConnectFor(self, variables.userInputService.InputEnded, function(input)
+        if
+            input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch
+        then
+            self:_endStopDrag()
+            self:_endAddDrag()
+        end
+    end)
+
     self.window:ConnectFor(self, self.mapInteract.InputBegan, function(input)
         if
             input.UserInputType == Enum.UserInputType.MouseButton1
@@ -1107,7 +1130,7 @@ end
 
 -- Drop a stop into the widest gap, at the colour the gradient already shows there, so adding one
 -- changes where the gradient can be edited rather than changing the gradient.
-function ColorPicker:_addStop()
+function ColorPicker:_addStop(time)
     if not self.gradient or #self.stops >= maxStops then
         return
     end
@@ -1120,7 +1143,19 @@ function ColorPicker:_addStop()
         end
     end
 
-    local time = (self.stops[at - 1].time + self.stops[at].time) / 2
+    -- placed by hand, or dropped in the widest gap when the button was only clicked
+    if type(time) == "number" then
+        at = #self.stops
+        for i = 1, #self.stops do
+            if self.stops[i].time > time then
+                at = i
+                break
+            end
+        end
+        time = math.clamp(time, 0.01, 0.99)
+    else
+        time = (self.stops[at - 1].time + self.stops[at].time) / 2
+    end
     table.insert(self.stops, at, { time = time, color = colorAtTime(self.stops, time) })
 
     self:_rebuildStopHandles()
@@ -1143,8 +1178,112 @@ function ColorPicker:_removeStop()
     self:_commitStops()
 end
 
+-- Where along the strip a screen position falls, and whether it is close enough to count as
+-- being on it at all.
+function ColorPicker:_stripAt(position)
+    local origin, size = self.strip.AbsolutePosition, self.strip.AbsoluteSize
+    if size.X <= 0 then
+        return 0, false
+    end
+
+    local time = math.clamp((position.X - origin.X) / size.X, 0, 1)
+    local off = math.abs(position.Y - (origin.Y + size.Y / 2))
+    return time, off <= dropTolerance
+end
+
+-- The stop that is not on the strip yet: it follows the pointer out of the + button and only
+-- becomes a real one where it is let go.
+function ColorPicker:_showGhost(shown)
+    if not shown then
+        if self.ghost then
+            self.ghost:Destroy()
+            self.ghost = nil
+        end
+        return
+    end
+
+    if self.ghost then
+        return
+    end
+
+    self.ghost = self.window:Create("Frame", {
+        Name = "NewStop",
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Size = UDim2.fromOffset(stopSize, stopSize),
+        BorderSizePixel = 0,
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BackgroundTransparency = 0.15,
+        ZIndex = 8,
+
+        Parent = self.main,
+    })
+
+    self.window:Create("UICorner", {
+        CornerRadius = UDim.new(1, 0),
+        Parent = self.ghost,
+    })
+
+    self.window:Create("UIStroke", {
+        Color = Color3.fromRGB(255, 255, 255),
+        Thickness = 2,
+        Transparency = 0.2,
+        Parent = self.ghost,
+    })
+end
+
+-- Drag a stop out of the + button and drop it where it belongs. Letting go anywhere off the strip
+-- is a cancel rather than a stop dumped at whichever end the pointer happened to be nearest.
+function ColorPicker:_beginAddDrag(isMouse)
+    if #self.stops >= maxStops then
+        return
+    end
+
+    self._addDrag = true
+    self._addPlaced = false
+    self:_showGhost(true)
+
+    self.window:Connect(variables.runService.RenderStepped, function()
+        if not self._addDrag or self.window.unloaded then
+            return
+        end
+
+        if isMouse and not variables.userInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+            self:_endAddDrag()
+            return
+        end
+
+        local at = variables.userInputService:GetMouseLocation()
+        local time, over = self:_stripAt(at)
+        self._addTime, self._addOver = time, over
+
+        if self.ghost then
+            local origin = self.main.AbsolutePosition
+            -- snapped onto the strip once it is close enough, so where it will land is obvious
+            local y = if over then self.strip.AbsolutePosition.Y + self.strip.AbsoluteSize.Y / 2 else at.Y
+            self.ghost.Position = UDim2.fromOffset(at.X - origin.X, y - origin.Y)
+            self.ghost.BackgroundColor3 = colorAtTime(self.stops, time)
+            self.ghost.BackgroundTransparency = if over then 0 else 0.5
+        end
+    end)
+end
+
+function ColorPicker:_endAddDrag()
+    if not self._addDrag then
+        return
+    end
+    self._addDrag = false
+    self:_showGhost(false)
+
+    if not self._addOver then
+        return -- let go somewhere that is not the strip, so nothing was placed
+    end
+
+    self:_addStop(self._addTime)
+end
+
 -- Slide a stop along the strip. It cannot pass its neighbours, and the outer two do not move at
--- all, so the sequence stays in order and keeps its ends.
+-- all, so the sequence stays in order and keeps its ends. Pulled far enough off the strip it is
+-- being thrown away instead, which is the other half of the - button.
 function ColorPicker:_beginStopDrag(index, isMouse)
     if index <= 1 or index >= #self.stops then
         return
@@ -1167,18 +1306,44 @@ function ColorPicker:_beginStopDrag(index, isMouse)
             return
         end
 
-        local at = (variables.userInputService:GetMouseLocation().X - self.strip.AbsolutePosition.X) / width
+        local at = variables.userInputService:GetMouseLocation()
+        local time = (at.X - self.strip.AbsolutePosition.X) / width
         local before, after = self.stops[index - 1].time, self.stops[index + 1].time
-        self.stops[index].time = math.clamp(at, before + 0.01, after - 0.01)
+        self.stops[index].time = math.clamp(time, before + 0.01, after - 0.01)
+
+        -- pulled clear of the strip: it will be dropped rather than moved, and it says so by
+        -- fading rather than by vanishing under the pointer before the choice has been made
+        local off = math.abs(at.Y - (self.strip.AbsolutePosition.Y + self.strip.AbsoluteSize.Y / 2))
+        self._stopDiscard = off > discardDistance and #self.stops > minStops
+
+        local handle = self.stopHandles[index]
+        if handle then
+            handle.frame.BackgroundTransparency = if self._stopDiscard then 0.65 else 0
+        end
+
         self:_renderStops()
     end)
 end
 
 function ColorPicker:_endStopDrag()
-    if not self._stopDrag then
+    local index = self._stopDrag
+    if not index then
         return
     end
     self._stopDrag = nil
+
+    local handle = self.stopHandles[index]
+    if handle then
+        handle.frame.BackgroundTransparency = 0
+    end
+
+    if self._stopDiscard then
+        self._stopDiscard = false
+        self.selected = index
+        self:_removeStop()
+        return
+    end
+
     self:_commitStops()
 end
 
