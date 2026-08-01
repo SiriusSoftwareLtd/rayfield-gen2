@@ -136,10 +136,11 @@ export type ColorPickerProps = {
     description: string?,
     icon: (string | number)?,
     flag: string?,
-    color: Color3?, -- initial colour (accepts a hex string too)
+    gradient: boolean?, -- edit a ColorSequence rather than one colour
+    color: (Color3 | ColorSequence)?, -- initial colour, or the whole sequence in gradient mode
     alpha: number?, -- initial alpha 0..1 (default 1)
     forgetState: boolean?,
-    callback: ((value: Color3, alpha: number) -> ())?,
+    callback: ((value: Color3 | ColorSequence, alpha: number) -> ())?,
 }
 
 export type StatProps = {
@@ -237,10 +238,12 @@ export type Keybind = Moveable & {
 }
 
 export type ColorPicker = Moveable & {
+    gradient: boolean, -- true when the value is a ColorSequence rather than a Color3
     value: Color3,
     alpha: number,
-    Set: (self: ColorPicker, value: Color3 | string, skipCallback: boolean?) -> (),
+    Set: (self: ColorPicker, value: Color3 | ColorSequence | string, skipCallback: boolean?) -> (),
     SetAlpha: (self: ColorPicker, alpha: number, skipCallback: boolean?) -> (),
+    GetValue: (self: ColorPicker) -> Color3 | ColorSequence,
 }
 
 export type Stat = Moveable & {

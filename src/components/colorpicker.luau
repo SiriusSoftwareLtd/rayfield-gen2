@@ -48,29 +48,45 @@ local fieldGap = 8
 -- too narrow, so they reflow to a full-width row under the map (see _applyLayout)
 local narrowWidth = 400
 
+-- The gradient strip: the row of stops a gradient picker carries above the map, and the two
+-- buttons beside it. A ColorSequence has to start at 0 and end at 1, so the outer two stops are
+-- fixed there and only the ones between them can be moved or taken away.
+local stripHeight = 18
+local stripGap = 16
+local stripBlock = stripHeight + stripGap
+local stopSize = 14
+local stopButton = 20
+local stopButtonGap = 6
+local minStops = 2
+local maxStops = 20 -- what a ColorSequence itself allows
+
 -- Per-mode geometry for the bits that move between layouts. map + hue + alpha stay top-left in
 -- both. "open" rects are where the preview morphs to and where the hex + alpha fields sit;
--- "height" is the card's open height. The preview morphs between its closed pill and this rect.
-local layoutSpec = {
-    wide = {
-        height = 190,
-        previewPos = UDim2.new(1, -20, 0, contentY + 39),
-        previewSize = UDim2.new(1, -(rightX + 20), 0, 78),
-        hexPos = UDim2.new(0, rightX, 0, contentY + 90),
-        hexSize = UDim2.new(1, -(rightX + 20 + alphaFieldWidth + fieldGap), 0, 30),
-        alphaFieldPos = UDim2.new(1, -(20 + alphaFieldWidth), 0, contentY + 90),
-        alphaFieldSize = UDim2.new(0, alphaFieldWidth, 0, 30),
-    },
-    narrow = {
-        height = 296,
-        previewPos = UDim2.new(1, -20, 0, contentY + mapSize.Y + 40),
-        previewSize = UDim2.new(1, -40, 0, 56),
-        hexPos = UDim2.new(0, 20, 0, contentY + mapSize.Y + 78),
-        hexSize = UDim2.new(1, -(40 + alphaFieldWidth + fieldGap), 0, 30),
-        alphaFieldPos = UDim2.new(1, -(20 + alphaFieldWidth), 0, contentY + mapSize.Y + 78),
-        alphaFieldSize = UDim2.new(0, alphaFieldWidth, 0, 30),
-    },
-}
+-- "height" is the card's open height. Built against the top the controls actually start at, so a
+-- gradient picker moves the whole block down by the strip rather than drawing over it.
+local function specFor(top)
+    local shift = top - contentY
+    return {
+        wide = {
+            height = 190 + shift,
+            previewPos = UDim2.new(1, -20, 0, top + 39),
+            previewSize = UDim2.new(1, -(rightX + 20), 0, 78),
+            hexPos = UDim2.new(0, rightX, 0, top + 90),
+            hexSize = UDim2.new(1, -(rightX + 20 + alphaFieldWidth + fieldGap), 0, 30),
+            alphaFieldPos = UDim2.new(1, -(20 + alphaFieldWidth), 0, top + 90),
+            alphaFieldSize = UDim2.new(0, alphaFieldWidth, 0, 30),
+        },
+        narrow = {
+            height = 296 + shift,
+            previewPos = UDim2.new(1, -20, 0, top + mapSize.Y + 40),
+            previewSize = UDim2.new(1, -40, 0, 56),
+            hexPos = UDim2.new(0, 20, 0, top + mapSize.Y + 78),
+            hexSize = UDim2.new(1, -(40 + alphaFieldWidth + fieldGap), 0, 30),
+            alphaFieldPos = UDim2.new(1, -(20 + alphaFieldWidth), 0, top + mapSize.Y + 78),
+            alphaFieldSize = UDim2.new(0, alphaFieldWidth, 0, 30),
+        },
+    }
+end
 
 -- The preview is a single frame that morphs between the closed header pill and the mode's open
 -- rect. AnchorPoint stays (1, 0.5) so only pos/size tween.
@@ -198,6 +214,34 @@ local function parseColor(input)
     return nil
 end
 
+-- The colour a list of stops shows at a given time, which is what a stop dropped between two
+-- others starts as: adding one should change where you can edit the gradient, not the gradient.
+local function colorAtTime(stops, t)
+    if #stops == 0 then
+        return Color3.fromRGB(255, 255, 255)
+    end
+    if t <= stops[1].time then
+        return stops[1].color
+    end
+    for i = 1, #stops - 1 do
+        local a, b = stops[i], stops[i + 1]
+        if t <= b.time then
+            local span = b.time - a.time
+            local at = if span > 0 then (t - a.time) / span else 0
+            return a.color:Lerp(b.color, at)
+        end
+    end
+    return stops[#stops].color
+end
+
+local function sequenceFromStops(stops)
+    local keypoints = {}
+    for _, stop in stops do
+        table.insert(keypoints, ColorSequenceKeypoint.new(stop.time, stop.color))
+    end
+    return ColorSequence.new(keypoints)
+end
+
 -- accept a Color3, or anything parseColor understands, or fall back to the given default
 local function coerceColor(value, fallback)
     if typeof(value) == "Color3" then
@@ -207,6 +251,23 @@ local function coerceColor(value, fallback)
         return parseColor(value) or fallback
     end
     return fallback
+end
+
+-- A sequence, a single colour, or anything parseColor understands, as stops we can edit. Roblox
+-- rejects a sequence whose ends are not at 0 and 1, so anything handed to us already obeys that.
+local function stopsFrom(value, fallback)
+    if typeof(value) == "ColorSequence" then
+        local stops = {}
+        for _, keypoint in value.Keypoints do
+            table.insert(stops, { time = keypoint.Time, color = keypoint.Value })
+        end
+        if #stops >= minStops then
+            return stops
+        end
+    end
+
+    local flat = coerceColor(value, fallback)
+    return { { time = 0, color = flat }, { time = 1, color = flat } }
 end
 
 function ColorPicker.new(tab, properties)
@@ -225,10 +286,17 @@ function ColorPicker.new(tab, properties)
         _isOpen = false,
     }, ColorPicker)
 
-    self.value = coerceColor(
-        properties.color or properties.Color or properties.value or properties.Value or properties.default,
-        Color3.fromRGB(255, 255, 255)
-    )
+    -- A gradient picker edits one stop at a time, so everything below here still works on a
+    -- single colour. self.value is that stop's colour; the sequence is what the dev gets back.
+    self.gradient = properties.gradient == true or properties.Gradient == true
+
+    local given = properties.color or properties.Color or properties.value or properties.Value or properties.default
+    self.stops = stopsFrom(given, Color3.fromRGB(255, 255, 255))
+    self.selected = 1
+    self.value = if self.gradient then self.stops[1].color else coerceColor(given, Color3.fromRGB(255, 255, 255))
+
+    self._contentTop = contentY + (if self.gradient then stripBlock else 0)
+    self.layoutSpec = specFor(self._contentTop)
 
     -- hue is kept alongside sat/val so dragging into a grey (where hue is undefined) doesnt
     -- lose the colour you were on, same as the classic pickers
@@ -259,6 +327,9 @@ function ColorPicker.new(tab, properties)
     self.hoverOverlay = self.window:CreateHoverOverlay(self.main)
 
     self:_buildHeader()
+    if self.gradient then
+        self:_buildStops()
+    end
     self:_buildPicker()
 
     self.window:ConnectFor(self, self.interact.MouseButton1Click, function()
@@ -321,6 +392,7 @@ function ColorPicker.new(tab, properties)
     self:_applyLayout()
 
     self:_render("instant")
+    self:_renderStops()
 
     return self
 end
@@ -466,12 +538,180 @@ function ColorPicker:_buildHeader()
     })
 end
 
+-- The gradient strip: the sequence drawn as a bar, a handle per stop sitting on it, and the two
+-- buttons that add and take stops away. Buttons rather than a right-click menu, because this runs
+-- on touch as often as it runs on a mouse and a menu you have to know about is no use there.
+function ColorPicker:_buildStops()
+    local buttonsWidth = (stopButton + stopButtonGap) * 2
+
+    self.strip = self.window:Create("Frame", {
+        Name = "Gradient",
+        Position = UDim2.fromOffset(20, contentY),
+        Size = UDim2.new(1, -(40 + buttonsWidth), 0, stripHeight),
+        BorderSizePixel = 0,
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BackgroundTransparency = 1, -- Open = 0
+
+        Parent = self.main,
+    })
+
+    self.window:Create("UICorner", {
+        CornerRadius = UDim.new(0, 6),
+        Parent = self.strip,
+    })
+
+    self.stripGradient = self.window:Create("UIGradient", {
+        Parent = self.strip,
+    })
+
+    self.stripStroke = self.window:Create("UIStroke", {
+        Color = Color3.fromRGB(255, 255, 255),
+        Transparency = 1, -- Open = 0.85
+
+        Parent = self.strip,
+    })
+
+    local function button(icon, offsetFromRight, order)
+        local frame = self.window:Create("TextButton", {
+            Name = order,
+            AnchorPoint = Vector2.new(1, 0),
+            Position = UDim2.new(1, -offsetFromRight, 0, contentY - 1),
+            Size = UDim2.fromOffset(stopButton, stopButton),
+            BorderSizePixel = 0,
+            BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+            BackgroundTransparency = 1, -- Open = 0.92
+            Text = "",
+            AutoButtonColor = false,
+
+            Parent = self.main,
+        })
+
+        self.window:Create("UICorner", {
+            CornerRadius = UDim.new(0, 6),
+            Parent = frame,
+        })
+
+        local label = self.window:Create("TextLabel", {
+            Size = UDim2.fromScale(1, 1),
+            BackgroundTransparency = 1,
+            Text = icon,
+            TextSize = 15,
+            TextTransparency = 1, -- Open = 0.35
+
+            Parent = frame,
+        }, { TextColor3 = "ContentColor", FontFace = "Font" })
+
+        return frame, label
+    end
+
+    self.addStop, self.addStopLabel = button("+", 20 + stopButton + stopButtonGap, "AddStop")
+    self.removeStop, self.removeStopLabel = button("-", 20, "RemoveStop")
+
+    self.window:ConnectFor(self, self.addStop.MouseButton1Click, function()
+        self:_addStop()
+    end)
+    self.window:ConnectFor(self, self.removeStop.MouseButton1Click, function()
+        self:_removeStop()
+    end)
+
+    self.stopHandles = {}
+    self:_rebuildStopHandles()
+end
+
+-- One handle per stop. Rebuilt rather than reused, since stops come and go and there are never
+-- more than twenty of them.
+function ColorPicker:_rebuildStopHandles()
+    for _, handle in self.stopHandles do
+        handle.frame:Destroy()
+    end
+    self.stopHandles = {}
+
+    for index in self.stops do
+        local handle = self.window:Create("Frame", {
+            Name = "Stop",
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Size = UDim2.fromOffset(stopSize, stopSize),
+            BorderSizePixel = 0,
+            BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+            BackgroundTransparency = 1, -- Open = 0
+            ZIndex = 4,
+
+            Parent = self.strip,
+        })
+
+        self.window:Create("UICorner", {
+            CornerRadius = UDim.new(1, 0),
+            Parent = handle,
+        })
+
+        local stroke = self.window:Create("UIStroke", {
+            Color = Color3.fromRGB(255, 255, 255),
+            Thickness = 2,
+            Transparency = 1, -- selected = 0, otherwise 0.6
+
+            Parent = handle,
+        })
+
+        local interact = self.window:Create("TextButton", {
+            BackgroundTransparency = 1,
+            Size = UDim2.fromScale(2, 2),
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.fromScale(0.5, 0.5),
+            Text = "",
+            TextTransparency = 1,
+            ZIndex = 5,
+
+            Parent = handle,
+        })
+
+        self.window:ConnectFor(self, interact.InputBegan, function(input)
+            if
+                input.UserInputType == Enum.UserInputType.MouseButton1
+                or input.UserInputType == Enum.UserInputType.Touch
+            then
+                self:_selectStop(index)
+                self:_beginStopDrag(index, input.UserInputType == Enum.UserInputType.MouseButton1)
+            end
+        end)
+
+        table.insert(self.stopHandles, { frame = handle, stroke = stroke, interact = interact })
+    end
+end
+
+-- Paint the strip from the stops: the bar itself, where each handle sits, which one is selected,
+-- and whether there is anything left to add or take away.
+function ColorPicker:_renderStops()
+    if not self.gradient then
+        return
+    end
+
+    self.stripGradient.Color = sequenceFromStops(self.stops)
+
+    for index, stop in self.stops do
+        local handle = self.stopHandles[index]
+        if handle then
+            handle.frame.Position = UDim2.new(stop.time, 0, 0.5, 0)
+            handle.frame.BackgroundColor3 = stop.color
+            if self._isOpen then
+                handle.stroke.Transparency = if index == self.selected then 0 else 0.6
+            end
+        end
+    end
+
+    -- an end stop is what holds the sequence to 0 and 1, so it can be recoloured but never removed
+    local removable = #self.stops > minStops and self.selected > 1 and self.selected < #self.stops
+    if self._isOpen then
+        self.addStopLabel.TextTransparency = if #self.stops < maxStops then 0.35 else 0.75
+        self.removeStopLabel.TextTransparency = if removable then 0.35 else 0.75
+    end
+end
+
 -- Sat/val field, built from gradients (no image asset): a hue-tinted Frame with a white
 -- left->right saturation gradient and a black top->bottom value gradient layered on top. Each
 -- layer rounds its own corners so nothing needs clipping (which would clip the cursor).
 function ColorPicker:_buildMap()
     self.map = self.window:Create("Frame", {
-        Position = UDim2.fromOffset(20, contentY),
+        Position = UDim2.fromOffset(20, self._contentTop),
         Size = UDim2.fromOffset(mapSize.X, mapSize.Y),
         BackgroundColor3 = Color3.fromHSV(self.hue, 1, 1),
         BorderSizePixel = 0,
@@ -576,7 +816,7 @@ function ColorPicker:_buildPicker()
 
     -- Hue bar: vertical spectrum with a round handle tracking self.hue.
     self.hueBar = self.window:Create("Frame", {
-        Position = UDim2.fromOffset(hueX, contentY),
+        Position = UDim2.fromOffset(hueX, self._contentTop),
         Size = UDim2.fromOffset(hueWidth, mapSize.Y),
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         BorderSizePixel = 0,
@@ -643,7 +883,7 @@ function ColorPicker:_buildPicker()
     -- gradient does the fade (0 at top -> 1 at bottom), so the card shows through as it clears.
     -- The round handle tracks self.alpha.
     self.alphaBar = self.window:Create("Frame", {
-        Position = UDim2.fromOffset(alphaX, contentY),
+        Position = UDim2.fromOffset(alphaX, self._contentTop),
         Size = UDim2.fromOffset(alphaWidth, mapSize.Y),
         BackgroundColor3 = self.value,
         BorderSizePixel = 0,
@@ -709,7 +949,7 @@ function ColorPicker:_buildPicker()
 
     -- Hex field under the big preview.
     self.hexBox = self.window:Create("Frame", {
-        Position = UDim2.new(0, rightX, 0, contentY + 90),
+        Position = UDim2.new(0, rightX, 0, self._contentTop + 90),
         Size = UDim2.new(1, -(rightX + 20), 0, 30),
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         BorderSizePixel = 0,
@@ -752,7 +992,7 @@ function ColorPicker:_buildPicker()
 
     -- Alpha % field, sits right of the hex field. Same styling as hexBox.
     self.alphaBox = self.window:Create("Frame", {
-        Position = UDim2.new(0, rightX, 0, contentY + 90),
+        Position = UDim2.new(0, rightX, 0, self._contentTop + 90),
         Size = UDim2.fromOffset(alphaFieldWidth, 30),
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         BorderSizePixel = 0,
@@ -849,6 +1089,104 @@ function ColorPicker:_buildPicker()
             self.alphaInput.Text = tostring(math.round(self.alpha * 100)) .. "%"
         end
     end)
+end
+
+-- Move the picker onto another stop. Everything below works on one colour, so selecting is just
+-- pointing hue/sat/val at that stop and repainting.
+function ColorPicker:_selectStop(index)
+    if not self.gradient or not self.stops[index] then
+        return
+    end
+
+    self.selected = index
+    self.value = self.stops[index].color
+    self.hue, self.sat, self.val = self.value:ToHSV()
+    self:_render(if self._isOpen then "animate" else "instant")
+    self:_renderStops()
+end
+
+-- Drop a stop into the widest gap, at the colour the gradient already shows there, so adding one
+-- changes where the gradient can be edited rather than changing the gradient.
+function ColorPicker:_addStop()
+    if not self.gradient or #self.stops >= maxStops then
+        return
+    end
+
+    local at, widest = 2, -1
+    for i = 1, #self.stops - 1 do
+        local gap = self.stops[i + 1].time - self.stops[i].time
+        if gap > widest then
+            at, widest = i + 1, gap
+        end
+    end
+
+    local time = (self.stops[at - 1].time + self.stops[at].time) / 2
+    table.insert(self.stops, at, { time = time, color = colorAtTime(self.stops, time) })
+
+    self:_rebuildStopHandles()
+    self:_selectStop(at)
+    self:_commitStops()
+end
+
+function ColorPicker:_removeStop()
+    if not self.gradient or #self.stops <= minStops then
+        return
+    end
+    -- the outer two are what hold the sequence to 0 and 1
+    if self.selected <= 1 or self.selected >= #self.stops then
+        return
+    end
+
+    table.remove(self.stops, self.selected)
+    self:_rebuildStopHandles()
+    self:_selectStop(math.clamp(self.selected, 1, #self.stops))
+    self:_commitStops()
+end
+
+-- Slide a stop along the strip. It cannot pass its neighbours, and the outer two do not move at
+-- all, so the sequence stays in order and keeps its ends.
+function ColorPicker:_beginStopDrag(index, isMouse)
+    if index <= 1 or index >= #self.stops then
+        return
+    end
+
+    self._stopDrag = index
+    self.window:Connect(variables.runService.RenderStepped, function()
+        if self._stopDrag ~= index or self.window.unloaded then
+            return
+        end
+
+        -- a dropped InputEnded would otherwise leave the loop running, same guard the bars use
+        if isMouse and not variables.userInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+            self:_endStopDrag()
+            return
+        end
+
+        local width = self.strip.AbsoluteSize.X
+        if width <= 0 then
+            return
+        end
+
+        local at = (variables.userInputService:GetMouseLocation().X - self.strip.AbsolutePosition.X) / width
+        local before, after = self.stops[index - 1].time, self.stops[index + 1].time
+        self.stops[index].time = math.clamp(at, before + 0.01, after - 0.01)
+        self:_renderStops()
+    end)
+end
+
+function ColorPicker:_endStopDrag()
+    if not self._stopDrag then
+        return
+    end
+    self._stopDrag = nil
+    self:_commitStops()
+end
+
+-- The stops changed shape rather than colour: repaint, tell the dev, save.
+function ColorPicker:_commitStops()
+    self:_renderStops()
+    self:_fireCallback()
+    self.window:_persist(self)
 end
 
 -- start following the mouse for the given region ("sat" or "hue"). Mirrors the slider: one
@@ -965,8 +1303,22 @@ function ColorPicker:_pump()
     end
 
     self.value = Color3.fromHSV(self.hue, self.sat, self.val)
+    self:_holdSelected()
     self:_render("drag")
     self:_fireCallback()
+end
+
+-- Everything below the strip edits one colour, so whatever it lands on belongs to the stop the
+-- strip has selected. A plain picker has no stops and keeps the colour to itself.
+function ColorPicker:_holdSelected()
+    if not self.gradient then
+        return
+    end
+    local stop = self.stops[self.selected]
+    if stop then
+        stop.color = self.value
+        self:_renderStops()
+    end
 end
 
 -- paint every surface from the current hue/sat/val/alpha.
@@ -1045,7 +1397,12 @@ function ColorPicker:_renderInvisible(animate)
 end
 
 function ColorPicker:_fireCallback()
-    self.window:_runGuarded(self, self.callback, self.value, self.alpha)
+    self.window:_runGuarded(self, self.callback, self:GetValue(), self.alpha)
+end
+
+-- What the dev gets: the sequence for a gradient picker, the colour for a plain one.
+function ColorPicker:GetValue()
+    return if self.gradient then sequenceFromStops(self.stops) else self.value
 end
 
 function ColorPicker:_open()
@@ -1151,6 +1508,22 @@ function ColorPicker:_applyPickerVisibility(open, animate)
         [self.alphaInput] = { TextTransparency = if open then 0.4 else 1 },
     }
 
+    if self.gradient then
+        set[self.strip] = { BackgroundTransparency = if open then 0 else 1 }
+        set[self.stripStroke] = { Transparency = if open then 0.85 else 1 }
+        set[self.addStop] = { BackgroundTransparency = if open then 0.92 else 1 }
+        set[self.removeStop] = { BackgroundTransparency = if open then 0.92 else 1 }
+        set[self.addStopLabel] = { TextTransparency = if open then 0.35 else 1 }
+        set[self.removeStopLabel] = { TextTransparency = if open then 0.35 else 1 }
+
+        for index, handle in self.stopHandles do
+            set[handle.frame] = { BackgroundTransparency = if open then 0 else 1 }
+            set[handle.stroke] = {
+                Transparency = if open then (if index == self.selected then 0 else 0.6) else 1,
+            }
+        end
+    end
+
     for instance, props in set do
         if animate then
             variables.tweenService:Create(instance, fadeInfo, props):Play()
@@ -1170,6 +1543,11 @@ function ColorPicker:_setControlsVisible(visible)
     for _, frame in { self.map, self.hueBar, self.alphaBar, self.hexBox, self.alphaBox } do
         frame.Visible = visible
     end
+    for _, frame in { self.strip, self.addStop, self.removeStop } do
+        if frame then
+            frame.Visible = visible
+        end
+    end
 end
 
 -- Pick side-by-side (wide) vs stacked (narrow) from the real width and apply the mode's
@@ -1183,7 +1561,7 @@ function ColorPicker:_applyLayout()
     end
     self._layoutMode = mode
 
-    local l = layoutSpec[mode]
+    local l = self.layoutSpec[mode]
     self._openHeight = l.height
     self._previewOpenPos = l.previewPos
     self._previewOpenSize = l.previewSize
@@ -1201,8 +1579,22 @@ function ColorPicker:_applyLayout()
 end
 
 function ColorPicker:Set(color, skipCallback)
+    -- a whole sequence replaces the stops; anything else is a colour for the selected one
+    if self.gradient and typeof(color) == "ColorSequence" then
+        self.stops = stopsFrom(color, self.value)
+        self:_rebuildStopHandles()
+        self:_selectStop(math.clamp(self.selected, 1, #self.stops))
+
+        if not skipCallback then
+            self:_fireCallback()
+            self.window:_persist(self)
+        end
+        return
+    end
+
     self.value = coerceColor(color, self.value)
     self.hue, self.sat, self.val = self.value:ToHSV()
+    self:_holdSelected()
     -- ease the cursors only when the picker is open, otherwise theres nothing on screen to move
     self:_render(if self._isOpen then "animate" else "instant")
 
@@ -1222,15 +1614,42 @@ function ColorPicker:SetAlpha(alpha, skipCallback)
     end
 end
 
--- Persistence: RRGGBB plus an alpha byte (AA) so alpha round-trips.
+-- Persistence: RRGGBB plus an alpha byte (AA) so alpha round-trips. A gradient writes every stop
+-- as time:hex, which keeps the same trailing alpha byte and so loads through the same path.
 function ColorPicker:_serialize()
-    return self.value:ToHex() .. string.format("%02x", math.clamp(math.round((self.alpha or 1) * 255), 0, 255))
+    local alpha = string.format("%02x", math.clamp(math.round((self.alpha or 1) * 255), 0, 255))
+
+    if self.gradient then
+        local parts = {}
+        for _, stop in self.stops do
+            table.insert(parts, string.format("%.4f:%s", stop.time, stop.color:ToHex()))
+        end
+        return table.concat(parts, ",") .. "|" .. alpha
+    end
+
+    return self.value:ToHex() .. alpha
 end
 
 -- Restore colour + alpha from that hex. Old 6-char configs (no alpha byte) still load. Alpha is
 -- set silently first so the Set fires the callback just once, with the final colour and alpha.
 function ColorPicker:_deserialize(raw)
-    local hex = tostring(raw)
+    local saved = tostring(raw)
+
+    local stops, alpha = saved:match("^(.*)|(%x%x)$")
+    if self.gradient and stops then
+        self:SetAlpha((tonumber(alpha, 16) or 255) / 255, true)
+
+        local restored = {}
+        for time, hex in stops:gmatch("([%d%.]+):(%x%x%x%x%x%x)") do
+            table.insert(restored, { time = tonumber(time) or 0, color = Color3.fromHex(hex) })
+        end
+        if #restored >= minStops then
+            self:Set(sequenceFromStops(restored))
+            return
+        end
+    end
+
+    local hex = saved
     if #hex >= 8 then
         self:SetAlpha((tonumber(hex:sub(7, 8), 16) or 255) / 255, true)
         hex = hex:sub(1, 6)
