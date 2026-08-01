@@ -1409,6 +1409,326 @@ return function()
         end)
     end)
 
+    describe("component dropdown", function()
+        local dropWindow
+
+        local function makeWindow()
+            dropWindow = Window.new({
+                name = "Dropdown Window",
+                configuration = { autoSave = false, autoLoad = false },
+            })
+            dropWindow.hidden = false
+            return dropWindow
+        end
+
+        afterEach(function()
+            if dropWindow and not dropWindow.unloaded then
+                dropWindow:Unload()
+            end
+            dropWindow = nil
+        end)
+
+        it("leaves a dropdown's borders outside the frame that clips its contents", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local drop = tab:CreateDropdown({
+                name = "Choice",
+                options = { "Alpha", "Beta" },
+                value = "Alpha",
+                forgetState = true,
+            })
+
+            -- a UIStroke is drawn outside the frame it belongs to, and both cards fill the
+            -- wrapper exactly, so a clip there takes the border off each of them
+            -- unset reads as nil in the harness, which is the same thing as not clipping
+            expect(drop.main.ClipsDescendants or false).to.equal(false)
+
+            -- the options card is what has contents to hide while it is collapsed, and it is
+            -- zero height there, so the cut belongs to it
+            expect(drop.panel.ClipsDescendants).to.equal(true)
+            expect(drop.panelStroke).to.be.ok()
+        end)
+
+        it("opens a dropdown far enough to choose from, and stops there", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local drop = tab:CreateDropdown({
+                name = "Choice",
+                options = { "Alpha", "Beta" },
+                forgetState = true,
+            })
+
+            -- two options is the whole list, so the card is only as tall as it needs to be
+            local two = drop:_openHeight()
+
+            drop:Refresh({ "Alpha", "Beta", "Gamma", "Delta" })
+            local four = drop:_openHeight()
+            expect(four > two).to.equal(true)
+
+            -- past that it scrolls instead of growing without end
+            drop:Refresh({ "Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta" })
+            expect(drop:_openHeight()).to.equal(four)
+
+            -- and four rows really do fit inside it, gaps and padding included
+            expect(four >= 4 * 38 + 3 * 5).to.equal(true)
+        end)
+
+        it("grows the card by what the search bar takes when it opens", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local drop = tab:CreateDropdown({
+                name = "Choice",
+                options = { "Alpha", "Beta", "Gamma", "Delta" },
+                forgetState = true,
+            })
+
+            local closed = drop:_openHeight()
+
+            -- the bar grows when it takes focus. The card has to grow with it, or the list is
+            -- pushed down by the difference and the last row goes over the card's own edge
+            drop._searchOpen = true
+            expect(drop:_openHeight() - closed).to.equal(8)
+
+            drop._searchOpen = false
+            expect(drop:_openHeight()).to.equal(closed)
+        end)
+
+        it("counts the bulk actions row in the height it opens to", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local plain = tab:CreateDropdown({ name = "One", options = { "A", "B" }, forgetState = true })
+            local multi = tab:CreateDropdown({
+                name = "Many",
+                options = { "A", "B" },
+                multiSelect = true,
+                forgetState = true,
+            })
+
+            -- same options either side, so the difference is the row the multi-select carries
+            expect(multi:_openHeight() > plain:_openHeight()).to.equal(true)
+        end)
+
+        it("opens and closes the search, keeping the card the right height either way", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local drop = tab:CreateDropdown({
+                name = "Choice",
+                options = { "Alpha", "Beta", "Gamma" },
+                forgetState = true,
+            })
+
+            drop._isOpen = true
+            local closed = drop:_openHeight()
+
+            drop:_expandSearch()
+            expect(drop._searchOpen).to.equal(true)
+            expect(drop.searchInput.TextEditable).to.equal(true)
+            expect(drop:_openHeight() > closed).to.equal(true)
+
+            drop:_expandSearch()
+            expect(drop._searchOpen).to.equal(true)
+
+            drop.searchInput.Text = "alp"
+            drop:_applyFilter("alp")
+            drop:_collapseSearch()
+            expect(drop._searchOpen).to.equal(false)
+            expect(drop.searchInput.Text).to.equal("")
+
+            -- clearing the box is what re-runs the filter, and the harness only delivers that
+            -- through the signal the component listens on
+            drop.searchInput:GetPropertyChangedSignal("Text"):Fire()
+            expect(drop:_openHeight()).to.equal(closed)
+
+            drop:_collapseSearch()
+            expect(drop._searchOpen).to.equal(false)
+        end)
+
+        it("says so when a search matches nothing", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local drop = tab:CreateDropdown({
+                name = "Choice",
+                options = { "Alpha", "Beta" },
+                forgetState = true,
+            })
+
+            expect(drop.emptyLabel.Visible).to.equal(false)
+
+            -- an empty card under a search box reads as broken rather than as no matches
+            drop:_applyFilter("zzz")
+            expect(drop.emptyLabel.Visible).to.equal(true)
+
+            drop:_applyFilter("al")
+            expect(drop.emptyLabel.Visible).to.equal(false)
+
+            -- and the card keeps a row of room to say it in
+            drop:_applyFilter("zzz")
+            expect(drop:_openHeight() > 95).to.equal(true)
+
+            -- a list with nothing in it is not a search that found nothing. Both leave the same
+            -- count behind, so the query is what tells them apart.
+            drop:Refresh({})
+            drop:_applyFilter("")
+            expect(drop.emptyLabel.Visible).to.equal(false)
+
+            local bare = tab:CreateDropdown({ name = "Bare", options = {}, forgetState = true })
+            expect(bare.emptyLabel.Visible).to.equal(false)
+        end)
+
+        it("shows the scrollbar only while there is list left to reach", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local drop = tab:CreateDropdown({
+                name = "Choice",
+                options = { "Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta" },
+                forgetState = true,
+            })
+
+            drop._isOpen = true
+            drop.list.AbsoluteWindowSize = Vector2.new(300, 160)
+            drop.list.AbsoluteCanvasSize = Vector2.new(300, 260)
+            drop.list.CanvasPosition = Vector2.new(0, 0)
+            drop:_syncScrollHint()
+            expect(drop.list.ScrollBarImageTransparency < 1).to.equal(true)
+
+            -- scrolled to the end, so there is nothing left to point at
+            drop.list.CanvasPosition = Vector2.new(0, 100)
+            drop:_syncScrollHint()
+            expect(drop.list.ScrollBarImageTransparency).to.equal(1)
+
+            -- and a list that fits never showed one at all
+            drop.list.AbsoluteCanvasSize = Vector2.new(300, 120)
+            drop.list.CanvasPosition = Vector2.new(0, 0)
+            drop:_syncScrollHint()
+            expect(drop.list.ScrollBarImageTransparency).to.equal(1)
+        end)
+
+        it("selects and clears only what the search is showing", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local handed
+            local drop = tab:CreateDropdown({
+                name = "Choice",
+                options = { "Alpha", "Beta", "Gamma" },
+                multiSelect = true,
+                forgetState = true,
+                callback = function(value)
+                    handed = value
+                end,
+            })
+
+            expect(drop.actions).to.be.ok()
+
+            -- Beta picked, then filtered out of sight
+            drop:Set({ "Beta" })
+            drop:_applyFilter("al")
+            expect(#drop:_visibleOptions()).to.equal(1)
+
+            -- selecting all adds what is shown and leaves the hidden pick alone. Taking the
+            -- visible list wholesale would quietly unselect Beta, which is worse than not
+            -- being able to bulk select at all.
+            drop.actions:FindFirstChild("Select all")
+            local selectAll, clear
+            for _, child in drop.actions:GetChildren() do
+                if child.Text == "Select all" then
+                    selectAll = child
+                elseif child.Text == "Clear" then
+                    clear = child
+                end
+            end
+            expect(selectAll).to.be.ok()
+
+            selectAll.MouseButton1Click:Fire()
+            expect(#drop.value).to.equal(2)
+            expect(table.find(drop.value, "Beta")).to.be.ok()
+            expect(table.find(drop.value, "Alpha")).to.be.ok()
+
+            -- clearing takes away only what is shown, for the same reason
+            clear.MouseButton1Click:Fire()
+            expect(#drop.value).to.equal(1)
+            expect(drop.value[1]).to.equal("Beta")
+            expect(#handed).to.equal(1)
+
+            -- and a single-choice card has nothing to select all of
+            local single = tab:CreateDropdown({ name = "One", options = { "A", "B" }, forgetState = true })
+            expect(single.actions).to.equal(nil)
+        end)
+
+        it("keeps a bulk change through a later refresh", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local drop = tab:CreateDropdown({
+                name = "Choice",
+                options = { "Alpha", "Beta", "Gamma" },
+                multiSelect = true,
+                value = { "Alpha" },
+                forgetState = true,
+            })
+
+            drop.value = drop:_visibleOptions()
+            drop:_afterBulkChange()
+            expect(#drop.value).to.equal(3)
+
+            -- Refresh rebuilds the selection from the remembered intent, so a bulk change that
+            -- did not record itself there would be undone by the next one
+            drop:Refresh({ "Alpha", "Beta", "Gamma" })
+            expect(#drop.value).to.equal(3)
+        end)
+
+        it("watches the window height the scroll hint is measured against", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local drop = tab:CreateDropdown({
+                name = "Choice",
+                options = { "Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta" },
+                forgetState = true,
+            })
+
+            drop._isOpen = true
+            drop.list.AbsoluteCanvasSize = Vector2.new(300, 260)
+            drop.list.CanvasPosition = Vector2.new(0, 0)
+
+            -- the card opens on a tween, so the list is still its collapsed height when _open
+            -- asks. The height arriving late is what has to bring the hint with it.
+            drop.list.AbsoluteWindowSize = Vector2.new(300, 0)
+            drop:_syncScrollHint()
+            expect(drop.list.ScrollBarImageTransparency).to.equal(1)
+
+            drop.list.AbsoluteWindowSize = Vector2.new(300, 160)
+            drop.list:GetPropertyChangedSignal("AbsoluteWindowSize"):Fire()
+            expect(drop.list.ScrollBarImageTransparency < 1).to.equal(true)
+        end)
+
+        it("brings an opened dropdown back inside the page it opened past", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local drop = tab:CreateDropdown({
+                name = "Choice",
+                options = { "Alpha", "Beta", "Gamma", "Delta" },
+                forgetState = true,
+            })
+
+            local page = tab.tabPage
+            page.AbsoluteWindowSize = Vector2.new(400, 300)
+            page.AbsolutePosition = Vector2.new(0, 0)
+            page.CanvasPosition = Vector2.new(0, 0)
+
+            -- sitting near the bottom, so opening runs off the fold
+            drop.main.AbsolutePosition = Vector2.new(0, 260)
+            drop:_bringIntoView()
+            expect(page.CanvasPosition.Y > 0).to.equal(true)
+
+            -- never past the card's own top, since pushing it off the top edge is not a fix
+            expect(page.CanvasPosition.Y <= 260).to.equal(true)
+
+            -- one that already ends inside the view is left where it is
+            page.CanvasPosition = Vector2.new(0, 0)
+            drop.main.AbsolutePosition = Vector2.new(0, 10)
+            drop:_bringIntoView()
+            expect(page.CanvasPosition.Y).to.equal(0)
+        end)
+    end)
+
     describe("component window viewport fitting", function()
         local variables = helpers.requireUtility("variables")
         local originalCamera
