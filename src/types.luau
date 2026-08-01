@@ -139,8 +139,8 @@ export type ColorPickerProps = {
     description: string?,
     icon: (string | number)?,
     flag: string?,
-    gradient: nil, -- see GradientColorPickerProps
-    color: Color3?, -- initial colour (accepts a hex string too)
+    gradient: false?, -- see GradientColorPickerProps
+    color: (Color3 | string)?, -- initial colour, hex accepted
     alpha: number?, -- initial alpha 0..1 (default 1)
     forgetState: boolean?,
     callback: ((value: Color3, alpha: number) -> ())?,
@@ -152,7 +152,9 @@ export type GradientColorPickerProps = {
     icon: (string | number)?,
     flag: string?,
     gradient: true, -- edit a ColorSequence rather than one colour
-    color: ColorSequence?, -- the sequence the picker starts on
+    -- the sequence the picker starts on. One colour, hex included, is taken as a flat
+    -- gradient of that colour, the same way an old saved config is
+    color: (ColorSequence | Color3 | string)?,
     alpha: number?,
     forgetState: boolean?,
     callback: ((value: ColorSequence, alpha: number) -> ())?,

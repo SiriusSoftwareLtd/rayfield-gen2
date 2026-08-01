@@ -1848,6 +1848,37 @@ return function()
             expect(math.abs(long.alpha - 0.5) < 0.01).to.equal(true)
         end)
 
+        it("takes one colour, or false, the same way the runtime always has", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+
+            -- a gradient picker handed a single colour is a flat gradient of it, which is what
+            -- the old saved configs load as too
+            local flat = tab:CreateColorPicker({
+                name = "Fill",
+                gradient = true,
+                color = Color3.fromRGB(255, 0, 0),
+                forgetState = true,
+            })
+            expect(#flat.stops).to.equal(2)
+            expect(flat.stops[1].color).to.equal(Color3.fromRGB(255, 0, 0))
+            expect(flat.stops[2].color).to.equal(Color3.fromRGB(255, 0, 0))
+
+            -- hex, the same as a plain picker
+            local hex = tab:CreateColorPicker({ name = "Hex", gradient = true, color = "#00ff00", forgetState = true })
+            expect(hex.stops[1].color).to.equal(Color3.fromRGB(0, 255, 0))
+
+            -- and gradient = false is a plain picker, not a broken gradient one
+            local plain = tab:CreateColorPicker({
+                name = "Plain",
+                gradient = false,
+                color = Color3.fromRGB(0, 0, 255),
+                forgetState = true,
+            })
+            expect(plain.gradient).to.equal(false)
+            expect(plain:GetValue()).to.equal(Color3.fromRGB(0, 0, 255))
+        end)
+
         it("drags a stop packed tight against its neighbours", function()
             local w = makeWindow()
             local tab = w:CreateTab({ name = "Main" })
