@@ -2003,7 +2003,7 @@ return function()
             expect(w.size).to.equal(held)
         end)
 
-        it("reflows a slider between its two layouts when the window crosses the width it needs", function()
+        it("stacks a slider once the wide layout stops fitting, and holds a band at the edge", function()
             local w = makeWindow()
             w.hasShownOnce = true
             local tab = w:CreateTab({ name = "Main" })
@@ -2015,190 +2015,20 @@ return function()
                 forgetState = true,
             })
 
-            -- built wide, and the first pass lands at once because there is nothing to watch yet
-            slider.main.AbsoluteSize = Vector2.new(455, 65)
+            slider.main.AbsoluteSize = Vector2.new(600, 65)
             slider:_applyLayout()
             expect(slider._layoutMode).to.equal("wide")
             expect(slider.track.AnchorPoint).to.equal(Vector2.new(1, 0.5))
-            expect(slider.containerLayout.FillDirection).to.equal(Enum.FillDirection.Vertical)
 
-            -- pulled in past what the wide layout needs: the track heads for the bottom edge,
-            -- and the labels land in their row once the fade has taken them off screen
-            slider.main.AbsoluteSize = Vector2.new(360, 65)
+            -- narrower than the title block, the track, the padding either side and the gap
+            -- between them: the track drops under the title rather than being drawn through it
+            slider.main.AbsoluteSize = Vector2.new(400, 65)
             slider:_applyLayout()
             expect(slider._layoutMode).to.equal("narrow")
             expect(slider.track.AnchorPoint).to.equal(Vector2.new(0.5, 1))
 
-            slider:_finishReflow(slider._reflowPass, "narrow")
-            expect(slider.containerLayout.FillDirection).to.equal(Enum.FillDirection.Horizontal)
-            expect(slider.title.TextTransparency).to.equal(0)
-
-            -- and back out again
-            slider.main.AbsoluteSize = Vector2.new(455, 65)
-            slider:_applyLayout()
-            slider:_finishReflow(slider._reflowPass, "wide")
-            expect(slider.track.AnchorPoint).to.equal(Vector2.new(1, 0.5))
-            expect(slider.containerLayout.FillDirection).to.equal(Enum.FillDirection.Vertical)
-        end)
-
-        it("drops a reflow that a newer one has already replaced", function()
-            local w = makeWindow()
-            w.hasShownOnce = true
-            local tab = w:CreateTab({ name = "Main" })
-            local slider = tab:CreateSlider({ name = "Volume", range = { 0, 100 }, value = 40, forgetState = true })
-
-            slider.main.AbsoluteSize = Vector2.new(455, 65)
-            slider:_applyLayout()
-            slider.main.AbsoluteSize = Vector2.new(360, 65)
-            slider:_applyLayout()
-            slider:_finishReflow(slider._reflowPass, "narrow")
-
-            -- a pass the resize has already moved past must not put its layout back on screen
-            slider:_finishReflow(slider._reflowPass - 1, "wide")
-            expect(slider.containerLayout.FillDirection).to.equal(Enum.FillDirection.Horizontal)
-        end)
-
-        it("travels a row child only when the packing moved it to another line", function()
-            local w = makeWindow()
-            local tab = w:CreateTab({ name = "Main" })
-            local row = tab:CreateGroup({ direction = "row" })
-            local first = row:CreateButton({ name = "First" })
-            local second = row:CreateButton({ name = "Second" })
-
-            -- the layout owns the position of what it lays out, so each row child rides inside
-            -- a slot it can be animated within
-            expect(second._slot).to.be.ok()
-            expect(second.main.Parent).to.equal(second._slot)
-            expect(first._slot.LayoutOrder).to.equal(first.main.LayoutOrder)
-
-            -- both on one line to begin with
-            row.main.AbsoluteSize = Vector2.new(900, 41)
-            row:_shareWidth()
-            expect(first._line).to.equal(1)
-            expect(second._line).to.equal(1)
-
-            -- THE regression this guards: the window moves under the group every frame of a
-            -- resize, so the slot's screen position changes constantly. None of that is a wrap,
-            -- and none of it may start an animation.
-            second.main.Position = UDim2.fromOffset(0, 0)
-            second._slot.AbsolutePosition = Vector2.new(600, 900)
-            row:_slideIntoPlace(second)
-            expect(second.main.Position).to.equal(UDim2.fromOffset(0, 0))
-
-            -- narrow enough to push the second child onto its own line: now it has somewhere to
-            -- travel from, and the layout hands it over on the next position change
-            row.main.AbsoluteSize = Vector2.new(second._minSlotWidth + 20, 41)
-            row:_shareWidth()
-            expect(second._line).to.equal(2)
-            expect(second._travelFrom).to.be.ok()
-
-            row:_slideIntoPlace(second)
-            expect(second._travelFrom).to.equal(nil)
-
-            -- and the hand-over is spent: a second call has nothing left to act on
-            second.main.Position = UDim2.fromOffset(0, 0)
-            row:_slideIntoPlace(second)
-            expect(second.main.Position).to.equal(UDim2.fromOffset(0, 0))
-        end)
-
-        it("holds a line's break width until there is room to spare", function()
-            local w = makeWindow()
-            local tab = w:CreateTab({ name = "Main" })
-            local row = tab:CreateGroup({ direction = "row" })
-            local one = row:CreateButton({ name = "One" })
-            local two = row:CreateButton({ name = "Two" })
-
-            local padding = row.layout.Padding.Offset
-            local both = one._minSlotWidth + padding + two._minSlotWidth
-
-            -- a width that just holds both
-            row.main.AbsoluteSize = Vector2.new(both + 40, 41)
-            row:_shareWidth()
-            expect(two._line).to.equal(1)
-
-            -- one pixel under, and the second child is pushed down
-            row.main.AbsoluteSize = Vector2.new(both, 41)
-            row:_shareWidth()
-            expect(two._line).to.equal(2)
-
-            -- back to the width it broke at is not enough to bring it up again, or a drag held
-            -- there would flip it every frame
-            row.main.AbsoluteSize = Vector2.new(both + 4, 41)
-            row:_shareWidth()
-            expect(two._line).to.equal(2)
-
-            -- clear of the band, and it comes back
-            row.main.AbsoluteSize = Vector2.new(both + 40, 41)
-            row:_shareWidth()
-            expect(two._line).to.equal(1)
-        end)
-
-        it("shares a line's width between the children on it", function()
-            local w = makeWindow()
-            local tab = w:CreateTab({ name = "Main" })
-            local row = tab:CreateGroup({ direction = "row" })
-            local one = row:CreateButton({ name = "One" })
-            local two = row:CreateButton({ name = "Two" })
-
-            -- wide enough for both: the spare width is split between them
-            row.main.AbsoluteSize = Vector2.new(600, 41)
-            row:_shareWidth()
-            expect(#row:_packRows(600)).to.equal(1)
-            expect(one._slot.Size.X.Offset).to.equal(two._slot.Size.X.Offset)
-            expect(one._slot.Size.X.Offset > one._minSlotWidth).to.equal(true)
-
-            -- and it is very nearly the whole line: a couple of pixels are left back so the
-            -- layout has to break its lines where the packing did, rather than a rounding error
-            -- away from it
-            local padding = row.layout.Padding.Offset
-            local filled = one._slot.Size.X.Offset + two._slot.Size.X.Offset + padding
-            expect(filled <= 600).to.equal(true)
-            expect(filled > 600 - 6).to.equal(true)
-        end)
-
-        it("lands a slot's width at once and eases only what is inside it", function()
-            local w = makeWindow()
-            local tab = w:CreateTab({ name = "Main" })
-            local row = tab:CreateGroup({ direction = "row" })
-            local child = row:CreateButton({ name = "One" })
-
-            -- the layout measures the slot to decide where its lines break, so a slot easing
-            -- into a width would have it re-deciding against a width still on its way
-            child.main.AbsoluteSize = Vector2.new(150, 41)
-            row:_setSlotWidth(child, 400, true)
-            expect(child._slot.Size.X.Offset).to.equal(400)
-            expect(child.main.Size.X.Scale).to.equal(1) -- the harness lands the tween at once
-
-            -- with nothing to ease from, it simply takes the slot
-            child.main.AbsoluteSize = Vector2.new(0, 41)
-            row:_setSlotWidth(child, 300, true)
-            expect(child._slot.Size.X.Offset).to.equal(300)
-            expect(child.main.Size).to.equal(UDim2.new(1, 0, 0, child.main.Size.Y.Offset))
-
-            -- a width it already has is not worth touching
-            local held = child.main.Size
-            row:_setSlotWidth(child, 300, true)
-            expect(child.main.Size).to.equal(held)
-        end)
-
-        it("holds the slider's layout inside the band around its threshold", function()
-            local w = makeWindow()
-            w.hasShownOnce = true
-            local tab = w:CreateTab({ name = "Main" })
-            local slider = tab:CreateSlider({ name = "Volume", range = { 0, 100 }, value = 40, forgetState = true })
-
-            slider.main.AbsoluteSize = Vector2.new(600, 65)
-            slider:_applyLayout()
-            expect(slider._layoutMode).to.equal("wide")
-
-            -- under what the wide layout needs, so it stacks
-            slider.main.AbsoluteSize = Vector2.new(400, 65)
-            slider:_applyLayout()
-            slider:_finishReflow(slider._reflowPass, "narrow")
-            expect(slider._layoutMode).to.equal("narrow")
-
-            -- back to exactly the threshold is not room to spare, so it stays stacked rather
-            -- than trading layouts every frame a drag is held there
+            -- exactly the threshold is not room to spare. a hand-resized window can be held at
+            -- any width, and without a band the two layouts trade places every frame it is there
             slider.main.AbsoluteSize = Vector2.new(437, 65)
             slider:_applyLayout()
             expect(slider._layoutMode).to.equal("narrow")
@@ -2206,84 +2036,7 @@ return function()
             -- clear of the band, and the wide layout comes back
             slider.main.AbsoluteSize = Vector2.new(500, 65)
             slider:_applyLayout()
-            slider:_finishReflow(slider._reflowPass, "wide")
             expect(slider._layoutMode).to.equal("wide")
-        end)
-
-        it("leaves the width sharing alone where it is not the row's to do", function()
-            local w = makeWindow()
-            local tab = w:CreateTab({ name = "Main" })
-
-            -- a column stacks, so there is no line to share out
-            local column = tab:CreateGroup({ direction = "column" })
-            column:CreateToggle({ name = "Stacked" })
-            expect(column:_shareWidth()).to.equal(nil)
-
-            -- a row holding a nested column has a child with no slot, and the engine keeps it
-            local row = tab:CreateGroup({ direction = "row" })
-            row:CreateButton({ name = "Leaf" })
-            local nested = row:CreateGroup({ direction = "column" })
-            nested:CreateToggle({ name = "Inside" })
-            row.main.AbsoluteSize = Vector2.new(600, 41)
-            expect(row:_shareWidth()).to.equal(nil)
-
-            -- and nothing to share before the group has a width at all
-            local unbuilt = tab:CreateGroup({ direction = "row" })
-            unbuilt:CreateButton({ name = "Early" })
-            unbuilt.main.AbsoluteSize = Vector2.new(0, 0)
-            expect(unbuilt:_shareWidth()).to.equal(nil)
-        end)
-
-        it("lands a held-back height once the expansion it was waiting on is done", function()
-            local w = makeWindow()
-            local tab = w:CreateTab({ name = "Main" })
-            local row = tab:CreateGroup({ direction = "row" })
-            local child = row:CreateButton({ name = "One" })
-
-            child.main.AbsoluteSize = Vector2.new(150, 41)
-            child._pendingSlotHeight = 70
-            row:_setSlotWidth(child, 400, true)
-
-            -- the harness lands the tween at once, so the held height is applied with it
-            expect(child._pendingSlotHeight).to.equal(nil)
-            expect(child.main.Size).to.equal(UDim2.new(1, 0, 0, 70))
-        end)
-
-        it("hands a height change over to the row while it is still easing into a width", function()
-            local w = makeWindow()
-            local tab = w:CreateTab({ name = "Main" })
-            local row = tab:CreateGroup({ direction = "row" })
-            local slider = row:CreateSlider({ name = "Row Slider", range = { 0, 100 }, value = 10 })
-
-            slider._slotExpanding = true
-            local before = slider.main.Size
-            slider:_setMainHeight(70, true)
-            expect(slider.main.Size).to.equal(before)
-            expect(slider._pendingSlotHeight).to.equal(70)
-
-            slider._slotExpanding = false
-            slider:_setMainHeight(65, false)
-            expect(slider.main.Size.Y.Offset).to.equal(65)
-        end)
-
-        it("leaves a row child alone while the window is not on screen", function()
-            local w = makeWindow()
-            local tab = w:CreateTab({ name = "Main" })
-            local row = tab:CreateGroup({ direction = "row" })
-            local child = row:CreateButton({ name = "Only" })
-
-            child._slot.AbsolutePosition = Vector2.new(300, 100)
-            row:_slideIntoPlace(child)
-
-            w.hidden = true
-            child._slot.AbsolutePosition = Vector2.new(20, 160)
-            row:_slideIntoPlace(child)
-            expect(child.main.Position).to.equal(UDim2.fromOffset(0, 0))
-
-            -- a child with no slot at all (a row that never wrapped it) is a no-op
-            child._slot = nil
-            row:_slideIntoPlace(child)
-            expect(child.main.Position).to.equal(UDim2.fromOffset(0, 0))
         end)
 
         it("holds the bottom fade above the corner radius as the window grows", function()

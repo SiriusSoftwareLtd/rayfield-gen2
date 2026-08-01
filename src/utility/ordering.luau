@@ -11,16 +11,10 @@
 type OrderedElement = {
     main: GuiObject,
     descriptor: { main: GuiObject }?,
-    _slot: GuiObject?,
 }
 
 local function assignOrder(element: OrderedElement, order: number)
     element.main.LayoutOrder = order
-    -- a row child is laid out by its slot rather than itself, so the order has to reach that
-    -- instead, or a Move* call would reorder something the layout never looks at
-    if element._slot then
-        element._slot.LayoutOrder = order
-    end
     if element.descriptor then
         element.descriptor.main.LayoutOrder = order + 1
     end
