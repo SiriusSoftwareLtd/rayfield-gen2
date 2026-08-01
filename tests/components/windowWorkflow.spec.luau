@@ -1499,7 +1499,7 @@ return function()
             expect(#picker.stops).to.equal(4)
         end)
 
-        it("places a stop where it is dropped, and cancels one let go off the strip", function()
+        it("adds a stop where the bar was clicked, in order", function()
             local w = makeWindow()
             local tab = w:CreateTab({ name = "Main" })
             local picker = tab:CreateColorPicker({
@@ -1512,28 +1512,18 @@ return function()
                 forgetState = true,
             })
 
-            picker.strip.AbsolutePosition = Vector2.new(100, 200)
-            picker.strip.AbsoluteSize = Vector2.new(200, 18)
+            picker:_addStop(0.75)
+            expect(#picker.stops).to.equal(3)
+            expect(math.abs(picker.stops[2].time - 0.75) < 0.01).to.equal(true)
 
-            -- a quarter along the strip, and near enough to it vertically to count
-            local time, over = picker:_stripAt(Vector2.new(150, 209))
-            expect(math.abs(time - 0.25) < 0.01).to.equal(true)
-            expect(over).to.equal(true)
-
-            -- well below it, which is a cancel rather than a stop dumped at the nearest end
-            local _, far = picker:_stripAt(Vector2.new(150, 320))
-            expect(far).to.equal(false)
-
+            -- earlier than the one already there, so it lands before it rather than on the end
             picker:_addStop(0.25)
-            expect(#picker.stops).to.equal(3)
-            expect(math.abs(picker.stops[2].time - 0.25) < 0.01).to.equal(true)
-
-            -- and it lands in order, not simply on the end
-            picker:_addStop(0.1)
+            expect(#picker.stops).to.equal(4)
             expect(picker.stops[2].time < picker.stops[3].time).to.equal(true)
+            expect(picker.selected).to.equal(2)
         end)
 
-        it("throws a stop away when it is dragged clear of the strip", function()
+        it("moves a stop along the bar without letting it pass its neighbours", function()
             local w = makeWindow()
             local tab = w:CreateTab({ name = "Main" })
             local picker = tab:CreateColorPicker({
@@ -1545,72 +1535,14 @@ return function()
                 }),
                 forgetState = true,
             })
+            picker:_addStop(0.5)
 
-            picker:_addStop()
-            expect(#picker.stops).to.equal(3)
-
-            -- let go while clear of the strip, so it is being dropped rather than moved
-            picker._stopDrag = 2
-            picker._stopDiscard = true
-            picker:_endStopDrag()
-            expect(#picker.stops).to.equal(2)
-
-            -- and letting go on the strip keeps it
-            picker:_addStop()
-            picker._stopDrag = 2
-            picker._stopDiscard = false
-            picker:_endStopDrag()
-            expect(#picker.stops).to.equal(3)
-        end)
-
-        it("only makes a stop where the drag actually ended on the strip", function()
-            local w = makeWindow()
-            local tab = w:CreateTab({ name = "Main" })
-            local picker = tab:CreateColorPicker({
-                name = "Fill",
-                gradient = true,
-                color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
-                    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
-                }),
-                forgetState = true,
-            })
-
-            picker:_beginAddDrag(true)
-            expect(picker.ghost).to.be.ok()
-
-            picker._addOver, picker._addTime = false, 0.5
-            picker:_endAddDrag()
-            expect(#picker.stops).to.equal(2)
-            expect(picker.ghost).to.equal(nil)
-
-            picker:_beginAddDrag(true)
-            picker._addOver, picker._addTime = true, 0.5
-            picker:_endAddDrag()
-            expect(#picker.stops).to.equal(3)
-        end)
-
-        it("follows the pointer while a stop is being placed or moved", function()
-            local w = makeWindow()
-            local tab = w:CreateTab({ name = "Main" })
-            local picker = tab:CreateColorPicker({
-                name = "Fill",
-                gradient = true,
-                color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
-                    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
-                }),
-                forgetState = true,
-            })
-
-            picker.main.AbsolutePosition = Vector2.new(60, 100)
             picker.strip.AbsolutePosition = Vector2.new(100, 200)
-            picker.strip.AbsoluteSize = Vector2.new(200, 18)
+            picker.strip.AbsoluteSize = Vector2.new(200, 26)
 
             local uis = helpers.services.UserInputService
-            local mouse = uis.GetMouseLocation
-            local pressed = uis.IsMouseButtonPressed
-            local at = Vector2.new(150, 209)
+            local mouse, pressed = uis.GetMouseLocation, uis.IsMouseButtonPressed
+            local at = Vector2.new(160, 213)
             uis.GetMouseLocation = function()
                 return at
             end
@@ -1618,38 +1550,81 @@ return function()
                 return true
             end
 
-            -- dragging out of the button: the ghost tracks the pointer and snaps onto the strip
-            picker:_beginAddDrag(true)
-            helpers.services.RunService.RenderStepped:Fire(1 / 60)
-            expect(picker._addOver).to.equal(true)
-            expect(math.abs(picker._addTime - 0.25) < 0.01).to.equal(true)
-
-            -- carried off the strip, so letting go there would place nothing
-            at = Vector2.new(150, 340)
-            helpers.services.RunService.RenderStepped:Fire(1 / 60)
-            expect(picker._addOver).to.equal(false)
-
-            at = Vector2.new(240, 209)
-            helpers.services.RunService.RenderStepped:Fire(1 / 60)
-            picker:_endAddDrag()
-            expect(#picker.stops).to.equal(3)
-
-            -- moving that stop along the strip, then pulling it clear of it
             picker:_beginStopDrag(2, true)
-            at = Vector2.new(180, 209)
             helpers.services.RunService.RenderStepped:Fire(1 / 60)
-            expect(picker.stops[2].time < 0.5).to.equal(true)
-            expect(picker._stopDiscard).to.equal(false)
+            expect(math.abs(picker.stops[2].time - 0.3) < 0.02).to.equal(true)
 
-            at = Vector2.new(180, 340)
+            -- dragged past the far end, and held short of it
+            at = Vector2.new(500, 213)
             helpers.services.RunService.RenderStepped:Fire(1 / 60)
-            expect(picker._stopDiscard).to.equal(true)
+            expect(picker.stops[2].time < 1).to.equal(true)
 
             picker:_endStopDrag()
+            uis.GetMouseLocation, uis.IsMouseButtonPressed = mouse, pressed
+        end)
+
+        it("adds from a click on the bar, and removes with the button beside it", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local picker = tab:CreateColorPicker({
+                name = "Fill",
+                gradient = true,
+                color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
+                }),
+                forgetState = true,
+            })
+
+            picker.strip.AbsolutePosition = Vector2.new(100, 200)
+            picker.strip.AbsoluteSize = Vector2.new(200, 26)
+
+            local uis = helpers.services.UserInputService
+            local mouse = uis.GetMouseLocation
+            uis.GetMouseLocation = function()
+                return Vector2.new(160, 213)
+            end
+
+            -- the bar itself is what adds a stop, where the click landed
+            picker.stripInteract.MouseButton1Click:Fire()
+            expect(#picker.stops).to.equal(3)
+            expect(math.abs(picker.stops[2].time - 0.3) < 0.02).to.equal(true)
+
+            -- and the button beside it takes the selected one away
+            picker.removeStop.MouseButton1Click:Fire()
+            expect(#picker.stops).to.equal(2)
+
+            -- with nothing removable left, pressing it again does nothing
+            picker.removeStop.MouseButton1Click:Fire()
             expect(#picker.stops).to.equal(2)
 
             uis.GetMouseLocation = mouse
-            uis.IsMouseButtonPressed = pressed
+        end)
+
+        it("shows the whole gradient on the swatch, not the stop being edited", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local picker = tab:CreateColorPicker({
+                name = "Fill",
+                gradient = true,
+                color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 255)),
+                }),
+                forgetState = true,
+            })
+
+            -- the swatch is all that is left once the card is closed, so it carries the sequence
+            expect(picker.previewGradient).to.be.ok()
+            expect(#picker.previewGradient.Color.Keypoints).to.equal(2)
+
+            picker:_addStop(0.5)
+            picker:Set(Color3.fromRGB(0, 255, 0))
+            expect(#picker.previewGradient.Color.Keypoints).to.equal(3)
+
+            -- and a plain picker has no gradient on its swatch at all
+            local plain = tab:CreateColorPicker({ name = "Plain", forgetState = true })
+            expect(plain.previewGradient).to.equal(nil)
         end)
 
         it("keeps the two ends, since a sequence has to start at 0 and finish at 1", function()

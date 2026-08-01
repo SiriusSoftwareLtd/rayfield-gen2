@@ -51,20 +51,14 @@ local narrowWidth = 400
 -- The gradient strip: the row of stops a gradient picker carries above the map, and the two
 -- buttons beside it. A ColorSequence has to start at 0 and end at 1, so the outer two stops are
 -- fixed there and only the ones between them can be moved or taken away.
-local stripHeight = 18
-local stripGap = 16
+local stripHeight = 26
+local stripGap = 18
 local stripBlock = stripHeight + stripGap
-local stopSize = 14
-local stopButton = 20
-local stopButtonGap = 6
+local stopSize = 16
+local stopButton = 26
+local stopButtonGap = 10
 local minStops = 2
 local maxStops = 20 -- what a ColorSequence itself allows
-
--- How far off the strip a stop has to be dragged before letting go of it takes it away, and how
--- far either side of the strip still counts as dropping onto it. Far enough apart that neither
--- happens by accident on the way to the other.
-local dropTolerance = 26
-local discardDistance = 44
 
 -- Per-mode geometry for the bits that move between layouts. map + hue + alpha stay top-left in
 -- both. "open" rects are where the preview morphs to and where the hex + alpha fields sit;
@@ -461,7 +455,7 @@ function ColorPicker:_buildHeader()
         AnchorPoint = Vector2.new(1, 0.5),
         Position = previewClosedPos,
         Size = previewClosedSize,
-        BackgroundColor3 = self.value,
+        BackgroundColor3 = if self.gradient then Color3.fromRGB(255, 255, 255) else self.value,
         BorderSizePixel = 0,
         ZIndex = 3,
 
@@ -477,6 +471,14 @@ function ColorPicker:_buildHeader()
 
     -- Soft glow behind the preview, tinted to the colour. Its transparency tracks alpha
     -- (0.6 solid -> 1 fully clear). One shadow follows the preview through the mini<->full morph.
+    -- a gradient picker's swatch shows the sequence, since that is the thing being edited and
+    -- the only thing left on screen once the card is closed. A plain one keeps its flat colour.
+    if self.gradient then
+        self.previewGradient = self.window:Create("UIGradient", {
+            Parent = self.preview,
+        })
+    end
+
     self.previewShadow = self.window:CreateGlow(self.preview, self.value, 20, 1)
 
     -- Shown centred on the (open) preview once alpha reaches 0, since the swatch is fully clear
@@ -544,16 +546,14 @@ function ColorPicker:_buildHeader()
     })
 end
 
--- The gradient strip: the sequence drawn as a bar, a handle per stop sitting on it, and the two
--- buttons that add and take stops away. Buttons rather than a right-click menu, because this runs
--- on touch as often as it runs on a mouse and a menu you have to know about is no use there.
+-- The gradient bar: the sequence drawn full width, a handle per stop sitting on it, and one
+-- button to take the selected stop away. Adding is a click on the bar itself, where the stop is
+-- going to go, which is how every gradient editor worth using does it and needs no second button.
 function ColorPicker:_buildStops()
-    local buttonsWidth = (stopButton + stopButtonGap) * 2
-
     self.strip = self.window:Create("Frame", {
         Name = "Gradient",
         Position = UDim2.fromOffset(20, contentY),
-        Size = UDim2.new(1, -(40 + buttonsWidth), 0, stripHeight),
+        Size = UDim2.new(1, -(40 + stopButton + stopButtonGap), 0, stripHeight),
         BorderSizePixel = 0,
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         BackgroundTransparency = 1, -- Open = 0
@@ -562,7 +562,7 @@ function ColorPicker:_buildStops()
     })
 
     self.window:Create("UICorner", {
-        CornerRadius = UDim.new(0, 6),
+        CornerRadius = UDim.new(0, 8),
         Parent = self.strip,
     })
 
@@ -577,52 +577,64 @@ function ColorPicker:_buildStops()
         Parent = self.strip,
     })
 
-    local function button(icon, offsetFromRight, order)
-        local frame = self.window:Create("TextButton", {
-            Name = order,
-            AnchorPoint = Vector2.new(1, 0),
-            Position = UDim2.new(1, -offsetFromRight, 0, contentY - 1),
-            Size = UDim2.fromOffset(stopButton, stopButton),
-            BorderSizePixel = 0,
-            BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-            BackgroundTransparency = 1, -- Open = 0.92
-            Text = "",
-            AutoButtonColor = false,
+    -- sits under the handles, so a click that misses one is a click on the bar
+    self.stripInteract = self.window:Create("TextButton", {
+        BackgroundTransparency = 1,
+        Size = UDim2.fromScale(1, 1),
+        Text = "",
+        TextTransparency = 1,
+        ZIndex = 2,
 
-            Parent = self.main,
-        })
+        Parent = self.strip,
+    })
 
-        self.window:Create("UICorner", {
-            CornerRadius = UDim.new(0, 6),
-            Parent = frame,
-        })
-
-        local label = self.window:Create("TextLabel", {
-            Size = UDim2.fromScale(1, 1),
-            BackgroundTransparency = 1,
-            Text = icon,
-            TextSize = 15,
-            TextTransparency = 1, -- Open = 0.35
-
-            Parent = frame,
-        }, { TextColor3 = "ContentColor", FontFace = "Font" })
-
-        return frame, label
-    end
-
-    self.addStop, self.addStopLabel = button("+", 20 + stopButton + stopButtonGap, "AddStop")
-    self.removeStop, self.removeStopLabel = button("-", 20, "RemoveStop")
-
-    -- click to drop one in the widest gap, or drag out of the button and place it by hand. The
-    -- click is what makes the button discoverable; the drag is what makes it worth using.
-    self.window:ConnectFor(self, self.addStop.InputBegan, function(input)
-        if
-            input.UserInputType == Enum.UserInputType.MouseButton1
-            or input.UserInputType == Enum.UserInputType.Touch
-        then
-            self:_beginAddDrag(input.UserInputType == Enum.UserInputType.MouseButton1)
+    self.window:ConnectFor(self, self.stripInteract.MouseButton1Click, function()
+        local width = self.strip.AbsoluteSize.X
+        if width <= 0 then
+            return
         end
+        local at = (variables.userInputService:GetMouseLocation().X - self.strip.AbsolutePosition.X) / width
+        self:_addStop(at)
     end)
+
+    self.removeStop = self.window:Create("TextButton", {
+        Name = "RemoveStop",
+        AnchorPoint = Vector2.new(1, 0),
+        Position = UDim2.new(1, -20, 0, contentY),
+        Size = UDim2.fromOffset(stopButton, stripHeight),
+        BorderSizePixel = 0,
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BackgroundTransparency = 1, -- Open = 0.92
+        Text = "",
+        AutoButtonColor = false,
+
+        Parent = self.main,
+    })
+
+    self.window:Create("UICorner", {
+        CornerRadius = UDim.new(0, 8),
+        Parent = self.removeStop,
+    })
+
+    self.removeStopStroke = self.window:Create("UIStroke", {
+        Color = Color3.fromRGB(255, 255, 255),
+        Transparency = 1, -- Open = 0.88
+
+        Parent = self.removeStop,
+    })
+
+    -- a bar rather than a glyph: a minus at this size reads as a dash of text, and the icon
+    -- packs are not loaded for a control this small
+    self.removeStopMark = self.window:Create("Frame", {
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.fromOffset(10, 2),
+        BorderSizePixel = 0,
+        BackgroundTransparency = 1, -- Open = 0.35
+
+        Parent = self.removeStop,
+    }, { BackgroundColor3 = "ContentColor" })
+
     self.window:ConnectFor(self, self.removeStop.MouseButton1Click, function()
         self:_removeStop()
     end)
@@ -714,8 +726,13 @@ function ColorPicker:_renderStops()
     -- an end stop is what holds the sequence to 0 and 1, so it can be recoloured but never removed
     local removable = #self.stops > minStops and self.selected > 1 and self.selected < #self.stops
     if self._isOpen then
-        self.addStopLabel.TextTransparency = if #self.stops < maxStops then 0.35 else 0.75
-        self.removeStopLabel.TextTransparency = if removable then 0.35 else 0.75
+        self.removeStopMark.BackgroundTransparency = if removable then 0.35 else 0.8
+    end
+
+    -- the swatch shows the whole gradient rather than the one stop being edited, since the
+    -- gradient is what the picker is for and it is all you can see once the card is closed
+    if self.previewGradient then
+        self.previewGradient.Color = self.stripGradient.Color
     end
 end
 
@@ -1052,7 +1069,6 @@ function ColorPicker:_buildPicker()
             or input.UserInputType == Enum.UserInputType.Touch
         then
             self:_endStopDrag()
-            self:_endAddDrag()
         end
     end)
 
@@ -1178,109 +1194,6 @@ function ColorPicker:_removeStop()
     self:_commitStops()
 end
 
--- Where along the strip a screen position falls, and whether it is close enough to count as
--- being on it at all.
-function ColorPicker:_stripAt(position)
-    local origin, size = self.strip.AbsolutePosition, self.strip.AbsoluteSize
-    if size.X <= 0 then
-        return 0, false
-    end
-
-    local time = math.clamp((position.X - origin.X) / size.X, 0, 1)
-    local off = math.abs(position.Y - (origin.Y + size.Y / 2))
-    return time, off <= dropTolerance
-end
-
--- The stop that is not on the strip yet: it follows the pointer out of the + button and only
--- becomes a real one where it is let go.
-function ColorPicker:_showGhost(shown)
-    if not shown then
-        if self.ghost then
-            self.ghost:Destroy()
-            self.ghost = nil
-        end
-        return
-    end
-
-    if self.ghost then
-        return
-    end
-
-    self.ghost = self.window:Create("Frame", {
-        Name = "NewStop",
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Size = UDim2.fromOffset(stopSize, stopSize),
-        BorderSizePixel = 0,
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-        BackgroundTransparency = 0.15,
-        ZIndex = 8,
-
-        Parent = self.main,
-    })
-
-    self.window:Create("UICorner", {
-        CornerRadius = UDim.new(1, 0),
-        Parent = self.ghost,
-    })
-
-    self.window:Create("UIStroke", {
-        Color = Color3.fromRGB(255, 255, 255),
-        Thickness = 2,
-        Transparency = 0.2,
-        Parent = self.ghost,
-    })
-end
-
--- Drag a stop out of the + button and drop it where it belongs. Letting go anywhere off the strip
--- is a cancel rather than a stop dumped at whichever end the pointer happened to be nearest.
-function ColorPicker:_beginAddDrag(isMouse)
-    if #self.stops >= maxStops then
-        return
-    end
-
-    self._addDrag = true
-    self._addPlaced = false
-    self:_showGhost(true)
-
-    self.window:Connect(variables.runService.RenderStepped, function()
-        if not self._addDrag or self.window.unloaded then
-            return
-        end
-
-        if isMouse and not variables.userInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
-            self:_endAddDrag()
-            return
-        end
-
-        local at = variables.userInputService:GetMouseLocation()
-        local time, over = self:_stripAt(at)
-        self._addTime, self._addOver = time, over
-
-        if self.ghost then
-            local origin = self.main.AbsolutePosition
-            -- snapped onto the strip once it is close enough, so where it will land is obvious
-            local y = if over then self.strip.AbsolutePosition.Y + self.strip.AbsoluteSize.Y / 2 else at.Y
-            self.ghost.Position = UDim2.fromOffset(at.X - origin.X, y - origin.Y)
-            self.ghost.BackgroundColor3 = colorAtTime(self.stops, time)
-            self.ghost.BackgroundTransparency = if over then 0 else 0.5
-        end
-    end)
-end
-
-function ColorPicker:_endAddDrag()
-    if not self._addDrag then
-        return
-    end
-    self._addDrag = false
-    self:_showGhost(false)
-
-    if not self._addOver then
-        return -- let go somewhere that is not the strip, so nothing was placed
-    end
-
-    self:_addStop(self._addTime)
-end
-
 -- Slide a stop along the strip. It cannot pass its neighbours, and the outer two do not move at
 -- all, so the sequence stays in order and keeps its ends. Pulled far enough off the strip it is
 -- being thrown away instead, which is the other half of the - button.
@@ -1311,39 +1224,15 @@ function ColorPicker:_beginStopDrag(index, isMouse)
         local before, after = self.stops[index - 1].time, self.stops[index + 1].time
         self.stops[index].time = math.clamp(time, before + 0.01, after - 0.01)
 
-        -- pulled clear of the strip: it will be dropped rather than moved, and it says so by
-        -- fading rather than by vanishing under the pointer before the choice has been made
-        local off = math.abs(at.Y - (self.strip.AbsolutePosition.Y + self.strip.AbsoluteSize.Y / 2))
-        self._stopDiscard = off > discardDistance and #self.stops > minStops
-
-        local handle = self.stopHandles[index]
-        if handle then
-            handle.frame.BackgroundTransparency = if self._stopDiscard then 0.65 else 0
-        end
-
         self:_renderStops()
     end)
 end
 
 function ColorPicker:_endStopDrag()
-    local index = self._stopDrag
-    if not index then
+    if not self._stopDrag then
         return
     end
     self._stopDrag = nil
-
-    local handle = self.stopHandles[index]
-    if handle then
-        handle.frame.BackgroundTransparency = 0
-    end
-
-    if self._stopDiscard then
-        self._stopDiscard = false
-        self.selected = index
-        self:_removeStop()
-        return
-    end
-
     self:_commitStops()
 end
 
@@ -1505,7 +1394,9 @@ function ColorPicker:_render(mode)
         self.hueHandle.Position, self.hueHandle.BackgroundColor3 = huePos, mapHue
         self.alphaBar.BackgroundColor3 = self.value
         self.alphaHandle.Position, self.alphaHandle.BackgroundColor3 = alphaPos, self.value
-        self.preview.BackgroundColor3 = self.value
+        if not self.gradient then
+            self.preview.BackgroundColor3 = self.value
+        end
         self.previewShadow.Color = self.value
         if not self.window.hidden then
             self.preview.BackgroundTransparency = previewT
@@ -1523,7 +1414,7 @@ function ColorPicker:_render(mode)
             :Play()
         -- the preview + its glow morph colour and opacity together on the softer follow tween
         variables.tweenService:Create(self.alphaBar, followInfo, { BackgroundColor3 = self.value }):Play()
-        local previewGoal = { BackgroundColor3 = self.value }
+        local previewGoal = if self.gradient then {} else { BackgroundColor3 = self.value }
         local shadowGoal = { Color = self.value }
         if not self.window.hidden then
             previewGoal.BackgroundTransparency = previewT
@@ -1676,10 +1567,9 @@ function ColorPicker:_applyPickerVisibility(open, animate)
     if self.gradient then
         set[self.strip] = { BackgroundTransparency = if open then 0 else 1 }
         set[self.stripStroke] = { Transparency = if open then 0.85 else 1 }
-        set[self.addStop] = { BackgroundTransparency = if open then 0.92 else 1 }
         set[self.removeStop] = { BackgroundTransparency = if open then 0.92 else 1 }
-        set[self.addStopLabel] = { TextTransparency = if open then 0.35 else 1 }
-        set[self.removeStopLabel] = { TextTransparency = if open then 0.35 else 1 }
+        set[self.removeStopStroke] = { Transparency = if open then 0.88 else 1 }
+        set[self.removeStopMark] = { BackgroundTransparency = if open then 0.35 else 1 }
 
         for index, handle in self.stopHandles do
             set[handle.frame] = { BackgroundTransparency = if open then 0 else 1 }
@@ -1708,7 +1598,7 @@ function ColorPicker:_setControlsVisible(visible)
     for _, frame in { self.map, self.hueBar, self.alphaBar, self.hexBox, self.alphaBox } do
         frame.Visible = visible
     end
-    for _, frame in { self.strip, self.addStop, self.removeStop } do
+    for _, frame in { self.strip, self.removeStop } do
         if frame then
             frame.Visible = visible
         end
