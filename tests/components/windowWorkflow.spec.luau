@@ -1487,6 +1487,41 @@ return function()
             expect(paragraph.body.Visible).to.equal(false)
         end)
 
+        it("keeps text set after the fact through a language change", function()
+            local w = makeWindow()
+            w:RegisterTranslations({
+                fr = {
+                    ["Built with this"] = "Construit avec ceci",
+                    ["Set after the fact"] = "Defini apres coup",
+                    ["Original heading"] = "Titre original",
+                    ["New heading"] = "Nouveau titre",
+                },
+            })
+
+            local tab = w:CreateTab({ name = "Main" })
+            local label = tab:CreateLabel({ text = "Built with this" })
+            local paragraph = tab:CreateParagraph({ name = "Original heading", text = "Built with this" })
+
+            label:Set("Set after the fact")
+            paragraph:Set("Set after the fact", "New heading")
+
+            -- the window re-resolves every localised property from the source it was bound to,
+            -- so text written straight to the label would be replaced here by a translation of
+            -- the copy it no longer shows
+            w:SetLocale("fr")
+            expect(label.title.Text).to.equal("Defini apres coup")
+            expect(paragraph.body.Text).to.equal("Defini apres coup")
+            expect(paragraph.title.Text).to.equal("Nouveau titre")
+
+            -- and setting again while a language is active still lands
+            label:Set("Built with this")
+            expect(label.title.Text).to.equal("Construit avec ceci")
+
+            w:SetLocale("en")
+            expect(label.title.Text).to.equal("Built with this")
+            expect(paragraph.body.Text).to.equal("Set after the fact")
+        end)
+
         it("reveals and hides both with the rest of the page", function()
             local w = makeWindow()
             local tab = w:CreateTab({ name = "Main" })

@@ -138,17 +138,20 @@ function Paragraph.new(tab, properties)
     return self
 end
 
--- Change either half. Both go through the locale the same way the text they were built with did.
+-- Change either half. Both rebind rather than being written directly: the window remembers the
+-- source each localised property was built from and re-resolves them all on SetLocale, so a
+-- direct write would be undone by the next language change, replaced by a translation of the
+-- copy this paragraph no longer shows.
 function Paragraph:Set(text, title)
     if text ~= nil then
         self.text = tostring(text)
-        self.body.Text = locale.resolve(self.text)
+        self.window:_bindLocale(self.body, "Text", self.text)
         self.body.Visible = self.text ~= ""
     end
 
     if title ~= nil then
         self.name = tostring(title)
-        self.title.Text = locale.resolve(self.name)
+        self.window:_bindLocale(self.title, "Text", self.name)
         self.title.Visible = self.name ~= ""
     end
 end

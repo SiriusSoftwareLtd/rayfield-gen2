@@ -94,11 +94,13 @@ function Label.new(tab, properties)
     return self
 end
 
--- Swap the text. Kept as a method rather than leaving the label to be written to directly, so it
--- goes through the locale the same way the text it was built with did.
+-- Swap the text. It rebinds rather than writing the label directly: the window remembers the
+-- source each localised property was built from and re-resolves them all on SetLocale, so a
+-- direct write would be undone by the next language change, replaced by a translation of the
+-- text this label no longer shows.
 function Label:Set(text)
     self.text = tostring(text)
-    self.title.Text = locale.resolve(self.text)
+    self.window:_bindLocale(self.title, "Text", self.text)
 end
 
 function Label:_setShown(shown, animate)
