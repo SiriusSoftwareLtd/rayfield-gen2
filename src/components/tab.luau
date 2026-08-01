@@ -400,6 +400,16 @@ function Tab:CreateSection(properties)
     return self:_register(require(script.Parent.section).new(self, properties))
 end
 
+-- Label
+function Tab:CreateLabel(properties)
+    return self:_register(require(script.Parent.label).new(self, properties))
+end
+
+-- Paragraph
+function Tab:CreateParagraph(properties)
+    return self:_register(require(script.Parent.paragraph).new(self, properties))
+end
+
 -- Stat
 function Tab:CreateStat(properties)
     return self:_register(require(script.Parent.stat).new(self, properties))

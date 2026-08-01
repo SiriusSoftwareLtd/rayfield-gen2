@@ -56,6 +56,17 @@ export type SectionProps = {
     icon: (string | number)?,
 }
 
+export type LabelProps = {
+    text: string?,
+    icon: (string | number)?,
+}
+
+export type ParagraphProps = {
+    name: string?, -- the title above the body
+    text: string?,
+    icon: (string | number)?,
+}
+
 export type GroupProps = {
     direction: string?, -- "row" | "column" (default row); "horizontal"/"vertical" also work
 }
@@ -251,6 +262,17 @@ export type Stat = Moveable & {
 
 export type Section = Moveable & {}
 
+export type Label = Moveable & {
+    text: string,
+    Set: (self: Label, text: string) -> (),
+}
+
+export type Paragraph = Moveable & {
+    name: string,
+    text: string,
+    Set: (self: Paragraph, text: string?, title: string?) -> (),
+}
+
 -- Tags sit in the window's title bar and order themselves, so they aren't Moveable.
 export type Tag = {
     Set: (self: Tag, props: TagProps) -> (),
@@ -293,6 +315,8 @@ export type Tab = {
     CreateColorPicker: (self: Tab, props: ColorPickerProps) -> ColorPicker,
     CreateStat: (self: Tab, props: StatProps) -> Stat,
     CreateSection: (self: Tab, props: SectionProps) -> Section,
+    CreateLabel: (self: Tab, props: LabelProps) -> Label,
+    CreateParagraph: (self: Tab, props: ParagraphProps) -> Paragraph,
     CreateGroup: (self: Tab, props: GroupProps?) -> Group,
 }
 
