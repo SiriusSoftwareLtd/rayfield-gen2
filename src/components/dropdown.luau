@@ -873,7 +873,9 @@ function Dropdown:_applyFilter(query)
         end
     end
 
-    self.emptyLabel.Visible = shown == 0
+    -- only a search that found nothing gets told so. A dropdown built with no options, or one
+    -- emptied by Refresh, is a list waiting to be filled rather than a failed search.
+    self.emptyLabel.Visible = shown == 0 and query ~= ""
     self:_updateCorners()
     self:_resizeToOptions()
     self:_syncScrollHint()

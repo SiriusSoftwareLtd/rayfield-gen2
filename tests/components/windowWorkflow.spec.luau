@@ -1564,6 +1564,15 @@ return function()
             -- and the card keeps a row of room to say it in
             drop:_applyFilter("zzz")
             expect(drop:_openHeight() > 95).to.equal(true)
+
+            -- a list with nothing in it is not a search that found nothing. Both leave the same
+            -- count behind, so the query is what tells them apart.
+            drop:Refresh({})
+            drop:_applyFilter("")
+            expect(drop.emptyLabel.Visible).to.equal(false)
+
+            local bare = tab:CreateDropdown({ name = "Bare", options = {}, forgetState = true })
+            expect(bare.emptyLabel.Visible).to.equal(false)
         end)
 
         it("shows the scrollbar only while there is list left to reach", function()
