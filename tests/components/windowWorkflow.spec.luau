@@ -1550,7 +1550,7 @@ return function()
                 return true
             end
 
-            picker:_beginStopDrag(2, true)
+            picker:_beginStopDrag(2, { UserInputType = Enum.UserInputType.MouseButton1 })
             helpers.services.RunService.RenderStepped:Fire(1 / 60)
             expect(math.abs(picker.stops[2].time - 0.3) < 0.02).to.equal(true)
 
@@ -1585,8 +1585,8 @@ return function()
                 return Vector2.new(160, 213)
             end
 
-            -- the bar itself is what adds a stop, where the click landed
-            picker.stripInteract.MouseButton1Click:Fire()
+            -- the bar itself is what adds a stop, where the press landed
+            picker.stripInteract.InputBegan:Fire({ UserInputType = Enum.UserInputType.MouseButton1 })
             expect(#picker.stops).to.equal(3)
             expect(math.abs(picker.stops[2].time - 0.3) < 0.02).to.equal(true)
 
@@ -1599,6 +1599,72 @@ return function()
             expect(#picker.stops).to.equal(2)
 
             uis.GetMouseLocation = mouse
+        end)
+
+        it("keeps the flat shadow out of the way, and the drag connection off the frame loop", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local picker = tab:CreateColorPicker({
+                name = "Fill",
+                gradient = true,
+                color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 255)),
+                }),
+                forgetState = true,
+            })
+
+            -- the banded glow throws the light, so the single flat shadow must not be shown
+            -- again by a render that runs after it was hidden
+            picker:_render("instant")
+            expect(picker.previewShadow.Transparency).to.equal(1)
+            picker:_render("animate")
+            expect(picker.previewShadow.Transparency).to.equal(1)
+
+            -- one connection at a time, and none left running once the drag is over
+            picker:_addStop(0.5)
+            picker:_beginStopDrag(2, { UserInputType = Enum.UserInputType.MouseButton1 })
+            expect(picker._stopConnection).to.be.ok()
+
+            picker:_endStopDrag()
+            expect(picker._stopConnection).to.equal(nil)
+            expect(picker._stopDrag).to.equal(nil)
+
+            -- ending twice is harmless
+            picker:_endStopDrag()
+            expect(picker._stopConnection).to.equal(nil)
+        end)
+
+        it("hands the whole sequence to the flag APIs, not the stop being edited", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local picker = tab:CreateColorPicker({
+                name = "Fill",
+                flag = "gradientFlag",
+                gradient = true,
+                color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 255)),
+                }),
+            })
+            picker:_selectStop(1)
+
+            -- value is the selected stop, which is the picker's own business. What the outside
+            -- asks for is the thing the picker represents.
+            expect(typeof(picker.value)).to.equal("Color3")
+            expect(typeof(w:Get("gradientFlag"))).to.equal("ColorSequence")
+            expect(typeof(w.Flags.gradientFlag)).to.equal("ColorSequence")
+
+            for flag, value in w.Flags do
+                if flag == "gradientFlag" then
+                    expect(typeof(value)).to.equal("ColorSequence")
+                end
+            end
+
+            -- and a plain picker still reads as the colour it is
+            local plain = tab:CreateColorPicker({ name = "Plain", flag = "plainFlag" })
+            expect(typeof(w:Get("plainFlag"))).to.equal("Color3")
+            expect(plain.gradient).to.equal(false)
         end)
 
         it("glows in the colour the gradient has at each end", function()

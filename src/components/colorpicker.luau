@@ -636,13 +636,23 @@ function ColorPicker:_buildStops()
         Parent = self.strip,
     })
 
-    self.window:ConnectFor(self, self.stripInteract.MouseButton1Click, function()
+    -- InputBegan rather than MouseButton1Click, so a touch brings its own position with it: a
+    -- click event carries none, and asking the mouse where it is puts the stop under the cursor
+    -- rather than under the finger that placed it.
+    self.window:ConnectFor(self, self.stripInteract.InputBegan, function(input)
+        if
+            input.UserInputType ~= Enum.UserInputType.MouseButton1
+            and input.UserInputType ~= Enum.UserInputType.Touch
+        then
+            return
+        end
+
         local width = self.strip.AbsoluteSize.X
         if width <= 0 then
             return
         end
-        local at = (variables.userInputService:GetMouseLocation().X - self.strip.AbsolutePosition.X) / width
-        self:_addStop(at)
+
+        self:_addStop((self:_pointerX(input) - self.strip.AbsolutePosition.X) / width)
     end)
 
     self.removeStop = self.window:Create("TextButton", {
@@ -743,7 +753,7 @@ function ColorPicker:_rebuildStopHandles()
                 or input.UserInputType == Enum.UserInputType.Touch
             then
                 self:_selectStop(index)
-                self:_beginStopDrag(index, input.UserInputType == Enum.UserInputType.MouseButton1)
+                self:_beginStopDrag(index, input)
             end
         end)
 
@@ -1198,6 +1208,15 @@ function ColorPicker:_buildPicker()
     end)
 end
 
+-- Where the pointer is, along the screen's x. A touch reports its own position and a mouse does
+-- not, so the input is kept and asked rather than the mouse being asked on a touch's behalf.
+function ColorPicker:_pointerX(input)
+    if input and input.UserInputType == Enum.UserInputType.Touch and input.Position then
+        return input.Position.X
+    end
+    return variables.userInputService:GetMouseLocation().X
+end
+
 -- Move the picker onto another stop. Everything below works on one colour, so selecting is just
 -- pointing hue/sat/val at that stop and repainting.
 function ColorPicker:_selectStop(index)
@@ -1265,14 +1284,26 @@ end
 -- Slide a stop along the strip. It cannot pass its neighbours, and the outer two do not move at
 -- all, so the sequence stays in order and keeps its ends. Pulled far enough off the strip it is
 -- being thrown away instead, which is the other half of the - button.
-function ColorPicker:_beginStopDrag(index, isMouse)
+function ColorPicker:_beginStopDrag(index, input)
     if index <= 1 or index >= #self.stops then
         return
     end
 
     self._stopDrag = index
-    self.window:Connect(variables.runService.RenderStepped, function()
+    self._stopInput = input
+
+    -- one connection at a time, disconnected on release. Left tracked and forgotten, every
+    -- completed drag would leave another callback running every frame for the window's life.
+    if self._stopConnection then
+        self._stopConnection:Disconnect()
+        self._stopConnection = nil
+    end
+
+    local isMouse = input == nil or input.UserInputType == Enum.UserInputType.MouseButton1
+
+    self._stopConnection = variables.runService.RenderStepped:Connect(function()
         if self._stopDrag ~= index or self.window.unloaded then
+            self:_endStopDrag()
             return
         end
 
@@ -1287,20 +1318,25 @@ function ColorPicker:_beginStopDrag(index, isMouse)
             return
         end
 
-        local at = variables.userInputService:GetMouseLocation()
-        local time = (at.X - self.strip.AbsolutePosition.X) / width
+        local at = (self:_pointerX(self._stopInput) - self.strip.AbsolutePosition.X) / width
         local before, after = self.stops[index - 1].time, self.stops[index + 1].time
-        self.stops[index].time = math.clamp(time, before + 0.01, after - 0.01)
-
+        self.stops[index].time = math.clamp(at, before + 0.01, after - 0.01)
         self:_renderStops()
     end)
 end
 
 function ColorPicker:_endStopDrag()
+    if self._stopConnection then
+        self._stopConnection:Disconnect()
+        self._stopConnection = nil
+    end
+
     if not self._stopDrag then
         return
     end
+
     self._stopDrag = nil
+    self._stopInput = nil
     self:_commitStops()
 end
 
@@ -1470,7 +1506,9 @@ function ColorPicker:_render(mode)
         end
         if not self.window.hidden then
             self.preview.BackgroundTransparency = previewT
-            self.previewShadow.Transparency = shadowT
+            -- a gradient throws its light from the banded glow, so the single flat shadow stays
+            -- out of the way rather than being shown again by every render
+            self.previewShadow.Transparency = if self.gradient then 1 else shadowT
         end
     else
         local moveInfo = if mode == "drag" then dragInfo else followInfo
@@ -1485,10 +1523,12 @@ function ColorPicker:_render(mode)
         -- the preview + its glow morph colour and opacity together on the softer follow tween
         variables.tweenService:Create(self.alphaBar, followInfo, { BackgroundColor3 = self.value }):Play()
         local previewGoal = if self.gradient then {} else { BackgroundColor3 = self.value }
-        local shadowGoal = if self.gradient then {} else { Color = self.value }
+        local shadowGoal = if self.gradient then { Transparency = 1 } else { Color = self.value }
         if not self.window.hidden then
             previewGoal.BackgroundTransparency = previewT
-            shadowGoal.Transparency = shadowT
+            if not self.gradient then
+                shadowGoal.Transparency = shadowT
+            end
         end
         variables.tweenService:Create(self.preview, followInfo, previewGoal):Play()
         variables.tweenService:Create(self.previewShadow, followInfo, shadowGoal):Play()
