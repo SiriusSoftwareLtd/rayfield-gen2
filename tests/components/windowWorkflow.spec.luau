@@ -2058,7 +2058,7 @@ return function()
             expect(slider.containerLayout.FillDirection).to.equal(Enum.FillDirection.Horizontal)
         end)
 
-        it("travels a row child to the row it was wrapped onto, then takes the width there", function()
+        it("travels a row child to the line it was wrapped onto", function()
             local w = makeWindow()
             local tab = w:CreateTab({ name = "Main" })
             local row = tab:CreateGroup({ direction = "row" })
@@ -2073,43 +2073,41 @@ return function()
 
             -- first pass has nothing to travel from
             wrapped._slot.AbsolutePosition = Vector2.new(300, 100)
-            wrapped._slot.AbsoluteSize = Vector2.new(150, 41)
             row:_slideIntoPlace(wrapped)
             expect(wrapped.main.Position).to.equal(UDim2.fromOffset(0, 0))
-            expect(wrapped._slotWidth).to.equal(150)
+            expect(wrapped._slotAt).to.equal(Vector2.new(300, 100))
 
-            -- wrapped onto the next row, where it now has the whole width to itself: it travels
-            -- at the width it left with, and the expansion follows it down
+            -- wrapped onto the next line: it starts back where it was and runs the gap down
             wrapped._slot.AbsolutePosition = Vector2.new(20, 160)
-            wrapped._slot.AbsoluteSize = Vector2.new(420, 41)
             row:_slideIntoPlace(wrapped)
             expect(wrapped._slotAt).to.equal(Vector2.new(20, 160))
-            expect(wrapped.main.Size).to.equal(UDim2.new(1, 0, 0, 41))
 
-            -- the flex sharing the width out again is not a wrap, so it is left alone
+            -- the widths being re-shared is not a wrap, so the position is left alone
             wrapped.main.Position = UDim2.fromOffset(0, 0)
             wrapped._slot.AbsolutePosition = Vector2.new(26, 161)
             row:_slideIntoPlace(wrapped)
             expect(wrapped.main.Position).to.equal(UDim2.fromOffset(0, 0))
         end)
 
-        it("hands a height change over to the row while it is still expanding", function()
+        it("shares a line's width between the children on it, and re-shares it on a wrap", function()
             local w = makeWindow()
             local tab = w:CreateTab({ name = "Main" })
             local row = tab:CreateGroup({ direction = "row" })
-            local slider = row:CreateSlider({ name = "Row Slider", range = { 0, 100 }, value = 10 })
+            local one = row:CreateButton({ name = "One" })
+            local two = row:CreateButton({ name = "Two" })
 
-            -- a size written here would take the width with it and strand the expansion, so the
-            -- height waits and lands with the rest of it
-            slider._slotExpanding = true
-            local before = slider.main.Size
-            slider:_setMainHeight(70, true)
-            expect(slider.main.Size).to.equal(before)
-            expect(slider._pendingSlotHeight).to.equal(70)
+            -- wide enough for both: the spare width is split between them
+            row.main.AbsoluteSize = Vector2.new(600, 41)
+            row:_shareWidth()
+            local packed = row:_packRows(600)
+            expect(#packed).to.equal(1)
+            expect(one._slot.Size.X.Offset).to.equal(two._slot.Size.X.Offset)
+            expect(one._slot.Size.X.Offset > one._minSlotWidth).to.equal(true)
 
-            slider._slotExpanding = false
-            slider:_setMainHeight(65, false)
-            expect(slider.main.Size.Y.Offset).to.equal(65)
+            -- too narrow for both: one wraps, and each is now owed a whole line
+            row.main.AbsoluteSize = Vector2.new(one._minSlotWidth + 10, 41)
+            row:_shareWidth()
+            expect(#row:_packRows(one._minSlotWidth + 10)).to.equal(2)
         end)
 
         it("leaves a row child alone while the window is not on screen", function()

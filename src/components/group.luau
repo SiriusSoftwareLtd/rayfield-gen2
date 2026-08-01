@@ -30,10 +30,9 @@ local elementPadding = 8
 -- sharing the width out again, and animating that would smear the whole row behind the drag.
 local wrapThreshold = 4
 
--- A wrap is two things happening at once: the child moves to another row, and the flex hands it
--- whatever width is going spare there, which for a child that lands alone is the whole row. Run
--- together they read as one jump. So the child travels first, at the width it had, and takes the
--- new one after it has arrived - the expansion starts as the move is settling, not before.
+-- A wrap is two things happening at once: the child moves to another line, and every child on
+-- both lines is owed a different share of the width. Run together they read as one jump. So the
+-- move goes first, and the widths open out as it settles rather than before it.
 local slideInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 local expandInfo = TweenInfo.new(0.36, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, 0, false, 0.14)
 
@@ -156,7 +155,6 @@ end
 -- real bounds, and HorizontalFlex grows each row's items to fill it.
 function Group:_wrapChild(element)
     self.layout.Wraps = true
-    self.layout.HorizontalFlex = Enum.UIFlexAlignment.Fill
 
     -- tells a width-owning element (the slider) that we drive its width now, so its own
     -- reflow stops fighting us. plain compact elements ignore the flag.
@@ -183,6 +181,7 @@ function Group:_wrapChild(element)
     })
 
     element._slot = slot
+    element._minSlotWidth = minWidth
     element.main.AutomaticSize = Enum.AutomaticSize.None
     element.main.Size = UDim2.new(1, 0, element.main.Size.Y.Scale, element.main.Size.Y.Offset)
     element.main.Position = UDim2.fromOffset(0, 0)
@@ -191,21 +190,116 @@ function Group:_wrapChild(element)
     self.window:ConnectFor(element, slot:GetPropertyChangedSignal("AbsolutePosition"), function()
         self:_slideIntoPlace(element)
     end)
+
+    if not self._watchingWidth then
+        self._watchingWidth = true
+        self.window:Connect(self.main:GetPropertyChangedSignal("AbsoluteSize"), function()
+            self:_shareWidth()
+        end)
+    end
+
+    self:_shareWidth()
 end
 
--- Let an element that has just been wrapped onto another row travel there, instead of being
--- somewhere else the next frame. The slot has already moved and already has its new width, so
--- the element starts back where the slot was, at the width it had there, and runs both down.
+-- Pack the row into lines by the width each child actually needs, then hand whatever is left
+-- over on each line out evenly between the children on it. This is what UIListLayout's own
+-- HorizontalFlex does, and it does it in the frame the wrap happens: a child leaving a line
+-- means the ones it leaves behind are simply wider on the next frame, with nothing in between.
+-- Doing the share here means the widths are ours to move, so a line that gains room opens into
+-- it and a line that loses a child closes up, in front of the person who resized the window.
+function Group:_packRows(available: number)
+    local padding = self.layout.Padding.Offset
+    local rows, current, used = {}, {}, 0
+
+    for _, element in self.elements do
+        local width = element._minSlotWidth or 0
+        local gap = if #current > 0 then padding else 0
+
+        if #current > 0 and used + gap + width > available then
+            table.insert(rows, { items = current, used = used })
+            current, used = { element }, width
+        else
+            table.insert(current, element)
+            used += gap + width
+        end
+    end
+
+    if #current > 0 then
+        table.insert(rows, { items = current, used = used })
+    end
+
+    return rows
+end
+
+-- Give every child the width its line owes it. `animate` is for the lines changing shape - a
+-- child wrapping away or coming back - and not for a drag, where the widths are already tracking
+-- the window a frame at a time and a tween on top would only trail behind it.
+function Group:_shareWidth()
+    if self.direction ~= Enum.FillDirection.Horizontal or #self.elements == 0 then
+        return
+    end
+
+    -- a row holding anything without a slot (a nested column) is still the engine's to share out
+    for _, element in self.elements do
+        if not element._slot then
+            return
+        end
+    end
+
+    local available = self.main.AbsoluteSize.X
+    if available <= 0 then
+        return
+    end
+
+    local rows = self._packRows and self:_packRows(available)
+    if not rows then
+        return
+    end
+
+    -- the shape of the packing, so a resize that only moves widths can be told apart from one
+    -- that moved a child to another line
+    local shape = {}
+    for index, row in rows do
+        shape[index] = #row.items
+    end
+    local shapeKey = table.concat(shape, ",")
+    local changed = self._rowShape ~= nil and self._rowShape ~= shapeKey
+    self._rowShape = shapeKey
+
+    for _, row in rows do
+        local spare = math.max(available - row.used, 0)
+        local share = math.floor(spare / #row.items)
+
+        for _, element in row.items do
+            local width = (element._minSlotWidth or 0) + share
+            local slot = element._slot
+            if slot.Size.X.Offset ~= width then
+                if changed and not self.window.hidden and not self.window.animating then
+                    variables.tweenService
+                        :Create(slot, expandInfo, { Size = UDim2.new(0, width, slot.Size.Y.Scale, 0) })
+                        :Play()
+                else
+                    slot.Size = UDim2.new(0, width, slot.Size.Y.Scale, 0)
+                end
+            end
+        end
+    end
+end
+
+-- Let an element that has just been wrapped onto another line travel there, instead of being
+-- somewhere else the next frame. The slot has already moved, so the element starts back where
+-- the slot was and runs the gap down. Its width is the slot's to change and is already easing
+-- into the new line underneath this, so what you see is a child leaving at the size it had and
+-- opening out once it has landed.
 function Group:_slideIntoPlace(element)
     local slot = element._slot
     if not slot then
         return
     end
 
-    local landed, width = slot.AbsolutePosition, slot.AbsoluteSize.X
-    local came, cameWidth = element._slotAt, element._slotWidth
+    local landed = slot.AbsolutePosition
+    local came = element._slotAt
     element._slotAt = landed
-    element._slotWidth = width
 
     -- nothing to travel from on the first pass, and nothing worth watching on a window that is
     -- mid-animation or not on screen
@@ -218,30 +312,8 @@ function Group:_slideIntoPlace(element)
         return
     end
 
-    local height = element.main.Size.Y
     element.main.Position = UDim2.fromOffset(travelled.X, travelled.Y)
     variables.tweenService:Create(element.main, slideInfo, { Position = UDim2.fromOffset(0, 0) }):Play()
-
-    -- the width it is leaving behind, held while it travels. an element whose own layout wants
-    -- to change height mid-flight hands that height over rather than writing a size of its own,
-    -- which would take the width with it and end the expansion wherever it had got to.
-    if cameWidth and math.abs(width - cameWidth) >= 1 then
-        element._slotExpanding = true
-        element.main.Size = UDim2.new(0, cameWidth, height.Scale, height.Offset)
-
-        local expand = variables.tweenService:Create(element.main, expandInfo, {
-            Size = UDim2.new(1, 0, height.Scale, height.Offset),
-        })
-        expand.Completed:Connect(function()
-            element._slotExpanding = false
-            local settled = element._pendingSlotHeight
-            element._pendingSlotHeight = nil
-            if settled then
-                element.main.Size = UDim2.new(1, 0, 0, settled)
-            end
-        end)
-        expand:Play()
-    end
 end
 
 function Group:CreateButton(properties)
