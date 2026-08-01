@@ -115,13 +115,17 @@ end
 
 -- Swap the word in the middle. A divider built without one has no label to put it in, since the
 -- rule is a single span in that case rather than two halves with a gap between them.
+--
+-- It rebinds rather than writing the label directly: the window remembers the source each
+-- localised property was built from and re-resolves them all on SetLocale, so a direct write
+-- would be undone by the next language change.
 function Divider:Set(text)
     if not self.title then
         return
     end
 
     self.text = if text ~= nil and text ~= "" then tostring(text) else ""
-    self.title.Text = locale.resolve(self.text)
+    self.window:_bindLocale(self.title, "Text", self.text)
     self.title.Visible = self.text ~= ""
 end
 
