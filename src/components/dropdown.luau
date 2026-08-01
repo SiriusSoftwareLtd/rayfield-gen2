@@ -39,7 +39,16 @@ local searchExpandedHeight = 38
 local optionHeight = 38
 local optionGap = 5
 local listPadding = 2 -- above and below the rows, so the first and last strokes clear the clip
-local cardOverhead = 95
+
+-- The header pill and the gap under it, which is what the options card is offset by, and the
+-- card's own padding. Everything the card owes on top of its rows is one of these, so the height
+-- it opens to is added up from them rather than carried as a single number that no longer says
+-- what it is made of, and that therefore stops being true when one of the parts changes.
+local headerHeight = 41
+local headerGap = 6
+local cardPaddingTop = 7
+local cardPaddingBottom = 6
+local cardPadding = cardPaddingTop + cardPaddingBottom
 
 -- How many options are on screen before the list starts scrolling. Two was enough to say what
 -- the control was; it was not enough to choose from without scrolling almost immediately.
@@ -294,7 +303,7 @@ function Dropdown.new(tab, properties)
     self.panel = self.window:Create("Frame", {
         AnchorPoint = Vector2.new(1, 1),
         Position = UDim2.new(1, 0, 1, 0),
-        Size = UDim2.new(1, 0, 1, -47),
+        Size = UDim2.new(1, 0, 1, -(headerHeight + headerGap)),
         BorderSizePixel = 0,
         ClipsDescendants = true,
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
@@ -321,8 +330,8 @@ function Dropdown.new(tab, properties)
     })
 
     self.window:Create("UIPadding", {
-        PaddingTop = UDim.new(0, 7),
-        PaddingBottom = UDim.new(0, 6),
+        PaddingTop = UDim.new(0, cardPaddingTop),
+        PaddingBottom = UDim.new(0, cardPaddingBottom),
 
         Parent = self.panel,
     })
@@ -381,17 +390,23 @@ function Dropdown.new(tab, properties)
     -- Nothing on screen says a list is longer than the card, since the scrollbar is kept out of
     -- the way. This is the edge of the list going soft while there is more of it below, which
     -- reads as more to come rather than as a list that simply ends there.
+    --
+    -- It hangs off the wrapper rather than the card, because the card lays its children out with
+    -- a UIListLayout and that lays out every visible child it has, wherever it has been put. On
+    -- the card this took a slot in the flow instead of floating over the list: it pushed the
+    -- search bar and every row down by its own height and forced the last row past the card's
+    -- edge, and only once there was something to scroll, which is when it first became visible.
     self.listFade = self.window:Create("Frame", {
         Name = "Fade",
         AnchorPoint = Vector2.new(0.5, 1),
-        Position = UDim2.new(0.5, 0, 1, 0),
-        Size = UDim2.new(1, 0, 0, fadeHeight),
+        Position = UDim2.new(0.5, 0, 1, -cardPaddingBottom),
+        Size = UDim2.new(1, -12, 0, fadeHeight),
         BorderSizePixel = 0,
         BackgroundTransparency = 1,
         ZIndex = 3,
         Visible = false,
 
-        Parent = self.panel,
+        Parent = self.main,
     }, { BackgroundColor3 = { "ElementGradient", firstColorOf } })
 
     self.window:Create("UIGradient", {
@@ -848,6 +863,7 @@ function Dropdown:_expandSearch()
     variables.tweenService:Create(self.searchShadow, searchTween, { Transparency = 0.92 }):Play()
     variables.tweenService:Create(self.searchInput, searchTween, { TextTransparency = 0.3 }):Play()
 
+    self:_resizeToOptions() -- the bar is taller now, so the card owes it the difference
     self.searchInput:CaptureFocus()
 end
 
@@ -871,6 +887,8 @@ function Dropdown:_collapseSearch()
     variables.tweenService:Create(self.searchStroke, searchTween, { Transparency = 1 }):Play()
     variables.tweenService:Create(self.searchShadow, searchTween, { Transparency = 1 }):Play()
     variables.tweenService:Create(self.searchInput, searchTween, { TextTransparency = 1 }):Play()
+
+    self:_resizeToOptions()
 end
 
 function Dropdown:_applyFilter(query)
@@ -1039,7 +1057,17 @@ function Dropdown:_openHeight()
 
     -- a search that matches nothing still has a line to say so, so the card keeps one row of room
     local rows = math.max(n, 1)
-    local overhead = cardOverhead + (if self.actions then actionsHeight + optionGap else 0)
+
+    -- the search bar grows when it takes focus, and the card has to grow with it. It did not, so
+    -- opening the search pushed the list down by the difference and the last row went over the
+    -- card's own edge, where the clip took it.
+    local searchHeight = if self._searchOpen then searchExpandedHeight else searchCollapsedHeight
+    local overhead = headerHeight
+        + headerGap
+        + cardPadding
+        + searchHeight
+        + optionGap
+        + (if self.actions then actionsHeight + optionGap else 0)
 
     return math.min(overhead + listHeight(maxVisibleOptions), overhead + listHeight(rows))
 end

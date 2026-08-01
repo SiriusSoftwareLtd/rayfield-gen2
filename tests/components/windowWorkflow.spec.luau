@@ -1473,6 +1473,76 @@ return function()
             expect(four >= 4 * 38 + 3 * 5).to.equal(true)
         end)
 
+        it("grows the card by what the search bar takes when it opens", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local drop = tab:CreateDropdown({
+                name = "Choice",
+                options = { "Alpha", "Beta", "Gamma", "Delta" },
+                forgetState = true,
+            })
+
+            local closed = drop:_openHeight()
+
+            -- the bar grows when it takes focus. The card has to grow with it, or the list is
+            -- pushed down by the difference and the last row goes over the card's own edge
+            drop._searchOpen = true
+            expect(drop:_openHeight() - closed).to.equal(8)
+
+            drop._searchOpen = false
+            expect(drop:_openHeight()).to.equal(closed)
+        end)
+
+        it("counts the bulk actions row in the height it opens to", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local plain = tab:CreateDropdown({ name = "One", options = { "A", "B" }, forgetState = true })
+            local multi = tab:CreateDropdown({
+                name = "Many",
+                options = { "A", "B" },
+                multiSelect = true,
+                forgetState = true,
+            })
+
+            -- same options either side, so the difference is the row the multi-select carries
+            expect(multi:_openHeight() > plain:_openHeight()).to.equal(true)
+        end)
+
+        it("opens and closes the search, keeping the card the right height either way", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local drop = tab:CreateDropdown({
+                name = "Choice",
+                options = { "Alpha", "Beta", "Gamma" },
+                forgetState = true,
+            })
+
+            drop._isOpen = true
+            local closed = drop:_openHeight()
+
+            drop:_expandSearch()
+            expect(drop._searchOpen).to.equal(true)
+            expect(drop.searchInput.TextEditable).to.equal(true)
+            expect(drop:_openHeight() > closed).to.equal(true)
+
+            drop:_expandSearch()
+            expect(drop._searchOpen).to.equal(true)
+
+            drop.searchInput.Text = "alp"
+            drop:_applyFilter("alp")
+            drop:_collapseSearch()
+            expect(drop._searchOpen).to.equal(false)
+            expect(drop.searchInput.Text).to.equal("")
+
+            -- clearing the box is what re-runs the filter, and the harness only delivers that
+            -- through the signal the component listens on
+            drop.searchInput:GetPropertyChangedSignal("Text"):Fire()
+            expect(drop:_openHeight()).to.equal(closed)
+
+            drop:_collapseSearch()
+            expect(drop._searchOpen).to.equal(false)
+        end)
+
         it("says so when a search matches nothing", function()
             local w = makeWindow()
             local tab = w:CreateTab({ name = "Main" })
@@ -1504,6 +1574,11 @@ return function()
                 options = { "Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta" },
                 forgetState = true,
             })
+
+            -- the card lays its children out, so anything meant to float over the list has to
+            -- hang off the wrapper instead, or it takes a slot in the flow and pushes the search
+            -- bar and every row down by its own height
+            expect(drop.listFade.Parent).to.equal(drop.main)
 
             drop._isOpen = true
             drop.list.AbsoluteWindowSize = Vector2.new(300, 160)
