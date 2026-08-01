@@ -429,6 +429,13 @@ end
 -- (_widthManaged): there the stack freezes us to _minWidth and wraps, so we must not
 -- stomp the X it set. Standalone we take the usual full width.
 function Slider:_setMainHeight(height, animate)
+    -- a row is easing us into a new width: a size written here would carry that width with it
+    -- and strand the expansion. hand the height over and let it land with the rest of it.
+    if self._slotExpanding then
+        self._pendingSlotHeight = height
+        return
+    end
+
     local size = if self._widthManaged
         then UDim2.new(self.main.Size.X.Scale, self.main.Size.X.Offset, 0, height)
         else UDim2.new(1, -20, 0, height)

@@ -271,26 +271,55 @@ function Group:_shareWidth()
         local share = math.floor(spare / #row.items)
 
         for _, element in row.items do
-            local width = (element._minSlotWidth or 0) + share
-            local slot = element._slot
-            if slot.Size.X.Offset ~= width then
-                if changed and not self.window.hidden and not self.window.animating then
-                    variables.tweenService
-                        :Create(slot, expandInfo, { Size = UDim2.new(0, width, slot.Size.Y.Scale, 0) })
-                        :Play()
-                else
-                    slot.Size = UDim2.new(0, width, slot.Size.Y.Scale, 0)
-                end
-            end
+            self:_setSlotWidth(element, (element._minSlotWidth or 0) + share, changed)
         end
     end
 end
 
+-- Give a child the width its line owes it. The slot takes it at once, always: the slot is what
+-- the layout measures to decide where the lines break, so a slot easing into a new width would
+-- have the layout re-deciding that against a width still on its way, wrapping and unwrapping
+-- under its own animation. The element inside the slot is what eases, from the width it was
+-- drawn at to the one the slot now holds, which the layout never looks at and cannot trip over.
+function Group:_setSlotWidth(element, width, animate)
+    local slot = element._slot
+    if slot.Size.X.Offset == width then
+        return
+    end
+
+    local before = element.main.AbsoluteSize.X
+    slot.Size = UDim2.new(0, width, slot.Size.Y.Scale, 0)
+
+    local height = element.main.Size.Y
+    if not animate or self.window.hidden or self.window.animating or before <= 0 then
+        element._slotExpanding = false
+        element.main.Size = UDim2.new(1, 0, height.Scale, height.Offset)
+        return
+    end
+
+    element._slotExpanding = true
+    element.main.Size = UDim2.new(0, before, height.Scale, height.Offset)
+
+    local expand = variables.tweenService:Create(element.main, expandInfo, {
+        Size = UDim2.new(1, 0, height.Scale, height.Offset),
+    })
+    expand.Completed:Connect(function()
+        element._slotExpanding = false
+        -- a height its own layout asked for while this was in flight, held back so that writing
+        -- it would not have taken the width with it
+        local settled = element._pendingSlotHeight
+        element._pendingSlotHeight = nil
+        if settled then
+            element.main.Size = UDim2.new(1, 0, 0, settled)
+        end
+    end)
+    expand:Play()
+end
+
 -- Let an element that has just been wrapped onto another line travel there, instead of being
 -- somewhere else the next frame. The slot has already moved, so the element starts back where
--- the slot was and runs the gap down. Its width is the slot's to change and is already easing
--- into the new line underneath this, so what you see is a child leaving at the size it had and
--- opening out once it has landed.
+-- the slot was and runs the gap down, while its width eases into the share the new line owes
+-- it. What you see is a child leaving at the size it had and opening out once it has landed.
 function Group:_slideIntoPlace(element)
     local slot = element._slot
     if not slot then

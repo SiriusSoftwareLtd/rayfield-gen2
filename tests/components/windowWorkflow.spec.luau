@@ -2104,10 +2104,56 @@ return function()
             expect(one._slot.Size.X.Offset).to.equal(two._slot.Size.X.Offset)
             expect(one._slot.Size.X.Offset > one._minSlotWidth).to.equal(true)
 
+            -- and it is the whole line, not the width they came with
+            local padding = row.layout.Padding.Offset
+            expect(one._slot.Size.X.Offset + two._slot.Size.X.Offset + padding > 600 - 2).to.equal(true)
+
             -- too narrow for both: one wraps, and each is now owed a whole line
             row.main.AbsoluteSize = Vector2.new(one._minSlotWidth + 10, 41)
             row:_shareWidth()
             expect(#row:_packRows(one._minSlotWidth + 10)).to.equal(2)
+        end)
+
+        it("lands a slot's width at once and eases only what is inside it", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local row = tab:CreateGroup({ direction = "row" })
+            local child = row:CreateButton({ name = "One" })
+
+            -- the layout measures the slot to decide where its lines break, so a slot easing
+            -- into a width would have it re-deciding against a width still on its way
+            child.main.AbsoluteSize = Vector2.new(150, 41)
+            row:_setSlotWidth(child, 400, true)
+            expect(child._slot.Size.X.Offset).to.equal(400)
+            expect(child.main.Size.X.Scale).to.equal(1) -- the harness lands the tween at once
+
+            -- with nothing to ease from, it simply takes the slot
+            child.main.AbsoluteSize = Vector2.new(0, 41)
+            row:_setSlotWidth(child, 300, true)
+            expect(child._slot.Size.X.Offset).to.equal(300)
+            expect(child.main.Size).to.equal(UDim2.new(1, 0, 0, child.main.Size.Y.Offset))
+
+            -- a width it already has is not worth touching
+            local held = child.main.Size
+            row:_setSlotWidth(child, 300, true)
+            expect(child.main.Size).to.equal(held)
+        end)
+
+        it("hands a height change over to the row while it is still easing into a width", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local row = tab:CreateGroup({ direction = "row" })
+            local slider = row:CreateSlider({ name = "Row Slider", range = { 0, 100 }, value = 10 })
+
+            slider._slotExpanding = true
+            local before = slider.main.Size
+            slider:_setMainHeight(70, true)
+            expect(slider.main.Size).to.equal(before)
+            expect(slider._pendingSlotHeight).to.equal(70)
+
+            slider._slotExpanding = false
+            slider:_setMainHeight(65, false)
+            expect(slider.main.Size.Y.Offset).to.equal(65)
         end)
 
         it("leaves a row child alone while the window is not on screen", function()
