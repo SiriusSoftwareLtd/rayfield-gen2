@@ -18,6 +18,8 @@ type SettingsWindow = {
         toggleKeybind: EnumItem,
         mouseOverride: boolean,
         keepOnScreen: boolean,
+        resizable: boolean,
+        gripAnimation: boolean,
         welcomeToast: boolean,
         haptics: boolean,
     },
@@ -27,6 +29,8 @@ type DecodedSettings = {
     toggleKeybind: { [number]: unknown }?,
     mouseOverride: unknown?,
     keepOnScreen: unknown?,
+    resizable: unknown?,
+    gripAnimation: unknown?,
     welcomeToast: unknown?,
     haptics: unknown?,
 }
@@ -45,6 +49,8 @@ function persistenceSettings.saveSettings(window: SettingsWindow): boolean
         } :: { unknown },
         mouseOverride = window.settings.mouseOverride,
         keepOnScreen = window.settings.keepOnScreen,
+        resizable = window.settings.resizable,
+        gripAnimation = window.settings.gripAnimation,
         welcomeToast = window.settings.welcomeToast,
         haptics = window.settings.haptics,
     }
@@ -125,6 +131,14 @@ function persistenceSettings.loadSettings(window: SettingsWindow): boolean
 
     if type(settings.keepOnScreen) == "boolean" then
         window.settings.keepOnScreen = settings.keepOnScreen
+    end
+
+    if type(settings.resizable) == "boolean" then
+        window.settings.resizable = settings.resizable
+    end
+
+    if type(settings.gripAnimation) == "boolean" then
+        window.settings.gripAnimation = settings.gripAnimation
     end
 
     if type(settings.welcomeToast) == "boolean" then

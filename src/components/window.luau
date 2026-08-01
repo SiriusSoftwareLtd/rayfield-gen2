@@ -53,6 +53,13 @@ local function fitWindowSize(): UDim2
     return windowSizing.fit(camera and camera.ViewportSize)
 end
 
+-- The same, for a size the user dragged out: held to what the screen can carry rather than
+-- re-picked for it.
+local function fitUserSize(size: Vector2): Vector2
+    local camera = variables.workspace.CurrentCamera
+    return windowSizing.clampUserSize(size, camera and camera.ViewportSize)
+end
+
 -- Keys that drive a UIGradient and so want a ColorSequence. A dev may pass a plain Color3 for
 -- any of these and we widen it to a flat sequence, so a theme reads the same either way.
 local gradientKeys = {
@@ -294,7 +301,10 @@ function Window.new(properties)
         Parent = self.main,
     })
 
-    self:Create("UICorner", {
+    -- kept as authored, so the height can be re-derived from it at any window size
+    self.bottomFadeSize = self.bottomFade.Size
+
+    self.bottomFadeCorner = self:Create("UICorner", {
         Parent = self.bottomFade,
     }, { CornerRadius = "CornerRoundness" })
 
@@ -593,6 +603,8 @@ function Window.new(properties)
         toggleKeybind = Enum.KeyCode.K,
         mouseOverride = true, -- free the cursor while the menu is open (for FPS games that lock it)
         keepOnScreen = true, -- clamp the drag so the window cant be pulled off screen
+        resizable = true, -- show the corner grip that drags the window's size
+        gripAnimation = true, -- the grip's mark leans toward the pointer rather than holding still
         welcomeToast = true, -- the "signed in as" toast on first open for a new/changed account
         haptics = false, -- off by default; opt in from settings (buzzes on presses/notifications)
     }
@@ -601,6 +613,9 @@ function Window.new(properties)
     hapticEngine.setContainer(self.screenGui) -- effects live with the interface, not the workspace
     hapticEngine.setEnabled(self.settings.haptics) -- honour a saved off before any interaction
     chrome.buildCollapsedFace(self)
+    -- after LoadSettings, so a saved-off grip is never built visible and then hidden a frame later
+    self.resize = require(script.Parent.resize).new(self)
+    self.resize:SetEnabled(self.settings.resizable)
     self:_bindKeybind()
     self:_bindMouseOverride()
     self:_bindTopbarDrag()
@@ -972,6 +987,8 @@ function Window:Hide()
     variables.tweenService:Create(self.windowShadow, fadeInfo, { Transparency = 1 }):Play()
     variables.tweenService:Create(self.windowStroke, fadeInfo, { Transparency = 1 }):Play()
     variables.tweenService:Create(self.bottomFade, fadeInfo, { BackgroundTransparency = 1 }):Play()
+    -- last on, first off: the corner it marks is the first thing the collapse takes away
+    self.resize:_setShown(false)
 
     if self.title then
         variables.tweenService:Create(self.title, fadeInfo, { TextTransparency = 1 }):Play()
@@ -1093,6 +1110,7 @@ function Window:ToggleMinimise()
             end
 
             self:_revealElements(0.035, 0.4)
+            self.resize:_setShown(true)
         end)
 
         task.delay(0.5, function()
@@ -1105,6 +1123,7 @@ function Window:ToggleMinimise()
         -- fade the content + tab pills out instead of cutting them, then hide them once faded
         -- so they don't sit clipped under the collapsed bar
         self:_fadeSelectedElementsOut()
+        self.resize:_setShown(false)
         for _, tab in pairs(self.tabs) do
             if not tab.neglectSelector and tab.topbarItem then
                 tab:_applyVisual("hidden", fadeInfo)
@@ -1191,12 +1210,82 @@ end
 -- Take the size the current screen calls for. Only a live window is resized on the spot;
 -- hidden, minimised or mid-animation ones just bank the size and pick it up on their next
 -- show, so a rotation cant yank a collapsed pill back open.
+-- The bounds a hand-picked size is held to, and the size the screen would pick for itself.
+-- The grip works in these to know where a drag has to stop before it moves anything.
+function Window:_boundUserSize(size: Vector2): Vector2
+    return fitUserSize(size)
+end
+
+function Window:_fittedSize(): Vector2
+    local fitted = fitWindowSize()
+    return Vector2.new(fitted.X.Offset, fitted.Y.Offset)
+end
+
+-- Take a size the user dragged out of the corner grip. Held to the same bounds the automatic
+-- sizing works to, then remembered so the viewport reconcile keeps it instead of fitting over
+-- the top of it. Returns the size actually applied, which is what the grip has to follow.
+function Window:_applyUserSize(size: Vector2): Vector2
+    local applied = fitUserSize(size)
+
+    -- remember what was asked for, not what fitted: a window dragged wider than the screen can
+    -- carry today should come back to that width on a screen that can, rather than stay pinned
+    -- to whatever the smaller one allowed
+    self._userSize = size
+    self.size = UDim2.fromOffset(applied.X, applied.Y)
+
+    if not (self.hidden or self.minimised or self.animating or self._revealing) then
+        self.main.Size = self.size
+    end
+
+    self:_syncBottomFade()
+    -- growing a window parked near an edge pushes its far edge off the screen, since the size
+    -- changed under a position that was only on screen at the old one. _applyWindowSize clamps
+    -- for the same reason after a re-fit.
+    self:_clampToScreen()
+    self:_syncDragBar()
+    return applied
+end
+
+-- The bottom fade's height is written as a negative scale over an offset, so it gets shorter as
+-- the window gets taller: 54px at the default height, 24px by 820. Roblox clamps a corner radius
+-- to half the shorter side, so once the fade falls under twice the window's radius its corners
+-- round tighter than the window's own and the squarer ones underneath cut across the curve as a
+-- dark line along the base. Holding the fade at that height keeps both curves identical.
+function Window:_syncBottomFade()
+    if not self.bottomFade then
+        return
+    end
+
+    -- measured against the size as authored, not as last written: reading back a height this
+    -- has already flattened to an offset would lose the scale and freeze the fade at it
+    local radius = if self.bottomFadeCorner then self.bottomFadeCorner.CornerRadius.Offset else 0
+    local authored = self.bottomFadeSize
+    local intended = authored.Y.Offset + authored.Y.Scale * self.size.Y.Offset
+    self.bottomFade.Size = UDim2.new(authored.X.Scale, authored.X.Offset, 0, math.max(radius * 2, intended))
+end
+
+-- Drop back to the size the screen calls for, as if the window had never been resized by hand.
+function Window:_resetUserSize()
+    if not self._userSize then
+        return
+    end
+    self._userSize = nil
+    self._pendingResize = true
+    self:_applyWindowSize()
+end
+
 function Window:_applyWindowSize()
     if self.unloaded then
         return
     end
 
+    -- a hand-picked size is held to the screen rather than replaced by one chosen for it
     local size = fitWindowSize()
+    if self._userSize then
+        local held = fitUserSize(self._userSize)
+        size = UDim2.fromOffset(held.X, held.Y)
+    end
+
     local changed = size ~= self.size
     self.size = size
 
@@ -1213,6 +1302,7 @@ function Window:_applyWindowSize()
     self._pendingResize = false
 
     self.main.Size = size
+    self:_syncBottomFade()
     self:_clampToScreen()
     self:_syncDragBar()
 end
@@ -1481,6 +1571,40 @@ function Window:_buildSettingsUI()
         callback = function(state)
             self.settings.keepOnScreen = state
             self:SaveSettings()
+        end,
+    })
+
+    self.rfSettings:CreateToggle({
+        name = "Resizable window",
+        description = "Shows a grip in the bottom-right corner that drags the window's size.",
+        value = self.settings.resizable,
+        callback = function(state)
+            if self.resize then
+                self.resize:SetEnabled(state)
+            else
+                self.settings.resizable = state
+            end
+            self:SaveSettings()
+        end,
+    })
+
+    self.rfSettings:CreateToggle({
+        name = "Animated resize grip",
+        description = "The corner mark leans toward the pointer. Turn this off to hold it still.",
+        value = self.settings.gripAnimation,
+        callback = function(state)
+            self.settings.gripAnimation = state
+            if self.resize then
+                self.resize:_settleMark()
+            end
+            self:SaveSettings()
+        end,
+    })
+
+    self.rfSettings:CreateButton({
+        name = "Reset Window Size",
+        callback = function()
+            self:_resetUserSize()
         end,
     })
 
@@ -1763,6 +1887,7 @@ function Window:_quickRestore()
         end
 
         self:_revealElements(0.035, 0.4)
+        self.resize:_setShown(true)
     end)
 
     -- Drag handle grows in with the chrome, same width sweep it uses on first reveal. Position
@@ -1887,6 +2012,8 @@ function Window:_firstShow()
     end)
 
     self:_revealElements(0.03, 2)
+    -- last thing on the window, so it lands once everything it sits over has arrived
+    self.resize:_setShown(true)
 
     task.wait(1)
 

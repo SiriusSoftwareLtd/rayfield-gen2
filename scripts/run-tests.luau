@@ -760,6 +760,18 @@ Font = {
 }
 NumberSequence = roblox.NumberSequence
 NumberSequenceKeypoint = roblox.NumberSequenceKeypoint
+-- lune's roblox library has no Rect, and the specs only ever hand one to a slice property and
+-- read its edges back, so a plain record covers everything they ask of it
+Rect = {
+    new = function(minX, minY, maxX, maxY)
+        return {
+            Min = Vector2.new(minX, minY),
+            Max = Vector2.new(maxX, maxY),
+            Width = maxX - minX,
+            Height = maxY - minY,
+        }
+    end,
+}
 UDim = roblox.UDim
 UDim2 = roblox.UDim2
 Vector2 = roblox.Vector2

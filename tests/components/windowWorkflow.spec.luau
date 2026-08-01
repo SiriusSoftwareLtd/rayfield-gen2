@@ -1632,4 +1632,702 @@ return function()
             expect(w.main.Size).to.equal(w.size)
         end)
     end)
+
+    describe("component window resizing", function()
+        local variables = helpers.requireUtility("variables")
+        local originalCamera
+        local originalMouseLocation
+        local resized
+        local mouse = Vector2.new(0, 0)
+
+        local function makeWindow()
+            resized = Window.new({
+                name = "Resize Window",
+                configuration = { autoSave = false, autoLoad = false },
+            })
+            resized.hidden = false
+            resized.resize:_refresh()
+            resized.resize:_setShown(true, false)
+            return resized
+        end
+
+        -- these specs drive the reconcile by hand, so the camera only has to be connectable
+        local function setViewport(x, y)
+            variables.workspace.CurrentCamera = {
+                ViewportSize = Vector2.new(x, y),
+                GetPropertyChangedSignal = function()
+                    return {
+                        Connect = function()
+                            return { Disconnect = function() end }
+                        end,
+                    }
+                end,
+            }
+        end
+
+        local function grab()
+            resized.resize.grip.InputBegan:Fire({ UserInputType = { Name = "MouseButton1" } }, false)
+        end
+
+        local function moveTo(x, y)
+            mouse = Vector2.new(x, y)
+            helpers.services.UserInputService.InputChanged:Fire({ UserInputType = { Name = "MouseMovement" } })
+        end
+
+        local function release()
+            helpers.services.UserInputService.InputEnded:Fire({ UserInputType = { Name = "MouseButton1" } })
+        end
+
+        -- one frame long enough that the follow closes the whole gap, so the specs assert where
+        -- the window lands rather than a point part-way along the glide
+        local function settle()
+            helpers.services.RunService.RenderStepped:Fire(1)
+            helpers.services.RunService.RenderStepped:Fire(1)
+        end
+
+        beforeEach(function()
+            originalCamera = variables.workspace.CurrentCamera
+            originalMouseLocation = helpers.services.UserInputService.GetMouseLocation
+            mouse = Vector2.new(0, 0)
+            helpers.services.UserInputService.GetMouseLocation = function()
+                return mouse
+            end
+            setViewport(1920, 1080)
+        end)
+
+        afterEach(function()
+            variables.workspace.CurrentCamera = originalCamera
+            helpers.services.UserInputService.GetMouseLocation = originalMouseLocation
+            if resized and not resized.unloaded then
+                resized:Unload()
+            end
+            resized = nil
+        end)
+
+        it("builds the grip and follows the resizable setting", function()
+            local w = makeWindow()
+            expect(w.resize).to.be.ok()
+            expect(w.resize.grip.Parent).to.equal(w.main)
+            expect(w.resize.grip.Visible).to.equal(true)
+
+            w.resize:SetEnabled(false)
+            expect(w.settings.resizable).to.equal(false)
+            expect(w.resize.grip.Visible).to.equal(false)
+
+            w.resize:SetEnabled(true)
+            expect(w.resize.grip.Visible).to.equal(true)
+        end)
+
+        it("brings the mark in after the window it sits on, and takes it off first", function()
+            local w = makeWindow()
+
+            w.resize:_setShown(false, false)
+            expect(w.resize.mark.ImageTransparency).to.equal(1)
+
+            w.resize:_setShown(true, false)
+            expect(w.resize.mark.ImageTransparency).to.equal(0)
+
+            -- the animated path goes through a tween, which the harness lands immediately
+            w.resize:_setShown(false)
+            expect(w.resize.mark.ImageTransparency).to.equal(1)
+        end)
+
+        it("holds the mark still when the lean is switched off", function()
+            local w = makeWindow()
+            local mark = w.resize.mark
+
+            w.resize.grip.AbsolutePosition = Vector2.new(400, 400)
+            w.resize.grip.AbsoluteSize = Vector2.new(54, 54)
+            mouse = Vector2.new(410, 410)
+
+            -- on, the mark reaches out toward the pointer
+            w.resize.grip.MouseEnter:Fire()
+            expect(mark.Size.X.Offset > 18).to.equal(true)
+
+            -- off, the corner of the window stops moving while you are aiming at it, though the
+            -- grip still answers to being hovered by taking the colour
+            w.settings.gripAnimation = false
+            w.resize.grip.MouseLeave:Fire()
+            w.resize.grip.MouseEnter:Fire()
+            expect(mark.Size).to.equal(UDim2.fromOffset(18, 18))
+
+            -- the setting is the one in the window's own settings tab, and it persists
+            local toggle
+            for _, element in w.rfSettings.elements do
+                if element.name == "Animated resize grip" then
+                    toggle = element
+                end
+            end
+            expect(toggle).to.be.ok()
+
+            toggle:Set(false)
+            expect(w.settings.gripAnimation).to.equal(false)
+            expect(mark.Size).to.equal(UDim2.fromOffset(18, 18))
+
+            toggle:Set(true)
+            expect(w.settings.gripAnimation).to.equal(true)
+
+            -- and a change of mind puts it back rather than leaving it at its last lean
+            w.resize.grip.MouseEnter:Fire()
+            expect(mark.Size.X.Offset > 18).to.equal(true)
+            w.resize:_settleMark()
+            expect(mark.Size).to.equal(UDim2.fromOffset(18, 18))
+        end)
+
+        it("takes the grip away from a window with no corner to grab", function()
+            local w = makeWindow()
+
+            w.minimised = true
+            w.resize:_refresh()
+            expect(w.resize.grip.Visible).to.equal(false)
+
+            w.minimised = false
+            w.hidden = true
+            w.resize:_refresh()
+            expect(w.resize.grip.Visible).to.equal(false)
+        end)
+
+        it("takes a hand-picked size and holds it to the screen", function()
+            local w = makeWindow()
+            local applied = w:_applyUserSize(Vector2.new(900, 640))
+
+            expect(applied.X).to.equal(900)
+            expect(w.size.X.Offset).to.equal(900)
+            expect(w.main.Size).to.equal(w.size)
+
+            -- a size the screen cant carry is held, but the ask is remembered as given
+            local held = w:_applyUserSize(Vector2.new(9999, 9999))
+            expect(held.X < 9999).to.equal(true)
+            expect(w._userSize.X).to.equal(9999)
+        end)
+
+        it("banks a hand-picked size without resizing a hidden window", function()
+            local w = makeWindow()
+            local before = w.main.Size
+            w.hidden = true
+
+            w:_applyUserSize(Vector2.new(900, 640))
+
+            expect(w.size.X.Offset).to.equal(900)
+            expect(w.main.Size).to.equal(before)
+        end)
+
+        it("keeps a hand-picked size through a viewport change instead of re-fitting it", function()
+            local w = makeWindow()
+            w:_applyUserSize(Vector2.new(900, 640))
+
+            setViewport(844, 390)
+            w:_applyWindowSize()
+
+            expect(w.size.X.Offset).to.equal(844 - 40)
+            expect(w.size.Y.Offset).to.equal(390 - 40)
+
+            -- and comes back in full once there is room for it again
+            setViewport(1920, 1080)
+            w:_applyWindowSize()
+            expect(w.size.X.Offset).to.equal(900)
+            expect(w.size.Y.Offset).to.equal(640)
+        end)
+
+        it("drops back to the fitted size on reset", function()
+            local w = makeWindow()
+            w:_applyUserSize(Vector2.new(900, 640))
+            expect(w.size.X.Offset).to.equal(900)
+
+            w:_resetUserSize()
+
+            expect(w._userSize).to.equal(nil)
+            expect(w.size.X.Offset).to.equal(475)
+
+            -- a reset with nothing to undo is a no-op rather than a re-fit
+            w:_resetUserSize()
+            expect(w.size.X.Offset).to.equal(475)
+        end)
+
+        it("grows the window by twice the distance the grip is dragged", function()
+            local w = makeWindow()
+            local before = Vector2.new(w.size.X.Offset, w.size.Y.Offset)
+
+            moveTo(400, 300)
+            grab()
+            moveTo(500, 380)
+            settle()
+
+            -- the window is centre-anchored, so both edges move and the corner under the cursor
+            -- only covers half of whatever the size gains
+            expect(w.size.X.Offset).to.equal(before.X + 200)
+            expect(w.size.Y.Offset).to.equal(before.Y + 160)
+        end)
+
+        it("leaves the window centred while it resizes", function()
+            local w = makeWindow()
+            local before = w.main.Position
+
+            moveTo(400, 300)
+            grab()
+            moveTo(500, 380)
+            settle()
+
+            expect(w.main.Position).to.equal(before)
+        end)
+
+        it("eases toward the size rather than jumping to it", function()
+            local w = makeWindow()
+            local before = w.size.X.Offset
+
+            moveTo(400, 300)
+            grab()
+            moveTo(600, 300)
+
+            -- a short frame closes only part of the gap, so the window is still on its way
+            helpers.services.RunService.RenderStepped:Fire(1 / 60)
+            local midway = w.size.X.Offset
+            expect(midway > before).to.equal(true)
+            expect(midway < before + 400).to.equal(true)
+
+            settle()
+            expect(w.size.X.Offset).to.equal(before + 400)
+        end)
+
+        it("holds the drag inside what the screen can carry", function()
+            local w = makeWindow()
+
+            moveTo(0, 0)
+            grab()
+            moveTo(4000, 4000)
+            settle()
+
+            expect(w.size.X.Offset).to.equal(1920 - 40)
+            expect(w.size.Y.Offset).to.equal(1080 - 40)
+        end)
+
+        it("holds the drag at the minimum size", function()
+            local w = makeWindow()
+            local sizing = helpers.requireUtility("windowSizing")
+
+            moveTo(400, 300)
+            grab()
+            moveTo(0, 0)
+            settle()
+
+            expect(w.size.X.Offset).to.equal(sizing.manualMinSize.X)
+            expect(w.size.Y.Offset).to.equal(sizing.manualMinSize.Y)
+        end)
+
+        it("stops resizing once the grip is released", function()
+            local w = makeWindow()
+            moveTo(400, 300)
+            grab()
+            moveTo(500, 400)
+            settle()
+            local held = w.size
+
+            release()
+            moveTo(900, 900)
+            settle()
+
+            expect(w.size).to.equal(held)
+        end)
+
+        it("keeps a resized window on screen when it grows near an edge", function()
+            local w = makeWindow()
+            w.settings.keepOnScreen = true
+            w.screenGui.AbsoluteSize = Vector2.new(900, 700)
+            w.main.Position = UDim2.fromOffset(700, 550)
+
+            -- the size changes under a position that was only on screen at the old one, so the
+            -- far edge walks off unless the position is clamped with it
+            w:_applyUserSize(Vector2.new(800, 620))
+
+            local half = Vector2.new(w.size.X.Offset / 2, w.size.Y.Offset / 2)
+            expect(w.main.Position.X.Offset + half.X <= 900).to.equal(true)
+            expect(w.main.Position.Y.Offset + half.Y <= 700).to.equal(true)
+        end)
+
+        it("does not count a drag as the first half of a double click", function()
+            local w = makeWindow()
+            local before = w.size
+
+            -- a press that travelled was a resize. Arming the reset on it means the next grab
+            -- snaps the window back instead of resizing it again.
+            moveTo(400, 300)
+            grab()
+            moveTo(520, 400)
+            settle()
+            release()
+
+            local resized = w.size
+            expect(resized).never.to.equal(before)
+
+            grab()
+            settle()
+            expect(w.size).to.equal(resized)
+            release()
+        end)
+
+        it("lets only the finger that started a resize move or end it", function()
+            local w = makeWindow()
+
+            mouse = Vector2.new(0, 0)
+            local first = { UserInputType = { Name = "Touch" }, Position = Vector3.new(400, 300, 0) }
+            w.resize.grip.InputBegan:Fire(first, false)
+
+            first.Position = Vector3.new(460, 340, 0)
+            helpers.services.UserInputService.InputChanged:Fire(first)
+            settle()
+            local held = w.size
+
+            -- a second finger landing anywhere sends its own events, and none of them belong to
+            -- this resize
+            local other = { UserInputType = { Name = "Touch" }, Position = Vector3.new(900, 900, 0) }
+            helpers.services.UserInputService.InputChanged:Fire(other)
+            settle()
+            expect(w.size).to.equal(held)
+
+            helpers.services.UserInputService.InputEnded:Fire(other)
+            first.Position = Vector3.new(520, 400, 0)
+            helpers.services.UserInputService.InputChanged:Fire(first)
+            settle()
+            expect(w.size).never.to.equal(held) -- the first finger still has it
+
+            helpers.services.UserInputService.InputEnded:Fire(first)
+        end)
+
+        it("snaps back to the fitted size on two presses that stayed put", function()
+            local w = makeWindow()
+            w:_applyUserSize(Vector2.new(900, 640))
+            expect(w.size.X.Offset).to.equal(900)
+
+            -- two presses inside the double-click window, neither of which moved: the first arms
+            -- the shortcut on release, the second takes it, and the window glides back
+            moveTo(400, 300)
+            grab()
+            release()
+            grab()
+            settle()
+
+            expect(w.size.X.Offset).to.equal(475)
+            expect(w._userSize).to.equal(nil)
+        end)
+
+        it("leaves the window fitted after a press that never moved", function()
+            local w = makeWindow()
+            local fitted = w.size
+
+            -- a click on the grip is not a resize, so it must not pin a size
+            moveTo(400, 300)
+            grab()
+            settle()
+            release()
+            settle()
+
+            expect(w._userSize).to.equal(nil)
+            expect(w.size).to.equal(fitted)
+
+            -- and the window still refits itself when the screen changes, rather than holding
+            -- the size it happened to be when the grip was clicked
+            setViewport(844, 390)
+            w:_applyWindowSize()
+            expect(w.size).never.to.equal(fitted)
+            expect(w._userSize).to.equal(nil)
+        end)
+
+        it("does not arm the reset from a drag that came back to where it started", function()
+            local w = makeWindow()
+
+            moveTo(400, 300)
+            grab()
+            moveTo(700, 600) -- out
+            settle()
+            moveTo(402, 302) -- and back, near enough to look like a press that never moved
+            settle()
+            release()
+
+            local size = w.size
+
+            -- this was a resize, so the grab after it is another resize and not the second half
+            -- of a double click. Judging it on where the pointer finished said otherwise.
+            grab()
+            moveTo(900, 800)
+            settle()
+            release()
+            settle()
+
+            expect(w._userSize).never.to.equal(nil)
+            expect(w.size).never.to.equal(size)
+        end)
+
+        it("keeps a mouse resize away from touches on a device carrying both", function()
+            local w = makeWindow()
+
+            moveTo(400, 300)
+            grab()
+            moveTo(600, 500)
+            settle()
+            local held = w.size
+
+            -- a finger on the screen during a mouse drag is not this resize, and neither is its
+            -- release. Both used to go straight through, since a mouse grab holds no input.
+            local finger = { UserInputType = { Name = "Touch" }, Position = Vector3.new(1200, 1200, 0) }
+            helpers.services.UserInputService.InputChanged:Fire(finger)
+            settle()
+            expect(w.size).to.equal(held)
+
+            helpers.services.UserInputService.InputEnded:Fire(finger)
+            moveTo(700, 600)
+            settle()
+            expect(w.size).never.to.equal(held) -- the mouse still has it
+
+            release()
+        end)
+
+        it("keeps the size from a drag that interrupts a reset", function()
+            local w = makeWindow()
+            w:_applyUserSize(Vector2.new(900, 640))
+
+            -- double click starts the glide back to the fitted size
+            moveTo(400, 300)
+            grab()
+            release()
+            grab()
+
+            -- but a fresh drag arrives before it lands, and the size that drag chooses is the
+            -- one the window keeps. The reset it interrupted must not fire underneath it.
+            moveTo(400, 300)
+            grab()
+            moveTo(700, 600)
+            settle()
+            release()
+            settle()
+
+            expect(w._userSize).never.to.equal(nil)
+            expect(w.size.X.Offset > 475).to.equal(true)
+        end)
+
+        it("drops a grab that goes stale under it", function()
+            local w = makeWindow()
+            moveTo(400, 300)
+            grab()
+
+            -- hidden mid-drag: the grab must die here rather than wake up later and yank the
+            -- window out to wherever the cursor drifted while it was away
+            w.hidden = true
+            settle()
+            local held = w.size
+
+            w.hidden = false
+            moveTo(1200, 1200)
+            settle()
+            expect(w.size).to.equal(held)
+        end)
+
+        it("ignores a grab while resizing is switched off", function()
+            local w = makeWindow()
+            w.resize:SetEnabled(false)
+            local before = w.size
+
+            moveTo(400, 300)
+            grab()
+            moveTo(600, 600)
+            settle()
+
+            expect(w.size).to.equal(before)
+        end)
+
+        it("ignores a grab the interface already handled, and input that is neither click nor touch", function()
+            local w = makeWindow()
+            local before = w.size
+
+            moveTo(400, 300)
+            w.resize.grip.InputBegan:Fire({ UserInputType = { Name = "MouseButton1" } }, true)
+            w.resize.grip.InputBegan:Fire({ UserInputType = { Name = "Keyboard" } }, false)
+            moveTo(600, 600)
+            helpers.services.UserInputService.InputEnded:Fire({ UserInputType = { Name = "Keyboard" } })
+            settle()
+
+            expect(w.size).to.equal(before)
+        end)
+
+        it("takes a touch by where it reports itself, not the mouse", function()
+            local w = makeWindow()
+            local before = w.size.X.Offset
+
+            -- the same finger throughout: a resize is only moved by the touch that began it
+            mouse = Vector2.new(0, 0)
+            local finger = { UserInputType = { Name = "Touch" }, Position = Vector3.new(400, 300, 0) }
+            w.resize.grip.InputBegan:Fire(finger, false)
+
+            finger.Position = Vector3.new(500, 300, 0)
+            helpers.services.UserInputService.InputChanged:Fire(finger)
+            settle()
+
+            expect(w.size.X.Offset).to.equal(before + 200)
+        end)
+
+        it("leans the bracket toward the corner and settles it again", function()
+            local w = makeWindow()
+            local mark = w.resize.mark
+            w.resize.grip.AbsolutePosition = Vector2.new(400, 400)
+            w.resize.grip.AbsoluteSize = Vector2.new(54, 54)
+
+            -- close to the far edge of the grip first, then right into the corner: the mark is
+            -- longest reaching out from the window and shortest at the corner itself
+            mouse = Vector2.new(410, 410)
+            w.resize.grip.MouseEnter:Fire()
+            local entered = mark.Size.X.Offset
+
+            -- further into the corner is a longer arm, not just a brighter one
+            mouse = Vector2.new(450, 440)
+            w.resize.grip.InputChanged:Fire({ UserInputType = { Name = "MouseMovement" } })
+            local near = mark.Size.X.Offset
+            expect(near < entered).to.equal(true)
+
+            w.resize.grip.MouseLeave:Fire()
+            expect(mark.Size.X.Offset).to.equal(18)
+        end)
+
+        it("releases a grab when the client loses focus", function()
+            local w = makeWindow()
+            moveTo(400, 300)
+            grab()
+            moveTo(500, 400)
+            settle()
+            local held = w.size
+
+            helpers.services.UserInputService.WindowFocusReleased:Fire()
+            moveTo(900, 900)
+            settle()
+
+            expect(w.size).to.equal(held)
+        end)
+
+        it("travels a row child that was wrapped onto another line", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local row = tab:CreateGroup({ direction = "row" })
+            local first = row:CreateButton({ name = "First" })
+            local child = row:CreateButton({ name = "Second" })
+
+            -- the layout owns the position of what it lays out, so each row child rides inside a
+            -- slot it can be animated within, and the slot carries the order
+            expect(child._slot).to.be.ok()
+            expect(child.main.Parent).to.equal(child._slot)
+            expect(first._slot.LayoutOrder).to.equal(first.main.LayoutOrder)
+
+            row.main.AbsolutePosition = Vector2.new(100, 100)
+            child._slot.AbsolutePosition = Vector2.new(400, 100)
+            row:_slideIntoPlace(child)
+            expect(child.main.Position).to.equal(UDim2.fromOffset(0, 0))
+
+            -- wrapped: to the start of another line, so it has travelled sideways as well as down
+            child._slot.AbsolutePosition = Vector2.new(110, 160)
+            row:_slideIntoPlace(child)
+            expect(child._slotAt).to.equal(Vector2.new(10, 60))
+        end)
+
+        it("leaves a row child alone for everything that is not a wrap", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local row = tab:CreateGroup({ direction = "row" })
+            local child = row:CreateButton({ name = "Only" })
+
+            row.main.AbsolutePosition = Vector2.new(100, 100)
+            child._slot.AbsolutePosition = Vector2.new(400, 100)
+            row:_slideIntoPlace(child)
+
+            -- THE regression this guards: the window moves under the group every frame it is
+            -- resized, so a slot's screen position never stops changing. Measured against the
+            -- group, none of that moved anything, and none of it may start an animation.
+            row.main.AbsolutePosition = Vector2.new(60, 20)
+            child._slot.AbsolutePosition = Vector2.new(360, 20)
+            row:_slideIntoPlace(child)
+            expect(child.main.Position).to.equal(UDim2.fromOffset(0, 0))
+
+            -- a line above growing pushes this one straight down, with no sideways travel. That
+            -- is that line's news, not this child's.
+            child._slot.AbsolutePosition = Vector2.new(360, 60)
+            row:_slideIntoPlace(child)
+            expect(child.main.Position).to.equal(UDim2.fromOffset(0, 0))
+
+            -- and the widths being re-shared slides it sideways without changing line
+            child._slot.AbsolutePosition = Vector2.new(300, 60)
+            row:_slideIntoPlace(child)
+            expect(child.main.Position).to.equal(UDim2.fromOffset(0, 0))
+
+            -- nothing happens for a child that never got a slot either
+            child._slot = nil
+            row:_slideIntoPlace(child)
+            expect(child.main.Position).to.equal(UDim2.fromOffset(0, 0))
+        end)
+
+        it("holds a row child still while the window is not on screen", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local row = tab:CreateGroup({ direction = "row" })
+            local child = row:CreateButton({ name = "Only" })
+
+            row.main.AbsolutePosition = Vector2.new(100, 100)
+            child._slot.AbsolutePosition = Vector2.new(400, 100)
+            row:_slideIntoPlace(child)
+
+            w.hidden = true
+            child._slot.AbsolutePosition = Vector2.new(110, 160)
+            row:_slideIntoPlace(child)
+            expect(child.main.Position).to.equal(UDim2.fromOffset(0, 0))
+        end)
+
+        it("stacks a slider once the wide layout stops fitting, and holds a band at the edge", function()
+            local w = makeWindow()
+            w.hasShownOnce = true
+            local tab = w:CreateTab({ name = "Main" })
+            local slider = tab:CreateSlider({
+                name = "Volume",
+                range = { 0, 100 },
+                increment = 1,
+                value = 40,
+                forgetState = true,
+            })
+
+            slider.main.AbsoluteSize = Vector2.new(600, 65)
+            slider:_applyLayout()
+            expect(slider._layoutMode).to.equal("wide")
+            expect(slider.track.AnchorPoint).to.equal(Vector2.new(1, 0.5))
+            -- the track is the part of the reflow that travels, and nothing lays it out but this
+            expect(slider.track.Position).to.equal(UDim2.new(1, -15, 0.5, 0))
+
+            -- narrower than the title block, the track, the padding either side and the gap
+            -- between them: the track drops under the title rather than being drawn through it
+            slider.main.AbsoluteSize = Vector2.new(400, 65)
+            slider:_applyLayout()
+            expect(slider._layoutMode).to.equal("narrow")
+            expect(slider.track.AnchorPoint).to.equal(Vector2.new(0.5, 1))
+
+            -- exactly the threshold is not room to spare. a hand-resized window can be held at
+            -- any width, and without a band the two layouts trade places every frame it is there
+            slider.main.AbsoluteSize = Vector2.new(437, 65)
+            slider:_applyLayout()
+            expect(slider._layoutMode).to.equal("narrow")
+
+            -- clear of the band, and the wide layout comes back
+            slider.main.AbsoluteSize = Vector2.new(500, 65)
+            slider:_applyLayout()
+            expect(slider._layoutMode).to.equal("wide")
+        end)
+
+        it("holds the bottom fade above the corner radius as the window grows", function()
+            local w = makeWindow()
+            local radius = w.bottomFadeCorner.CornerRadius.Offset
+
+            w:_applyUserSize(Vector2.new(600, 500))
+            local shortWindow = w.bottomFade.Size.Y.Offset
+
+            -- the fade is authored to shrink as the window grows; past a point it would round
+            -- tighter than the window and cut a line across the base
+            w:_applyUserSize(Vector2.new(600, 900))
+            local tallWindow = w.bottomFade.Size.Y.Offset
+
+            expect(shortWindow > tallWindow or tallWindow == radius * 2).to.equal(true)
+            expect(tallWindow >= radius * 2).to.equal(true)
+        end)
+    end)
 end

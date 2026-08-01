@@ -21,9 +21,19 @@ Group.__type = "Group"
 
 local moveable = require(script.Parent.Parent.utility.moveable)
 local log = require(script.Parent.Parent.utility.log)
+local variables = require(script.Parent.Parent.utility.variables)
 local assignOrder = require(script.Parent.Parent.utility.ordering)
 
 local elementPadding = 8
+
+-- What tells a wrap apart from the line above it simply changing height. A wrap moves a child to
+-- the start of another line, so it travels sideways as well as down - by a column at least, and
+-- columns are never this narrow. A line above growing moves everything under it straight down
+-- with no sideways travel at all, and is not this child's news.
+local wrapTravelX = 24
+local wrapTravelY = 16
+
+local slideInfo = TweenInfo.new(0.32, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
 -- these render fine side by side in a row: the compact builds (button/toggle/stat) and
 -- the slider (it reflows to its narrow layout). dropdown/section stay full-only.
@@ -151,10 +161,62 @@ function Group:_wrapChild(element)
     element._widthManaged = true
 
     local minWidth = if element._minWidth then element:_minWidth() else 0
-    if minWidth > 0 then
-        element.main.AutomaticSize = Enum.AutomaticSize.None
-        element.main.Size = UDim2.new(0, minWidth, element.main.Size.Y.Scale, element.main.Size.Y.Offset)
+    if minWidth <= 0 then
+        return
     end
+
+    -- A UIListLayout owns the position of everything it lays out, so a child cannot be animated
+    -- where it stands: the next layout pass puts it straight back. The layout is given a slot to
+    -- carry instead - same width, same flex, so it wraps and fills exactly as the child did - and
+    -- the child rides inside it, which leaves the child's own position free to be moved.
+    local slot = self.window:Create("Frame", {
+        Name = "Slot",
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        AutomaticSize = Enum.AutomaticSize.Y,
+        Size = UDim2.fromOffset(minWidth, 0),
+        LayoutOrder = element.main.LayoutOrder,
+
+        Parent = self.main,
+    })
+
+    element._slot = slot
+    element.main.AutomaticSize = Enum.AutomaticSize.None
+    element.main.Size = UDim2.new(1, 0, element.main.Size.Y.Scale, element.main.Size.Y.Offset)
+    element.main.Position = UDim2.fromOffset(0, 0)
+    element.main.Parent = slot
+
+    self.window:ConnectFor(element, slot:GetPropertyChangedSignal("AbsolutePosition"), function()
+        self:_slideIntoPlace(element)
+    end)
+end
+
+-- Let a child the row has just wrapped onto another line travel there, rather than being
+-- somewhere else the next frame. The slot has already moved, so the child starts back where the
+-- slot was and runs the gap down.
+function Group:_slideIntoPlace(element)
+    local slot = element._slot
+    if not slot then
+        return
+    end
+
+    -- measured against the group, never the screen: the window moves under this every frame it
+    -- is being resized, and reading from there would call every one of those frames a wrap
+    local landed = slot.AbsolutePosition - self.main.AbsolutePosition
+    local came = element._slotAt
+    element._slotAt = landed
+
+    if not came or self.window.hidden or self.window.animating then
+        return
+    end
+
+    local travelled = came - landed
+    if math.abs(travelled.X) < wrapTravelX or math.abs(travelled.Y) < wrapTravelY then
+        return
+    end
+
+    element.main.Position = UDim2.fromOffset(travelled.X, travelled.Y)
+    variables.tweenService:Create(element.main, slideInfo, { Position = UDim2.fromOffset(0, 0) }):Play()
 end
 
 function Group:CreateButton(properties)

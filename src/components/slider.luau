@@ -17,6 +17,7 @@ local variables = require(utility.variables)
 local functions = require(utility.functions)
 local odometer = require(utility.odometer)
 local moveable = require(utility.moveable)
+local reflow = require(utility.reflow)
 local locale = require(utility.locale)
 local hapticEngine = require(utility.HapticEngine)
 
@@ -47,12 +48,33 @@ local tweenInfo = TweenInfo.new(0.45, Enum.EasingStyle.Exponential, Enum.EasingD
 local heldInfo = TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 local followInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
--- Below this element width we reflow to the stacked layout (title/value on top, full-width
--- track under it) so the slider stays usable in a narrow column or small window instead of
--- overlapping. Sits well below a full-width slider (~435) - including the slightly narrower
--- width it has before the window's intro grow finishes - and well above a grid column (~180),
--- so those two cases land cleanly on either side and open/close transients never straddle it.
-local narrowWidth = 300
+-- The geometry the wide layout is drawn to. Named rather than repeated as numbers, because the
+-- width below which that layout stops fitting is the sum of them, and a threshold kept in step
+-- with them by hand is one that drifts out of step.
+local titleInset = 20 -- left padding before the title block
+local titleWidth = 170 -- the title/value column
+local titleTrackGap = 8 -- the least room worth leaving between the two
+local trackWidth = 222 -- the track itself
+local trackInset = 15 -- right padding after the track
+
+-- Below this element width we reflow to the stacked layout (title/value on top, full-width track
+-- under it). It is exactly what the wide layout needs, so a full-width slider in a default window
+-- sits on the wide side of it by a hair, and anything narrower stacks rather than drawing the
+-- track through the title. A window that can be resized by hand reaches that range immediately;
+-- one that could only ever be 475 wide never did, which is why the old figure held.
+local narrowWidth = titleInset + titleWidth + titleTrackGap + trackWidth + trackInset
+
+-- How much room over the threshold the wide layout has to be offered before it is taken back. A
+-- hand-resized window can be held at any width, including exactly this one, and without a band to
+-- sit in the two layouts trade places every frame it is held there.
+local reflowHysteresis = 12
+
+-- The track is the one part of a reflow that travels: it goes from the right-hand side of the
+-- element to the bottom edge of it, and back. Nothing lays it out but this, so it is free to be
+-- moved. The title block is not a move at all - its two arrangements are the same labels with a
+-- UIListLayout pointed a different way, which changes in a single frame with nothing in between
+-- to tween - so that is switched under the travel rather than dragged along with it.
+local trackReflow = TweenInfo.new(0.34, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
 function Slider.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
@@ -130,7 +152,7 @@ function Slider.new(tab, properties)
     self.track = self.window:Create("Frame", {
         AnchorPoint = Vector2.new(1, 0.5),
         Position = UDim2.new(1, -15, 0.5, 0),
-        Size = UDim2.fromOffset(222, 14),
+        Size = UDim2.fromOffset(trackWidth, 14),
         BorderSizePixel = 0,
         BackgroundTransparency = 1, -- In = 0
 
@@ -418,12 +440,11 @@ end
 -- Set the element height, keeping the width alone when a horizontal group owns it
 -- (_widthManaged): there the stack freezes us to _minWidth and wraps, so we must not
 -- stomp the X it set. Standalone we take the usual full width.
-function Slider:_setMainHeight(height)
-    if self._widthManaged then
-        self.main.Size = UDim2.new(self.main.Size.X.Scale, self.main.Size.X.Offset, 0, height)
-    else
-        self.main.Size = UDim2.new(1, -20, 0, height)
-    end
+function Slider:_setMainHeight(height, animate)
+    local size = if self._widthManaged
+        then UDim2.new(self.main.Size.X.Scale, self.main.Size.X.Offset, 0, height)
+        else UDim2.new(1, -20, 0, height)
+    reflow.morph(self.main, { Size = size }, animate, trackReflow)
 end
 
 -- wide: title over value on the left, fixed track on the right.
@@ -437,40 +458,60 @@ function Slider:_applyLayout()
         return -- bare mode has a fixed slim layout, nothing to reflow
     end
     local width = self.main.AbsoluteSize.X
-    local mode = if width > 0 and width < narrowWidth then "narrow" else "wide"
+    if width <= 0 then
+        return
+    end
+
+    -- narrow below the width the wide layout needs, wide once there is room to spare, and
+    -- whatever it already is in between
+    local mode = self._layoutMode
+    if width < narrowWidth then
+        mode = "narrow"
+    elseif width > narrowWidth + reflowHysteresis or mode == nil then
+        mode = "wide"
+    end
+
     if self._layoutMode == mode then
         return
     end
+
+    -- the first pass builds the layout, so it lands at once. Every pass after it is a window
+    -- being resized by hand, and is watched.
+    local animate = self._layoutMode ~= nil and not self.window.hidden and not self.window.animating
     self._layoutMode = mode
 
     if mode == "narrow" then
-        self:_setMainHeight(70)
+        self:_setMainHeight(70, animate)
 
         self.container.AnchorPoint = Vector2.new(0, 0)
-        self.container.Position = UDim2.new(0, 20, 0, 14)
-        self.container.Size = UDim2.new(1, -40, 0, 16)
+        self.container.Position = UDim2.new(0, titleInset, 0, 14)
+        self.container.Size = UDim2.new(1, -titleInset * 2, 0, 16)
         self.containerLayout.FillDirection = Enum.FillDirection.Horizontal
         self.titleFlex.FlexMode = Enum.UIFlexMode.Fill -- title grows, value hugs the right
         self.valueHost.AutomaticSize = Enum.AutomaticSize.X
         self.valueHost.Size = UDim2.new(0, 0, 0, 16)
 
-        self.track.AnchorPoint = Vector2.new(0.5, 1)
-        self.track.Position = UDim2.new(0.5, 0, 1, -14)
-        self.track.Size = UDim2.new(1, -30, 0, 14)
+        reflow.morph(self.track, {
+            AnchorPoint = Vector2.new(0.5, 1),
+            Position = UDim2.new(0.5, 0, 1, -14),
+            Size = UDim2.new(1, -30, 0, 14),
+        }, animate, trackReflow)
     else
-        self:_setMainHeight(65)
+        self:_setMainHeight(65, animate)
 
         self.container.AnchorPoint = Vector2.new(0, 0.5)
-        self.container.Position = UDim2.new(0, 20, 0.5, 0)
-        self.container.Size = UDim2.new(0, 170, 0, 33)
+        self.container.Position = UDim2.new(0, titleInset, 0.5, 0)
+        self.container.Size = UDim2.new(0, titleWidth, 0, 33)
         self.containerLayout.FillDirection = Enum.FillDirection.Vertical
         self.titleFlex.FlexMode = Enum.UIFlexMode.None
         self.valueHost.AutomaticSize = Enum.AutomaticSize.None
         self.valueHost.Size = UDim2.new(1, 0, 0, 16)
 
-        self.track.AnchorPoint = Vector2.new(1, 0.5)
-        self.track.Position = UDim2.new(1, -15, 0.5, 0)
-        self.track.Size = UDim2.new(0, 222, 0, 14)
+        reflow.morph(self.track, {
+            AnchorPoint = Vector2.new(1, 0.5),
+            Position = UDim2.new(1, -trackInset, 0.5, 0),
+            Size = UDim2.new(0, trackWidth, 0, 14),
+        }, animate, trackReflow)
     end
 end
 
