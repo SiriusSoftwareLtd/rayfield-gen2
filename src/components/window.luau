@@ -48,6 +48,19 @@ local viewportReconcileInterval = 2
 
 -- The size the current screen calls for. Everything downstream (the reveal target, drag
 -- clamp, collapse) reads self.size, so it all inherits whatever this returns.
+-- What a control is worth to the outside. Most keep it in `value`, but one whose value is not a
+-- single thing says so with GetValue: a gradient picker holds the selected stop in `value` and
+-- the whole sequence in GetValue, and the flag APIs owe the caller the sequence.
+local function controlValue(control)
+    if not control then
+        return nil
+    end
+    if type(control.GetValue) == "function" then
+        return control:GetValue()
+    end
+    return control.value
+end
+
 local function fitWindowSize(): UDim2
     local camera = variables.workspace.CurrentCamera
     return windowSizing.fit(camera and camera.ViewportSize)
@@ -207,8 +220,7 @@ function Window.new(properties)
     -- control's current value; assigning routes through its Set so the UI and callback fire.
     self.Flags = setmetatable({}, {
         __index = function(_, flag)
-            local control = self.controls[flag]
-            return control and control.value
+            return controlValue(self.controls[flag])
         end,
         __newindex = function(_, flag, value)
             local control = self.controls[flag]
@@ -224,7 +236,7 @@ function Window.new(properties)
                 local control
                 flag, control = next(self.controls, flag)
                 if flag then
-                    return flag, control.value
+                    return flag, controlValue(control)
                 end
                 return nil
             end
@@ -1971,8 +1983,7 @@ end
 
 -- Read a flag's current value, or nil if nothing is registered under it.
 function Window:Get(flag)
-    local control = self.controls[flag]
-    return control and control.value
+    return controlValue(self.controls[flag])
 end
 
 -- Set a flag's value, routing through the control so the UI updates and the callback fires.

@@ -131,15 +131,33 @@ export type KeybindProps = {
     onChanged: ((key: EnumItem) -> ())?, -- fires when the binding is changed
 }
 
+-- Split by mode rather than widened, so a picker that was never asked for a gradient keeps the
+-- Color3 it has always handed back. Widening the one type would give every existing strict-Luau
+-- callback a `Color3 | ColorSequence`, and Color3 methods on it would stop type checking.
 export type ColorPickerProps = {
     name: string?,
     description: string?,
     icon: (string | number)?,
     flag: string?,
-    color: Color3?, -- initial colour (accepts a hex string too)
+    gradient: false?, -- see GradientColorPickerProps
+    color: (Color3 | string)?, -- initial colour, hex accepted
     alpha: number?, -- initial alpha 0..1 (default 1)
     forgetState: boolean?,
     callback: ((value: Color3, alpha: number) -> ())?,
+}
+
+export type GradientColorPickerProps = {
+    name: string?,
+    description: string?,
+    icon: (string | number)?,
+    flag: string?,
+    gradient: true, -- edit a ColorSequence rather than one colour
+    -- the sequence the picker starts on. One colour, hex included, is taken as a flat
+    -- gradient of that colour, the same way an old saved config is
+    color: (ColorSequence | Color3 | string)?,
+    alpha: number?,
+    forgetState: boolean?,
+    callback: ((value: ColorSequence, alpha: number) -> ())?,
 }
 
 export type StatProps = {
@@ -237,10 +255,21 @@ export type Keybind = Moveable & {
 }
 
 export type ColorPicker = Moveable & {
+    gradient: boolean, -- false on a picker built without the gradient prop
     value: Color3,
     alpha: number,
     Set: (self: ColorPicker, value: Color3 | string, skipCallback: boolean?) -> (),
     SetAlpha: (self: ColorPicker, alpha: number, skipCallback: boolean?) -> (),
+    GetValue: (self: ColorPicker) -> Color3,
+}
+
+export type GradientColorPicker = Moveable & {
+    gradient: boolean,
+    value: Color3, -- the stop being edited; GetValue is the sequence the picker represents
+    alpha: number,
+    Set: (self: GradientColorPicker, value: Color3 | ColorSequence | string, skipCallback: boolean?) -> (),
+    SetAlpha: (self: GradientColorPicker, alpha: number, skipCallback: boolean?) -> (),
+    GetValue: (self: GradientColorPicker) -> ColorSequence,
 }
 
 export type Stat = Moveable & {
@@ -290,7 +319,8 @@ export type Tab = {
     CreateDropdown: (self: Tab, props: DropdownProps) -> Dropdown,
     CreateInput: (self: Tab, props: InputProps) -> Input,
     CreateKeybind: (self: Tab, props: KeybindProps) -> Keybind,
-    CreateColorPicker: (self: Tab, props: ColorPickerProps) -> ColorPicker,
+    CreateColorPicker: ((self: Tab, props: GradientColorPickerProps) -> GradientColorPicker)
+        & ((self: Tab, props: ColorPickerProps) -> ColorPicker),
     CreateStat: (self: Tab, props: StatProps) -> Stat,
     CreateSection: (self: Tab, props: SectionProps) -> Section,
     CreateGroup: (self: Tab, props: GroupProps?) -> Group,

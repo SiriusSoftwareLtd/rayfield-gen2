@@ -1409,6 +1409,551 @@ return function()
         end)
     end)
 
+    describe("component colorpicker gradients", function()
+        local gradientWindow
+
+        local function makeWindow()
+            gradientWindow = Window.new({
+                name = "Gradient Window",
+                configuration = { autoSave = false, autoLoad = false },
+            })
+            gradientWindow.hidden = false
+            return gradientWindow
+        end
+
+        -- lune's two-colour ColorSequence.new gives both keypoints black, so the specs build
+        -- sequences from keypoints, which is the form the component itself uses
+        local function times(picker)
+            local out = {}
+            for _, stop in picker.stops do
+                table.insert(out, stop.time)
+            end
+            return out
+        end
+
+        afterEach(function()
+            if gradientWindow and not gradientWindow.unloaded then
+                gradientWindow:Unload()
+            end
+            gradientWindow = nil
+        end)
+
+        it("takes a sequence, hands one back, and leaves a plain picker alone", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+
+            local handed
+            local picker = tab:CreateColorPicker({
+                name = "Fill",
+                gradient = true,
+                color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 255)),
+                }),
+                forgetState = true,
+                callback = function(value)
+                    handed = value
+                end,
+            })
+
+            expect(picker.gradient).to.equal(true)
+            expect(#picker.stops).to.equal(2)
+            expect(typeof(picker:GetValue())).to.equal("ColorSequence")
+
+            picker:Set(ColorSequence.new(Color3.fromRGB(0, 255, 0)))
+            expect(typeof(handed)).to.equal("ColorSequence")
+
+            -- a picker that was not asked for a gradient keeps working on one colour
+            local plain = tab:CreateColorPicker({ name = "Plain", forgetState = true })
+            expect(plain.gradient).to.equal(false)
+            expect(typeof(plain:GetValue())).to.equal("Color3")
+            expect(plain.strip).to.equal(nil)
+        end)
+
+        it("drops a new stop into the widest gap, at the colour already shown there", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local picker = tab:CreateColorPicker({
+                name = "Fill",
+                gradient = true,
+                color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
+                }),
+                forgetState = true,
+            })
+
+            picker:_addStop()
+            expect(#picker.stops).to.equal(3)
+            expect(times(picker)[2]).to.equal(0.5)
+
+            -- halfway between black and white, so adding it changed where the gradient can be
+            -- edited rather than changing the gradient
+            local middle = picker.stops[2].color
+            expect(math.abs(middle.R - 0.5) < 0.02).to.equal(true)
+
+            -- and the new one is what the picker is now editing
+            expect(picker.selected).to.equal(2)
+
+            picker:_addStop()
+            expect(#picker.stops).to.equal(4)
+        end)
+
+        it("adds a stop where the bar was clicked, in order", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local picker = tab:CreateColorPicker({
+                name = "Fill",
+                gradient = true,
+                color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
+                }),
+                forgetState = true,
+            })
+
+            picker:_addStop(0.75)
+            expect(#picker.stops).to.equal(3)
+            expect(math.abs(picker.stops[2].time - 0.75) < 0.01).to.equal(true)
+
+            -- earlier than the one already there, so it lands before it rather than on the end
+            picker:_addStop(0.25)
+            expect(#picker.stops).to.equal(4)
+            expect(picker.stops[2].time < picker.stops[3].time).to.equal(true)
+            expect(picker.selected).to.equal(2)
+        end)
+
+        it("moves a stop along the bar without letting it pass its neighbours", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local picker = tab:CreateColorPicker({
+                name = "Fill",
+                gradient = true,
+                color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
+                }),
+                forgetState = true,
+            })
+            picker:_addStop(0.5)
+
+            picker.strip.AbsolutePosition = Vector2.new(100, 200)
+            picker.strip.AbsoluteSize = Vector2.new(200, 26)
+
+            local uis = helpers.services.UserInputService
+            local mouse, pressed = uis.GetMouseLocation, uis.IsMouseButtonPressed
+            local at = Vector2.new(160, 213)
+            uis.GetMouseLocation = function()
+                return at
+            end
+            uis.IsMouseButtonPressed = function()
+                return true
+            end
+
+            picker:_beginStopDrag(2, { UserInputType = Enum.UserInputType.MouseButton1 })
+            helpers.services.RunService.RenderStepped:Fire(1 / 60)
+            expect(math.abs(picker.stops[2].time - 0.3) < 0.02).to.equal(true)
+
+            -- dragged past the far end, and held short of it
+            at = Vector2.new(500, 213)
+            helpers.services.RunService.RenderStepped:Fire(1 / 60)
+            expect(picker.stops[2].time < 1).to.equal(true)
+
+            picker:_endStopDrag()
+            uis.GetMouseLocation, uis.IsMouseButtonPressed = mouse, pressed
+        end)
+
+        it("adds from a click on the bar, and removes with the button beside it", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local picker = tab:CreateColorPicker({
+                name = "Fill",
+                gradient = true,
+                color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
+                }),
+                forgetState = true,
+            })
+
+            picker.strip.AbsolutePosition = Vector2.new(100, 200)
+            picker.strip.AbsoluteSize = Vector2.new(200, 26)
+
+            local uis = helpers.services.UserInputService
+            local mouse = uis.GetMouseLocation
+            uis.GetMouseLocation = function()
+                return Vector2.new(160, 213)
+            end
+
+            -- the bar itself is what adds a stop, where the press landed
+            picker.stripInteract.InputBegan:Fire({ UserInputType = Enum.UserInputType.MouseButton1 })
+            expect(#picker.stops).to.equal(3)
+            expect(math.abs(picker.stops[2].time - 0.3) < 0.02).to.equal(true)
+
+            -- and the button beside it takes the selected one away
+            picker.removeStop.MouseButton1Click:Fire()
+            expect(#picker.stops).to.equal(2)
+
+            -- with nothing removable left, pressing it again does nothing
+            picker.removeStop.MouseButton1Click:Fire()
+            expect(#picker.stops).to.equal(2)
+
+            uis.GetMouseLocation = mouse
+        end)
+
+        it("keeps the flat shadow out of the way, and the drag connection off the frame loop", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local picker = tab:CreateColorPicker({
+                name = "Fill",
+                gradient = true,
+                color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 255)),
+                }),
+                forgetState = true,
+            })
+
+            -- the banded glow throws the light, so the single flat shadow must not be shown
+            -- again by a render that runs after it was hidden
+            picker:_render("instant")
+            expect(picker.previewShadow.Transparency).to.equal(1)
+            picker:_render("animate")
+            expect(picker.previewShadow.Transparency).to.equal(1)
+
+            -- one connection at a time, and none left running once the drag is over
+            picker:_addStop(0.5)
+            picker:_beginStopDrag(2, { UserInputType = Enum.UserInputType.MouseButton1 })
+            expect(picker._stopConnection).to.be.ok()
+
+            picker:_endStopDrag()
+            expect(picker._stopConnection).to.equal(nil)
+            expect(picker._stopDrag).to.equal(nil)
+
+            -- ending twice is harmless
+            picker:_endStopDrag()
+            expect(picker._stopConnection).to.equal(nil)
+        end)
+
+        it("hands the whole sequence to the flag APIs, not the stop being edited", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local picker = tab:CreateColorPicker({
+                name = "Fill",
+                flag = "gradientFlag",
+                gradient = true,
+                color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 255)),
+                }),
+            })
+            picker:_selectStop(1)
+
+            -- value is the selected stop, which is the picker's own business. What the outside
+            -- asks for is the thing the picker represents.
+            expect(typeof(picker.value)).to.equal("Color3")
+            expect(typeof(w:Get("gradientFlag"))).to.equal("ColorSequence")
+            expect(typeof(w.Flags.gradientFlag)).to.equal("ColorSequence")
+
+            for flag, value in w.Flags do
+                if flag == "gradientFlag" then
+                    expect(typeof(value)).to.equal("ColorSequence")
+                end
+            end
+
+            -- and a plain picker still reads as the colour it is
+            local plain = tab:CreateColorPicker({ name = "Plain", flag = "plainFlag" })
+            expect(typeof(w:Get("plainFlag"))).to.equal("Color3")
+            expect(plain.gradient).to.equal(false)
+        end)
+
+        it("glows in the colour the gradient has at each end", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local picker = tab:CreateColorPicker({
+                name = "Fill",
+                gradient = true,
+                color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 255)),
+                }),
+                forgetState = true,
+            })
+
+            -- a UIShadow carries one colour, so the glow is bands across the swatch, each taking
+            -- the colour the gradient has where it sits
+            expect(#picker.glowBands).to.equal(6)
+
+            local first = picker.glowBands[1].glow.Color
+            local last = picker.glowBands[6].glow.Color
+            expect(first.R > first.B).to.equal(true) -- red end
+            expect(last.B > last.R).to.equal(true) -- blue end
+
+            -- move the sequence and the glow follows it
+            picker:Set(ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 255)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)),
+            }))
+            expect(picker.glowBands[1].glow.Color.B > picker.glowBands[1].glow.Color.R).to.equal(true)
+
+            -- and a plain picker still has the one shadow it always had
+            local plain = tab:CreateColorPicker({ name = "Plain", forgetState = true })
+            expect(plain.glowBands).to.equal(nil)
+            expect(plain.previewShadow).to.be.ok()
+        end)
+
+        it("shows the whole gradient on the swatch, not the stop being edited", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local picker = tab:CreateColorPicker({
+                name = "Fill",
+                gradient = true,
+                color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 255)),
+                }),
+                forgetState = true,
+            })
+
+            -- the swatch is all that is left once the card is closed, so it carries the sequence
+            expect(picker.previewGradient).to.be.ok()
+            expect(#picker.previewGradient.Color.Keypoints).to.equal(2)
+
+            picker:_addStop(0.5)
+            picker:Set(Color3.fromRGB(0, 255, 0))
+            expect(#picker.previewGradient.Color.Keypoints).to.equal(3)
+
+            -- and a plain picker has no gradient on its swatch at all
+            local plain = tab:CreateColorPicker({ name = "Plain", forgetState = true })
+            expect(plain.previewGradient).to.equal(nil)
+        end)
+
+        it("keeps the two ends, since a sequence has to start at 0 and finish at 1", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local picker = tab:CreateColorPicker({
+                name = "Fill",
+                gradient = true,
+                color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
+                }),
+                forgetState = true,
+            })
+
+            -- an end stop can be recoloured but never taken away
+            picker:_selectStop(1)
+            picker:_removeStop()
+            expect(#picker.stops).to.equal(2)
+
+            picker:_addStop()
+            picker:_selectStop(2)
+            picker:_removeStop()
+            expect(#picker.stops).to.equal(2)
+            expect(times(picker)[1]).to.equal(0)
+            expect(times(picker)[2]).to.equal(1)
+
+            -- nor can an end be dragged off its end
+            picker:_beginStopDrag(1)
+            expect(picker._stopDrag).to.equal(nil)
+        end)
+
+        it("edits the stop the strip has selected", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local picker = tab:CreateColorPicker({
+                name = "Fill",
+                gradient = true,
+                color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
+                }),
+                forgetState = true,
+            })
+
+            picker:_selectStop(2)
+            expect(picker.value).to.equal(Color3.fromRGB(255, 255, 255))
+
+            picker:Set(Color3.fromRGB(255, 0, 0))
+            expect(picker.stops[2].color).to.equal(Color3.fromRGB(255, 0, 0))
+            expect(picker.stops[1].color).to.equal(Color3.fromRGB(0, 0, 0))
+
+            local sequence = picker:GetValue()
+            expect(sequence.Keypoints[2].Value).to.equal(Color3.fromRGB(255, 0, 0))
+        end)
+
+        it("round trips its stops through a saved config", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local picker = tab:CreateColorPicker({
+                name = "Fill",
+                gradient = true,
+                color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 255)),
+                }),
+                forgetState = true,
+            })
+
+            picker:_addStop()
+            picker:_selectStop(2)
+            picker:Set(Color3.fromRGB(0, 255, 0))
+            picker:SetAlpha(0.5)
+
+            local saved = picker:_serialize()
+            picker:Set(ColorSequence.new(Color3.fromRGB(0, 0, 0)))
+            expect(#picker.stops).to.equal(2)
+
+            picker:_deserialize(saved)
+            expect(#picker.stops).to.equal(3)
+            expect(picker.stops[2].color).to.equal(Color3.fromRGB(0, 255, 0))
+            expect(math.abs(picker.alpha - 0.5) < 0.01).to.equal(true)
+
+            -- a plain picker's old six-character configs still load through the same path
+            local plain = tab:CreateColorPicker({ name = "Plain", forgetState = true })
+            plain:_deserialize("ff0000")
+            expect(plain.value).to.equal(Color3.fromRGB(255, 0, 0))
+        end)
+
+        it("loads a config saved before the picker was a gradient as the whole gradient", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+
+            local function gradientPicker()
+                return tab:CreateColorPicker({
+                    name = "Fill",
+                    gradient = true,
+                    color = ColorSequence.new({
+                        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
+                        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
+                    }),
+                    forgetState = true,
+                })
+            end
+
+            -- six characters, from before the alpha byte was written
+            local short = gradientPicker()
+            short:_selectStop(2)
+            short:_deserialize("ff0000")
+            expect(#short.stops).to.equal(2)
+            expect(short.stops[1].color).to.equal(Color3.fromRGB(255, 0, 0))
+            expect(short.stops[2].color).to.equal(Color3.fromRGB(255, 0, 0))
+
+            -- eight, with the alpha byte, which has to land as well
+            local long = gradientPicker()
+            long:_selectStop(2)
+            long:_deserialize("0000ff80")
+            expect(long.stops[1].color).to.equal(Color3.fromRGB(0, 0, 255))
+            expect(long.stops[2].color).to.equal(Color3.fromRGB(0, 0, 255))
+            expect(math.abs(long.alpha - 0.5) < 0.01).to.equal(true)
+        end)
+
+        it("takes one colour, or false, the same way the runtime always has", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+
+            -- a gradient picker handed a single colour is a flat gradient of it, which is what
+            -- the old saved configs load as too
+            local flat = tab:CreateColorPicker({
+                name = "Fill",
+                gradient = true,
+                color = Color3.fromRGB(255, 0, 0),
+                forgetState = true,
+            })
+            expect(#flat.stops).to.equal(2)
+            expect(flat.stops[1].color).to.equal(Color3.fromRGB(255, 0, 0))
+            expect(flat.stops[2].color).to.equal(Color3.fromRGB(255, 0, 0))
+
+            -- hex, the same as a plain picker
+            local hex = tab:CreateColorPicker({ name = "Hex", gradient = true, color = "#00ff00", forgetState = true })
+            expect(hex.stops[1].color).to.equal(Color3.fromRGB(0, 255, 0))
+
+            -- and gradient = false is a plain picker, not a broken gradient one
+            local plain = tab:CreateColorPicker({
+                name = "Plain",
+                gradient = false,
+                color = Color3.fromRGB(0, 0, 255),
+                forgetState = true,
+            })
+            expect(plain.gradient).to.equal(false)
+            expect(plain:GetValue()).to.equal(Color3.fromRGB(0, 0, 255))
+        end)
+
+        it("drags a stop packed tight against its neighbours", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local picker = tab:CreateColorPicker({
+                name = "Fill",
+                gradient = true,
+                -- a legal sequence is free to sit its keypoints closer together than the margin
+                color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+                    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 0)),
+                    ColorSequenceKeypoint.new(0.505, Color3.fromRGB(0, 0, 255)),
+                    ColorSequenceKeypoint.new(0.51, Color3.fromRGB(255, 255, 0)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
+                }),
+                forgetState = true,
+            })
+
+            picker.strip.AbsolutePosition = Vector2.new(100, 200)
+            picker.strip.AbsoluteSize = Vector2.new(200, 26)
+
+            local uis = helpers.services.UserInputService
+            local mouse, pressed = uis.GetMouseLocation, uis.IsMouseButtonPressed
+            uis.GetMouseLocation = function()
+                return Vector2.new(0, 213)
+            end
+            uis.IsMouseButtonPressed = function()
+                return true
+            end
+
+            -- dragged hard against the stop below it, in a gap narrower than twice the margin
+            picker:_beginStopDrag(3, { UserInputType = Enum.UserInputType.MouseButton1 })
+            helpers.services.RunService.RenderStepped:Fire(1 / 60)
+
+            expect(picker.stops[3].time > picker.stops[2].time).to.equal(true)
+            expect(picker.stops[3].time < picker.stops[4].time).to.equal(true)
+
+            picker:_endStopDrag()
+            uis.GetMouseLocation, uis.IsMouseButtonPressed = mouse, pressed
+        end)
+
+        it("keeps rebuilt stop handles visible while the card is open", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local picker = tab:CreateColorPicker({
+                name = "Fill",
+                gradient = true,
+                color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
+                }),
+                forgetState = true,
+            })
+
+            picker:_open()
+
+            -- adding and removing both rebuild every handle, and the fade only runs on open
+            picker:_addStop()
+            for _, handle in picker.stopHandles do
+                expect(handle.frame.BackgroundTransparency).to.equal(0)
+            end
+
+            picker:_selectStop(2)
+            picker:_removeStop()
+            for _, handle in picker.stopHandles do
+                expect(handle.frame.BackgroundTransparency).to.equal(0)
+            end
+
+            picker:_close()
+            picker:_addStop()
+            for _, handle in picker.stopHandles do
+                expect(handle.frame.BackgroundTransparency).to.equal(1)
+            end
+        end)
+    end)
+
     describe("component window viewport fitting", function()
         local variables = helpers.requireUtility("variables")
         local originalCamera
