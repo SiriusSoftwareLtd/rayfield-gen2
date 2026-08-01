@@ -26,9 +26,15 @@ local assignOrder = require(script.Parent.Parent.utility.ordering)
 
 local elementPadding = 8
 
--- A row change is worth watching; the sideways shuffle a resize causes every frame is the flex
--- sharing the width out again, and animating that would smear the whole row behind the drag.
-local wrapThreshold = 4
+-- The layout decides where its lines break from the widths it is handed, and this hands out the
+-- whole of one. Leaving a pixel back means the remainder is always too small for the next line's
+-- first child, so the layout is held to the same break this packing chose rather than finding its
+-- own a rounding error away from it.
+local lineSlack = 2
+
+-- How much wider than the break a line has to be before it takes a child back. Without it, a drag
+-- parked on a break width wraps and unwraps every frame it is held there.
+local lineHysteresis = 10
 
 -- A wrap is two things happening at once: the child moves to another line, and every child on
 -- both lines is owed a different share of the width. Run together they read as one jump. So the
@@ -194,6 +200,13 @@ function Group:_wrapChild(element)
     if not self._watchingWidth then
         self._watchingWidth = true
         self.window:Connect(self.main:GetPropertyChangedSignal("AbsoluteSize"), function()
+            -- the group grows taller as its own lines re-pack, which would land back here and
+            -- re-run a pass whose answer has not changed. Only a new width is news.
+            local width = self.main.AbsoluteSize.X
+            if width == self._sharedAt then
+                return
+            end
+            self._sharedAt = width
             self:_shareWidth()
         end)
     end
@@ -210,13 +223,22 @@ end
 function Group:_packRows(available: number)
     local padding = self.layout.Padding.Offset
     local rows, current, used = {}, {}, 0
+    local line = 1
 
     for _, element in self.elements do
         local width = element._minSlotWidth or 0
         local gap = if #current > 0 then padding else 0
 
-        if #current > 0 and used + gap + width > available then
+        -- a child that was pushed onto a line of its own has to be offered more than the width it
+        -- broke at before it comes back up, or a drag held on that width flips it every frame
+        local room = available
+        if element._line and element._line > line then
+            room -= lineHysteresis
+        end
+
+        if #current > 0 and used + gap + width > room then
             table.insert(rows, { items = current, used = used })
+            line += 1
             current, used = { element }, width
         else
             table.insert(current, element)
@@ -246,32 +268,34 @@ function Group:_shareWidth()
         end
     end
 
-    local available = self.main.AbsoluteSize.X
+    local available = self.main.AbsoluteSize.X - lineSlack
     if available <= 0 then
         return
     end
 
-    local rows = self._packRows and self:_packRows(available)
-    if not rows then
-        return
-    end
+    local rows = self:_packRows(available)
+    local settled = self._packed
+    self._packed = true
 
-    -- the shape of the packing, so a resize that only moves widths can be told apart from one
-    -- that moved a child to another line
-    local shape = {}
+    -- where the group sits on the screen is not the group's business: the window moves under it
+    -- every frame of a resize, and measuring from there would read every one of those frames as
+    -- a child having been moved. Everything below is measured against the group itself.
+    local origin = self.main.AbsolutePosition
+
     for index, row in rows do
-        shape[index] = #row.items
-    end
-    local shapeKey = table.concat(shape, ",")
-    local changed = self._rowShape ~= nil and self._rowShape ~= shapeKey
-    self._rowShape = shapeKey
-
-    for _, row in rows do
         local spare = math.max(available - row.used, 0)
         local share = math.floor(spare / #row.items)
 
         for _, element in row.items do
-            self:_setSlotWidth(element, (element._minSlotWidth or 0) + share, changed)
+            -- a child that changed line is the only child worth animating, and it is this that
+            -- knows, rather than anything having to be inferred from where it ended up
+            local wrapped = settled and element._line ~= nil and element._line ~= index
+            if wrapped then
+                element._travelFrom = element._slot.AbsolutePosition - origin
+            end
+            element._line = index
+
+            self:_setSlotWidth(element, (element._minSlotWidth or 0) + share, wrapped)
         end
     end
 end
@@ -300,9 +324,16 @@ function Group:_setSlotWidth(element, width, animate)
     element._slotExpanding = true
     element.main.Size = UDim2.new(0, before, height.Scale, height.Offset)
 
+    -- a second wrap arriving mid-expand replaces the animation rather than layering another one
+    -- over the same property, where the two would fight for it a frame at a time
+    if element._expandTween then
+        element._expandTween:Cancel()
+    end
+
     local expand = variables.tweenService:Create(element.main, expandInfo, {
         Size = UDim2.new(1, 0, height.Scale, height.Offset),
     })
+    element._expandTween = expand
     expand.Completed:Connect(function()
         element._slotExpanding = false
         -- a height its own layout asked for while this was in flight, held back so that writing
@@ -321,26 +352,16 @@ end
 -- the slot was and runs the gap down, while its width eases into the share the new line owes
 -- it. What you see is a child leaving at the size it had and opening out once it has landed.
 function Group:_slideIntoPlace(element)
-    local slot = element._slot
-    if not slot then
+    local came = element._travelFrom
+    element._travelFrom = nil
+
+    -- only a child the packing moved to another line has anywhere to travel from. Every other
+    -- call here is the layout reporting that the window moved, which is not this element's news.
+    if not came or not element._slot or self.window.hidden or self.window.animating then
         return
     end
 
-    local landed = slot.AbsolutePosition
-    local came = element._slotAt
-    element._slotAt = landed
-
-    -- nothing to travel from on the first pass, and nothing worth watching on a window that is
-    -- mid-animation or not on screen
-    if not came or self.window.hidden or self.window.animating then
-        return
-    end
-
-    local travelled = came - landed
-    if math.abs(travelled.Y) < wrapThreshold then
-        return
-    end
-
+    local travelled = came - (element._slot.AbsolutePosition - self.main.AbsolutePosition)
     element.main.Position = UDim2.fromOffset(travelled.X, travelled.Y)
     variables.tweenService:Create(element.main, slideInfo, { Position = UDim2.fromOffset(0, 0) }):Play()
 end

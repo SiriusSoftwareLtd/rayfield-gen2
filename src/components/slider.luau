@@ -64,6 +64,11 @@ local trackInset = 15 -- right padding after the track
 -- it came off its opening size.
 local narrowWidth = titleInset + titleWidth + titleTrackGap + trackWidth + trackInset
 
+-- How much room over the threshold the wide layout has to be offered before it is taken back.
+-- A hand-resized window can be held at any width, including exactly this one, and without a
+-- band to sit in the two layouts trade places every frame it is held there.
+local reflowHysteresis = 12
+
 function Slider.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
 
@@ -525,7 +530,19 @@ function Slider:_applyLayout()
         return -- bare mode has a fixed slim layout, nothing to reflow
     end
     local width = self.main.AbsoluteSize.X
-    local mode = if width > 0 and width < narrowWidth then "narrow" else "wide"
+    if width <= 0 then
+        return
+    end
+
+    -- narrow below the width the wide layout needs, wide once there is room to spare, and
+    -- whatever it already is in between
+    local mode = self._layoutMode
+    if width < narrowWidth then
+        mode = "narrow"
+    elseif width > narrowWidth + reflowHysteresis or mode == nil then
+        mode = "wide"
+    end
+
     if self._layoutMode == mode then
         return
     end
