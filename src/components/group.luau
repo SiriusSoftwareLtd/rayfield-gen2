@@ -29,7 +29,13 @@ local elementPadding = 8
 -- A row change is worth watching; the sideways shuffle a resize causes every frame is the flex
 -- sharing the width out again, and animating that would smear the whole row behind the drag.
 local wrapThreshold = 4
-local slideInfo = TweenInfo.new(0.38, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
+-- A wrap is two things happening at once: the child moves to another row, and the flex hands it
+-- whatever width is going spare there, which for a child that lands alone is the whole row. Run
+-- together they read as one jump. So the child travels first, at the width it had, and takes the
+-- new one after it has arrived - the expansion starts as the move is settling, not before.
+local slideInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+local expandInfo = TweenInfo.new(0.36, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, 0, false, 0.14)
 
 -- these render fine side by side in a row: the compact builds (button/toggle/stat) and
 -- the slider (it reflows to its narrow layout). dropdown/section stay full-only.
@@ -188,17 +194,18 @@ function Group:_wrapChild(element)
 end
 
 -- Let an element that has just been wrapped onto another row travel there, instead of being
--- somewhere else the next frame. The slot has already moved, so the element starts back where
--- the slot was and runs the gap down: the row it left, across and down to where it landed.
+-- somewhere else the next frame. The slot has already moved and already has its new width, so
+-- the element starts back where the slot was, at the width it had there, and runs both down.
 function Group:_slideIntoPlace(element)
     local slot = element._slot
     if not slot then
         return
     end
 
-    local landed = slot.AbsolutePosition
-    local came = element._slotAt
+    local landed, width = slot.AbsolutePosition, slot.AbsoluteSize.X
+    local came, cameWidth = element._slotAt, element._slotWidth
     element._slotAt = landed
+    element._slotWidth = width
 
     -- nothing to travel from on the first pass, and nothing worth watching on a window that is
     -- mid-animation or not on screen
@@ -211,8 +218,30 @@ function Group:_slideIntoPlace(element)
         return
     end
 
+    local height = element.main.Size.Y
     element.main.Position = UDim2.fromOffset(travelled.X, travelled.Y)
     variables.tweenService:Create(element.main, slideInfo, { Position = UDim2.fromOffset(0, 0) }):Play()
+
+    -- the width it is leaving behind, held while it travels. an element whose own layout wants
+    -- to change height mid-flight hands that height over rather than writing a size of its own,
+    -- which would take the width with it and end the expansion wherever it had got to.
+    if cameWidth and math.abs(width - cameWidth) >= 1 then
+        element._slotExpanding = true
+        element.main.Size = UDim2.new(0, cameWidth, height.Scale, height.Offset)
+
+        local expand = variables.tweenService:Create(element.main, expandInfo, {
+            Size = UDim2.new(1, 0, height.Scale, height.Offset),
+        })
+        expand.Completed:Connect(function()
+            element._slotExpanding = false
+            local settled = element._pendingSlotHeight
+            element._pendingSlotHeight = nil
+            if settled then
+                element.main.Size = UDim2.new(1, 0, 0, settled)
+            end
+        end)
+        expand:Play()
+    end
 end
 
 function Group:CreateButton(properties)
