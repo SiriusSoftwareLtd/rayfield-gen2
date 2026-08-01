@@ -400,6 +400,11 @@ function Tab:CreateSection(properties)
     return self:_register(require(script.Parent.section).new(self, properties))
 end
 
+-- Divider
+function Tab:CreateDivider(properties)
+    return self:_register(require(script.Parent.divider).new(self, properties))
+end
+
 -- Stat
 function Tab:CreateStat(properties)
     return self:_register(require(script.Parent.stat).new(self, properties))

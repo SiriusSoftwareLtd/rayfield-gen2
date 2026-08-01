@@ -56,6 +56,12 @@ export type SectionProps = {
     icon: (string | number)?,
 }
 
+export type DividerProps = {
+    text: string?, -- an optional word in the middle of the rule
+    spacing: number?, -- room above and below, in pixels
+    line: boolean?, -- false draws no rule, leaving only the room
+}
+
 export type GroupProps = {
     direction: string?, -- "row" | "column" (default row); "horizontal"/"vertical" also work
 }
@@ -251,6 +257,11 @@ export type Stat = Moveable & {
 
 export type Section = Moveable & {}
 
+export type Divider = Moveable & {
+    text: string?,
+    Set: (self: Divider, text: string?) -> (),
+}
+
 -- Tags sit in the window's title bar and order themselves, so they aren't Moveable.
 export type Tag = {
     Set: (self: Tag, props: TagProps) -> (),
@@ -293,6 +304,7 @@ export type Tab = {
     CreateColorPicker: (self: Tab, props: ColorPickerProps) -> ColorPicker,
     CreateStat: (self: Tab, props: StatProps) -> Stat,
     CreateSection: (self: Tab, props: SectionProps) -> Section,
+    CreateDivider: (self: Tab, props: DividerProps?) -> Divider,
     CreateGroup: (self: Tab, props: GroupProps?) -> Group,
 }
 
