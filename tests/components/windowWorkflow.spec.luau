@@ -2058,6 +2058,56 @@ return function()
             expect(slider.containerLayout.FillDirection).to.equal(Enum.FillDirection.Horizontal)
         end)
 
+        it("travels a row child to the row it was wrapped onto", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local row = tab:CreateGroup({ direction = "row" })
+            local first = row:CreateButton({ name = "First" })
+            local wrapped = row:CreateButton({ name = "Second" })
+
+            -- the layout owns the position of what it lays out, so each row child rides inside
+            -- a slot it can be animated within
+            expect(wrapped._slot).to.be.ok()
+            expect(wrapped.main.Parent).to.equal(wrapped._slot)
+            expect(first._slot.LayoutOrder).to.equal(first.main.LayoutOrder)
+
+            -- first pass has nothing to travel from
+            wrapped._slot.AbsolutePosition = Vector2.new(300, 100)
+            row:_slideIntoPlace(wrapped)
+            expect(wrapped.main.Position).to.equal(UDim2.fromOffset(0, 0))
+
+            -- wrapped onto the next row: it starts back where it was and runs the gap down
+            wrapped._slot.AbsolutePosition = Vector2.new(20, 160)
+            row:_slideIntoPlace(wrapped)
+            expect(wrapped._slotAt).to.equal(Vector2.new(20, 160))
+
+            -- the flex sharing the width out again is not a wrap, so it is left alone
+            wrapped.main.Position = UDim2.fromOffset(0, 0)
+            wrapped._slot.AbsolutePosition = Vector2.new(26, 161)
+            row:_slideIntoPlace(wrapped)
+            expect(wrapped.main.Position).to.equal(UDim2.fromOffset(0, 0))
+        end)
+
+        it("leaves a row child alone while the window is not on screen", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local row = tab:CreateGroup({ direction = "row" })
+            local child = row:CreateButton({ name = "Only" })
+
+            child._slot.AbsolutePosition = Vector2.new(300, 100)
+            row:_slideIntoPlace(child)
+
+            w.hidden = true
+            child._slot.AbsolutePosition = Vector2.new(20, 160)
+            row:_slideIntoPlace(child)
+            expect(child.main.Position).to.equal(UDim2.fromOffset(0, 0))
+
+            -- a child with no slot at all (a row that never wrapped it) is a no-op
+            child._slot = nil
+            row:_slideIntoPlace(child)
+            expect(child.main.Position).to.equal(UDim2.fromOffset(0, 0))
+        end)
+
         it("holds the bottom fade above the corner radius as the window grows", function()
             local w = makeWindow()
             local radius = w.bottomFadeCorner.CornerRadius.Offset
