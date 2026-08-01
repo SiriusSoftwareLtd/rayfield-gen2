@@ -1409,6 +1409,101 @@ return function()
         end)
     end)
 
+    describe("component divider", function()
+        local textWindow
+
+        local function makeWindow()
+            textWindow = Window.new({
+                name = "Text Window",
+                configuration = { autoSave = false, autoLoad = false },
+            })
+            textWindow.hidden = false
+            return textWindow
+        end
+
+        afterEach(function()
+            if textWindow and not textWindow.unloaded then
+                textWindow:Unload()
+            end
+            textWindow = nil
+        end)
+
+        it("draws a rule across the page, with or without a word in it", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+
+            local plain = tab:CreateDivider()
+            expect(plain.__type).to.equal("Divider")
+            expect(plain.left).to.be.ok()
+            expect(plain.title).to.equal(nil)
+            expect(plain.right).to.equal(nil) -- one span, not two halves
+
+            -- a word in the middle splits the rule, so it stays centred whatever the word is
+            local named = tab:CreateDivider({ text = "Advanced" })
+            expect(named.title.Text).to.equal("Advanced")
+            expect(named.left).to.be.ok()
+            expect(named.right).to.be.ok()
+
+            named:Set("Danger")
+            expect(named.title.Text).to.equal("Danger")
+
+            named:Set("")
+            expect(named.title.Visible).to.equal(false)
+
+            -- and one built without a label has nothing to set
+            plain:Set("ignored")
+            expect(plain.title).to.equal(nil)
+        end)
+
+        it("gives room and no rule when asked for one", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+
+            -- the other thing a divider gets reached for, and the only way to get it
+            local space = tab:CreateDivider({ line = false, spacing = 20 })
+            expect(space.left).to.equal(nil)
+            expect(space.main.Size.Y.Offset).to.equal(40)
+
+            local rule = tab:CreateDivider({ spacing = 8 })
+            expect(rule.main.Size.Y.Offset).to.equal(17)
+
+            -- default spacing when none is given
+            local plain = tab:CreateDivider()
+            expect(plain.main.Size.Y.Offset).to.equal(25)
+        end)
+
+        it("fades a divider with the rest of the page", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local divider = tab:CreateDivider({ text = "Advanced" })
+
+            divider:_setShown(false, false)
+            expect(divider.left.BackgroundTransparency).to.equal(1)
+            expect(divider.title.TextTransparency).to.equal(1)
+
+            divider:_setShown(true, false)
+            expect(divider.left.BackgroundTransparency < 1).to.equal(true)
+            expect(divider.right.BackgroundTransparency < 1).to.equal(true)
+            expect(divider.title.TextTransparency < 1).to.equal(true)
+
+            -- and one with no rule has nothing to fade, which must not error
+            local space = tab:CreateDivider({ line = false })
+            space:_setShown(true, false)
+            space:_setShown(false, false)
+        end)
+        it("reorders like every other element", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            tab:CreateButton({ name = "First" })
+            local divider = tab:CreateDivider({ text = "Second" })
+
+            divider:MoveToTop()
+            expect(tab.elements[1]).to.equal(divider)
+
+            divider:MoveToBottom()
+            expect(tab.elements[#tab.elements]).to.equal(divider)
+        end)
+    end)
     describe("component window viewport fitting", function()
         local variables = helpers.requireUtility("variables")
         local originalCamera
