@@ -1409,6 +1409,186 @@ return function()
         end)
     end)
 
+    describe("component dropdown", function()
+        local dropWindow
+
+        local function makeWindow()
+            dropWindow = Window.new({
+                name = "Dropdown Window",
+                configuration = { autoSave = false, autoLoad = false },
+            })
+            dropWindow.hidden = false
+            return dropWindow
+        end
+
+        afterEach(function()
+            if dropWindow and not dropWindow.unloaded then
+                dropWindow:Unload()
+            end
+            dropWindow = nil
+        end)
+
+        it("leaves a dropdown's borders outside the frame that clips its contents", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local drop = tab:CreateDropdown({
+                name = "Choice",
+                options = { "Alpha", "Beta" },
+                value = "Alpha",
+                forgetState = true,
+            })
+
+            -- a UIStroke is drawn outside the frame it belongs to, and both cards fill the
+            -- wrapper exactly, so a clip there takes the border off each of them
+            -- unset reads as nil in the harness, which is the same thing as not clipping
+            expect(drop.main.ClipsDescendants or false).to.equal(false)
+
+            -- the options card is what has contents to hide while it is collapsed, and it is
+            -- zero height there, so the cut belongs to it
+            expect(drop.panel.ClipsDescendants).to.equal(true)
+            expect(drop.panelStroke).to.be.ok()
+        end)
+
+        it("opens a dropdown far enough to choose from, and stops there", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local drop = tab:CreateDropdown({
+                name = "Choice",
+                options = { "Alpha", "Beta" },
+                forgetState = true,
+            })
+
+            -- two options is the whole list, so the card is only as tall as it needs to be
+            local two = drop:_openHeight()
+
+            drop:Refresh({ "Alpha", "Beta", "Gamma", "Delta" })
+            local four = drop:_openHeight()
+            expect(four > two).to.equal(true)
+
+            -- past that it scrolls instead of growing without end
+            drop:Refresh({ "Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta" })
+            expect(drop:_openHeight()).to.equal(four)
+
+            -- and four rows really do fit inside it, gaps and padding included
+            expect(four >= 4 * 38 + 3 * 5).to.equal(true)
+        end)
+
+        it("says so when a search matches nothing", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local drop = tab:CreateDropdown({
+                name = "Choice",
+                options = { "Alpha", "Beta" },
+                forgetState = true,
+            })
+
+            expect(drop.emptyLabel.Visible).to.equal(false)
+
+            -- an empty card under a search box reads as broken rather than as no matches
+            drop:_applyFilter("zzz")
+            expect(drop.emptyLabel.Visible).to.equal(true)
+
+            drop:_applyFilter("al")
+            expect(drop.emptyLabel.Visible).to.equal(false)
+
+            -- and the card keeps a row of room to say it in
+            drop:_applyFilter("zzz")
+            expect(drop:_openHeight() > 95).to.equal(true)
+        end)
+
+        it("softens the list edge only while there is more of it below", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local drop = tab:CreateDropdown({
+                name = "Choice",
+                options = { "Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta" },
+                forgetState = true,
+            })
+
+            drop._isOpen = true
+            drop.list.AbsoluteWindowSize = Vector2.new(300, 160)
+            drop.list.AbsoluteCanvasSize = Vector2.new(300, 260)
+            drop.list.CanvasPosition = Vector2.new(0, 0)
+            drop:_syncFade()
+            expect(drop.listFade.Visible).to.equal(true)
+
+            -- scrolled to the end, so there is nothing left to hint at
+            drop.list.CanvasPosition = Vector2.new(0, 100)
+            drop:_syncFade()
+            expect(drop.listFade.Visible).to.equal(false)
+
+            -- and a list that fits never wore it at all
+            drop.list.AbsoluteCanvasSize = Vector2.new(300, 120)
+            drop.list.CanvasPosition = Vector2.new(0, 0)
+            drop:_syncFade()
+            expect(drop.listFade.Visible).to.equal(false)
+        end)
+
+        it("selects and clears a multi-select list in one go", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local handed
+            local drop = tab:CreateDropdown({
+                name = "Choice",
+                options = { "Alpha", "Beta", "Gamma" },
+                multiSelect = true,
+                forgetState = true,
+                callback = function(value)
+                    handed = value
+                end,
+            })
+
+            expect(drop.actions).to.be.ok()
+
+            drop.value = drop:_visibleOptions()
+            drop:_afterBulkChange()
+            expect(#drop.value).to.equal(3)
+            expect(#handed).to.equal(3)
+
+            drop.value = {}
+            drop:_afterBulkChange()
+            expect(#drop.value).to.equal(0)
+
+            -- a filtered list only offers what it is showing: selecting all must not quietly
+            -- take the options the search is hiding
+            drop:_applyFilter("al")
+            expect(#drop:_visibleOptions()).to.equal(1)
+
+            -- and a single-choice card has nothing to select all of
+            local single = tab:CreateDropdown({ name = "One", options = { "A", "B" }, forgetState = true })
+            expect(single.actions).to.equal(nil)
+        end)
+
+        it("brings an opened dropdown back inside the page it opened past", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local drop = tab:CreateDropdown({
+                name = "Choice",
+                options = { "Alpha", "Beta", "Gamma", "Delta" },
+                forgetState = true,
+            })
+
+            local page = tab.tabPage
+            page.AbsoluteWindowSize = Vector2.new(400, 300)
+            page.AbsolutePosition = Vector2.new(0, 0)
+            page.CanvasPosition = Vector2.new(0, 0)
+
+            -- sitting near the bottom, so opening runs off the fold
+            drop.main.AbsolutePosition = Vector2.new(0, 260)
+            drop:_bringIntoView()
+            expect(page.CanvasPosition.Y > 0).to.equal(true)
+
+            -- never past the card's own top, since pushing it off the top edge is not a fix
+            expect(page.CanvasPosition.Y <= 260).to.equal(true)
+
+            -- one that already ends inside the view is left where it is
+            page.CanvasPosition = Vector2.new(0, 0)
+            drop.main.AbsolutePosition = Vector2.new(0, 10)
+            drop:_bringIntoView()
+            expect(page.CanvasPosition.Y).to.equal(0)
+        end)
+    end)
+
     describe("component window viewport fitting", function()
         local variables = helpers.requireUtility("variables")
         local originalCamera
