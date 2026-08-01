@@ -1238,6 +1238,10 @@ function Window:_applyUserSize(size: Vector2): Vector2
     end
 
     self:_syncBottomFade()
+    -- growing a window parked near an edge pushes its far edge off the screen, since the size
+    -- changed under a position that was only on screen at the old one. _applyWindowSize clamps
+    -- for the same reason after a re-fit.
+    self:_clampToScreen()
     self:_syncDragBar()
     return applied
 end

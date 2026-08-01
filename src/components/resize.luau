@@ -97,9 +97,20 @@ function Resize.new(window)
     local pointer: Vector2? = nil
     local lastClick = -math.huge
 
+    -- The touch that started the resize. Another finger landing on the screen sends its own
+    -- InputChanged and InputEnded, and without holding on to this one they would move and end a
+    -- resize they had nothing to do with.
+    local held: InputObject? = nil
+
+    -- How far the pointer may travel and still count as a press rather than a drag. A resize
+    -- that only moved a pixel or two was never meant to be one, and a resize that moved further
+    -- must not arm the double click, or the next grab resets the window instead of resizing it.
+    local stillDistance = 6
+
     -- Where the grab started, in pointer and in pixels, so the drag is measured against the
     -- size at the moment it began rather than accumulating rounding every frame.
     local startPointer = Vector2.zero
+    local pressedAt: Vector2? = nil
     local startSize = Vector2.zero
     local resetOnSettle = false
 
@@ -222,6 +233,7 @@ function Resize.new(window)
 
     local function beginResize(at: Vector2)
         resizing = true
+        pressedAt = at
         startPointer = at
         startSize = currentSize()
         target = startSize
@@ -229,11 +241,17 @@ function Resize.new(window)
         startFollowing()
     end
 
-    local function endResize()
+    local function endResize(at: Vector2?)
         if not resizing then
             return
         end
         resizing = false
+        held = nil
+
+        -- a press that stayed put is a click, and two of those in quick succession are the
+        -- reset. One that travelled was a resize, and must not arm it.
+        local travelled = if at and pressedAt then (at - pressedAt).Magnitude else math.huge
+        lastClick = if travelled <= stillDistance then os.clock() else -math.huge
 
         if hovering then
             leanMark(0.18)
@@ -267,7 +285,7 @@ function Resize.new(window)
         -- two clicks in quick succession is the shortcut back to the fitted size, so it must be
         -- read before the grab arms, or the drag that the second click starts fights the snap
         local now = os.clock()
-        if now - lastClick < doubleClickWindow then
+        if lastClick > -math.huge and now - lastClick < doubleClickWindow then
             lastClick = -math.huge
             resizing = false
             resetOnSettle = true
@@ -276,7 +294,10 @@ function Resize.new(window)
             startFollowing()
             return
         end
-        lastClick = now
+        -- armed on release instead, and only if the pointer stayed put. Arming here counted
+        -- every press as the first half of a double click, including presses that became drags.
+        lastClick = -math.huge
+        held = if inputType == "Touch" then input else nil
 
         beginResize(pointerOf(input))
     end)
@@ -327,6 +348,12 @@ function Resize.new(window)
             return
         end
 
+        -- a second finger on the screen sends its own events; only the one that started this
+        -- resize gets to move it
+        if held and input ~= held then
+            return
+        end
+
         -- twice the distance dragged: the window is centre-anchored, so both edges move and the
         -- corner under the cursor only covers half of whatever the size gains
         local moved = (pointerOf(input) - startPointer) * 2
@@ -335,13 +362,22 @@ function Resize.new(window)
 
     self.window:Connect(variables.userInputService.InputEnded, function(input)
         local inputType = input.UserInputType.Name
-        if inputType == "MouseButton1" or inputType == "Touch" then
-            endResize()
+        if inputType ~= "MouseButton1" and inputType ~= "Touch" then
+            return
         end
+
+        -- and only the finger that started it gets to end it
+        if held and input ~= held then
+            return
+        end
+
+        endResize(pointerOf(input))
     end)
 
     -- alt-tabbing with the button still down never delivers InputEnded
-    self.window:Connect(variables.userInputService.WindowFocusReleased, endResize)
+    self.window:Connect(variables.userInputService.WindowFocusReleased, function()
+        endResize()
+    end)
 
     -- A collapsed or hidden window has no corner to grab, and the grip would otherwise sit over
     -- the pill. The window's own size is the one signal every one of those paths goes through.

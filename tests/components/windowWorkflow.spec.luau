@@ -1929,13 +1929,77 @@ return function()
             expect(w.size).to.equal(held)
         end)
 
-        it("snaps back to the fitted size on a double click", function()
+        it("keeps a resized window on screen when it grows near an edge", function()
+            local w = makeWindow()
+            w.settings.keepOnScreen = true
+            w.screenGui.AbsoluteSize = Vector2.new(900, 700)
+            w.main.Position = UDim2.fromOffset(700, 550)
+
+            -- the size changes under a position that was only on screen at the old one, so the
+            -- far edge walks off unless the position is clamped with it
+            w:_applyUserSize(Vector2.new(800, 620))
+
+            local half = Vector2.new(w.size.X.Offset / 2, w.size.Y.Offset / 2)
+            expect(w.main.Position.X.Offset + half.X <= 900).to.equal(true)
+            expect(w.main.Position.Y.Offset + half.Y <= 700).to.equal(true)
+        end)
+
+        it("does not count a drag as the first half of a double click", function()
+            local w = makeWindow()
+            local before = w.size
+
+            -- a press that travelled was a resize. Arming the reset on it means the next grab
+            -- snaps the window back instead of resizing it again.
+            moveTo(400, 300)
+            grab()
+            moveTo(520, 400)
+            settle()
+            release()
+
+            local resized = w.size
+            expect(resized).never.to.equal(before)
+
+            grab()
+            settle()
+            expect(w.size).to.equal(resized)
+            release()
+        end)
+
+        it("lets only the finger that started a resize move or end it", function()
+            local w = makeWindow()
+
+            mouse = Vector2.new(0, 0)
+            local first = { UserInputType = { Name = "Touch" }, Position = Vector3.new(400, 300, 0) }
+            w.resize.grip.InputBegan:Fire(first, false)
+
+            first.Position = Vector3.new(460, 340, 0)
+            helpers.services.UserInputService.InputChanged:Fire(first)
+            settle()
+            local held = w.size
+
+            -- a second finger landing anywhere sends its own events, and none of them belong to
+            -- this resize
+            local other = { UserInputType = { Name = "Touch" }, Position = Vector3.new(900, 900, 0) }
+            helpers.services.UserInputService.InputChanged:Fire(other)
+            settle()
+            expect(w.size).to.equal(held)
+
+            helpers.services.UserInputService.InputEnded:Fire(other)
+            first.Position = Vector3.new(520, 400, 0)
+            helpers.services.UserInputService.InputChanged:Fire(first)
+            settle()
+            expect(w.size).never.to.equal(held) -- the first finger still has it
+
+            helpers.services.UserInputService.InputEnded:Fire(first)
+        end)
+
+        it("snaps back to the fitted size on two presses that stayed put", function()
             local w = makeWindow()
             w:_applyUserSize(Vector2.new(900, 640))
             expect(w.size.X.Offset).to.equal(900)
 
-            -- two presses inside the double-click window: the first arms the shortcut, the
-            -- second takes it, and the window glides back rather than jumping
+            -- two presses inside the double-click window, neither of which moved: the first arms
+            -- the shortcut on release, the second takes it, and the window glides back
             moveTo(400, 300)
             grab()
             release()
@@ -1994,15 +2058,13 @@ return function()
             local w = makeWindow()
             local before = w.size.X.Offset
 
+            -- the same finger throughout: a resize is only moved by the touch that began it
             mouse = Vector2.new(0, 0)
-            w.resize.grip.InputBegan:Fire({
-                UserInputType = { Name = "Touch" },
-                Position = Vector3.new(400, 300, 0),
-            }, false)
-            helpers.services.UserInputService.InputChanged:Fire({
-                UserInputType = { Name = "Touch" },
-                Position = Vector3.new(500, 300, 0),
-            })
+            local finger = { UserInputType = { Name = "Touch" }, Position = Vector3.new(400, 300, 0) }
+            w.resize.grip.InputBegan:Fire(finger, false)
+
+            finger.Position = Vector3.new(500, 300, 0)
+            helpers.services.UserInputService.InputChanged:Fire(finger)
             settle()
 
             expect(w.size.X.Offset).to.equal(before + 200)
