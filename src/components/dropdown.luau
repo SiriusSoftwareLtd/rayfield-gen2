@@ -54,17 +54,13 @@ local cardPadding = cardPaddingTop + cardPaddingBottom
 -- the control was; it was not enough to choose from without scrolling almost immediately.
 local maxVisibleOptions = 4
 
--- The row of bulk actions a multi-select card carries above its list, and the soft edge drawn
--- over the bottom of that list while there is more of it below the fold.
+-- The row of bulk actions a multi-select card carries above its list.
 local actionsHeight = 22
-local fadeHeight = 26
-local fadeTween = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local hintTween = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
--- The card's own colour, taken from the first stop of its gradient, so the soft edge is drawn in
--- the tone the list sits on whatever the theme is rather than a grey guessed against the default.
-local function firstColorOf(value)
-    return functions.toColorSequence(value).Keypoints[1].Value
-end
+-- How visible the scrollbar is while there is list left to reach. Faint on purpose: it is there
+-- to say the list carries on, not to be furniture.
+local scrollbarShown = 0.4
 local searchTween = TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 
 local function dedupStrings(arr)
@@ -364,10 +360,10 @@ function Dropdown.new(tab, properties)
     })
 
     self.window:ConnectFor(self, self.list:GetPropertyChangedSignal("CanvasPosition"), function()
-        self:_syncFade()
+        self:_syncScrollHint()
     end)
     self.window:ConnectFor(self, self.list:GetPropertyChangedSignal("AbsoluteCanvasSize"), function()
-        self:_syncFade()
+        self:_syncScrollHint()
     end)
 
     self.listLayout = self.window:Create("UIListLayout", {
@@ -385,38 +381,6 @@ function Dropdown.new(tab, properties)
         PaddingBottom = UDim.new(0, listPadding),
 
         Parent = self.list,
-    })
-
-    -- Nothing on screen says a list is longer than the card, since the scrollbar is kept out of
-    -- the way. This is the edge of the list going soft while there is more of it below, which
-    -- reads as more to come rather than as a list that simply ends there.
-    --
-    -- It hangs off the wrapper rather than the card, because the card lays its children out with
-    -- a UIListLayout and that lays out every visible child it has, wherever it has been put. On
-    -- the card this took a slot in the flow instead of floating over the list: it pushed the
-    -- search bar and every row down by its own height and forced the last row past the card's
-    -- edge, and only once there was something to scroll, which is when it first became visible.
-    self.listFade = self.window:Create("Frame", {
-        Name = "Fade",
-        AnchorPoint = Vector2.new(0.5, 1),
-        Position = UDim2.new(0.5, 0, 1, -cardPaddingBottom),
-        Size = UDim2.new(1, -12, 0, fadeHeight),
-        BorderSizePixel = 0,
-        BackgroundTransparency = 1,
-        ZIndex = 3,
-        Visible = false,
-
-        Parent = self.main,
-    }, { BackgroundColor3 = { "ElementGradient", firstColorOf } })
-
-    self.window:Create("UIGradient", {
-        Rotation = 270,
-        Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 1),
-            NumberSequenceKeypoint.new(1, 0),
-        }),
-
-        Parent = self.listFade,
     })
 
     -- Said when a search matches nothing. Without it the card is a search box over an empty
@@ -905,16 +869,16 @@ function Dropdown:_applyFilter(query)
     self.emptyLabel.Visible = shown == 0
     self:_updateCorners()
     self:_resizeToOptions()
-    self:_syncFade()
+    self:_syncScrollHint()
 end
 
--- Show the soft edge only while there is list left underneath it. Measured rather than assumed,
+-- Show the scrollbar only while there is list left to reach. Measured rather than assumed,
 -- because a filter can take a list that was scrolling down to two rows that are not.
-function Dropdown:_syncFade()
-    if not self.listFade then
-        return
-    end
-
+--
+-- A soft edge drawn over the bottom of the list was tried first, and it read as a shadow across
+-- the last row rather than as more to come. The rows are lighter than the card behind them, so
+-- anything laid over one dims it, and a dimmed row looks like a fault rather than an invitation.
+function Dropdown:_syncScrollHint()
     -- a list that has not been laid out yet has nothing to measure, and nothing to hide either
     local canvasSize, windowSize, at =
         self.list.AbsoluteCanvasSize, self.list.AbsoluteWindowSize, self.list.CanvasPosition
@@ -924,8 +888,9 @@ function Dropdown:_syncFade()
 
     local more = self._isOpen and windowSize.Y > 0 and canvasSize.Y - (at.Y + windowSize.Y) > 1
 
-    self.listFade.Visible = more == true
-    variables.tweenService:Create(self.listFade, fadeTween, { BackgroundTransparency = if more then 0 else 1 }):Play()
+    variables.tweenService
+        :Create(self.list, hintTween, { ScrollBarImageTransparency = if more then scrollbarShown else 1 })
+        :Play()
 end
 
 -- Every option the search is currently letting through, which is what a bulk action applies to:
@@ -977,10 +942,10 @@ function Dropdown:_buildActions()
         }, { TextColor3 = "ContentColor", FontFace = "Font" })
 
         self.window:ConnectFor(self, button.MouseEnter, function()
-            variables.tweenService:Create(button, fadeTween, { TextTransparency = 0.15 }):Play()
+            variables.tweenService:Create(button, hintTween, { TextTransparency = 0.15 }):Play()
         end)
         self.window:ConnectFor(self, button.MouseLeave, function()
-            variables.tweenService:Create(button, fadeTween, { TextTransparency = 0.45 }):Play()
+            variables.tweenService:Create(button, hintTween, { TextTransparency = 0.45 }):Play()
         end)
         self.window:ConnectFor(self, button.MouseButton1Click, function()
             apply()
@@ -1142,7 +1107,7 @@ function Dropdown:_open()
         self._renderOptionState(data, true)
     end
 
-    self:_syncFade()
+    self:_syncScrollHint()
     self:_bringIntoView()
 end
 
@@ -1191,7 +1156,7 @@ function Dropdown:_close()
     end
 
     self:_collapseSearch()
-    self:_syncFade()
+    self:_syncScrollHint()
 
     variables.tweenService
         :Create(

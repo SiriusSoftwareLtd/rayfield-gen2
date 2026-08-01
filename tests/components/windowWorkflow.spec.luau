@@ -1566,7 +1566,7 @@ return function()
             expect(drop:_openHeight() > 95).to.equal(true)
         end)
 
-        it("softens the list edge only while there is more of it below", function()
+        it("shows the scrollbar only while there is list left to reach", function()
             local w = makeWindow()
             local tab = w:CreateTab({ name = "Main" })
             local drop = tab:CreateDropdown({
@@ -1575,28 +1575,23 @@ return function()
                 forgetState = true,
             })
 
-            -- the card lays its children out, so anything meant to float over the list has to
-            -- hang off the wrapper instead, or it takes a slot in the flow and pushes the search
-            -- bar and every row down by its own height
-            expect(drop.listFade.Parent).to.equal(drop.main)
-
             drop._isOpen = true
             drop.list.AbsoluteWindowSize = Vector2.new(300, 160)
             drop.list.AbsoluteCanvasSize = Vector2.new(300, 260)
             drop.list.CanvasPosition = Vector2.new(0, 0)
-            drop:_syncFade()
-            expect(drop.listFade.Visible).to.equal(true)
+            drop:_syncScrollHint()
+            expect(drop.list.ScrollBarImageTransparency < 1).to.equal(true)
 
-            -- scrolled to the end, so there is nothing left to hint at
+            -- scrolled to the end, so there is nothing left to point at
             drop.list.CanvasPosition = Vector2.new(0, 100)
-            drop:_syncFade()
-            expect(drop.listFade.Visible).to.equal(false)
+            drop:_syncScrollHint()
+            expect(drop.list.ScrollBarImageTransparency).to.equal(1)
 
-            -- and a list that fits never wore it at all
+            -- and a list that fits never showed one at all
             drop.list.AbsoluteCanvasSize = Vector2.new(300, 120)
             drop.list.CanvasPosition = Vector2.new(0, 0)
-            drop:_syncFade()
-            expect(drop.listFade.Visible).to.equal(false)
+            drop:_syncScrollHint()
+            expect(drop.list.ScrollBarImageTransparency).to.equal(1)
         end)
 
         it("selects and clears a multi-select list in one go", function()
