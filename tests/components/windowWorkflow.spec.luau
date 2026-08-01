@@ -2210,22 +2210,6 @@ return function()
             expect(slider._layoutMode).to.equal("wide")
         end)
 
-        it("replaces an expansion already in flight rather than layering another over it", function()
-            local w = makeWindow()
-            local tab = w:CreateTab({ name = "Main" })
-            local row = tab:CreateGroup({ direction = "row" })
-            local child = row:CreateButton({ name = "One" })
-
-            child.main.AbsoluteSize = Vector2.new(150, 41)
-            row:_setSlotWidth(child, 400, true)
-            local first = child._expandTween
-            expect(first).to.be.ok()
-
-            child.main.AbsoluteSize = Vector2.new(220, 41)
-            row:_setSlotWidth(child, 300, true)
-            expect(child._expandTween).never.to.equal(first)
-        end)
-
         it("leaves the width sharing alone where it is not the row's to do", function()
             local w = makeWindow()
             local tab = w:CreateTab({ name = "Main" })

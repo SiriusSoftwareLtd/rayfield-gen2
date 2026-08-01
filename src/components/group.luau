@@ -277,6 +277,22 @@ function Group:_shareWidth()
     local settled = self._packed
     self._packed = true
 
+    -- Which line every child has landed on, resolved before anything is applied, because the two
+    -- questions this pass has to answer are not the same question. Whether a child travels is its
+    -- own: only the one that changed line has anywhere to travel from. Whether anything animates
+    -- at all belongs to the pass: if the packing moved, every child is owed a different share of
+    -- its line and they all have to open into it together, or the one that left is the only thing
+    -- that moves and the room it made appears out of nowhere.
+    local lines, changed = {}, false
+    for index, row in rows do
+        for _, element in row.items do
+            lines[element] = index
+            if settled and element._line ~= nil and element._line ~= index then
+                changed = true
+            end
+        end
+    end
+
     -- where the group sits on the screen is not the group's business: the window moves under it
     -- every frame of a resize, and measuring from there would read every one of those frames as
     -- a child having been moved. Everything below is measured against the group itself.
@@ -287,17 +303,34 @@ function Group:_shareWidth()
         local share = math.floor(spare / #row.items)
 
         for _, element in row.items do
-            -- a child that changed line is the only child worth animating, and it is this that
-            -- knows, rather than anything having to be inferred from where it ended up
-            local wrapped = settled and element._line ~= nil and element._line ~= index
-            if wrapped then
+            -- cleared as well as set: a wrap that happens to leave a slot where it already was is
+            -- never consumed, and would otherwise be spent on the next unrelated layout pass, long
+            -- after the position it holds has stopped meaning anything
+            if settled and element._line ~= nil and element._line ~= index then
                 element._travelFrom = element._slot.AbsolutePosition - origin
+            else
+                element._travelFrom = nil
             end
             element._line = index
 
-            self:_setSlotWidth(element, (element._minSlotWidth or 0) + share, wrapped)
+            self:_setSlotWidth(element, (element._minSlotWidth or 0) + share, changed)
         end
     end
+end
+
+-- End an expansion and hand back the height to finish it at. A height its own layout asked for
+-- while the width was in flight was held rather than written, since writing one would have taken
+-- the width with it, so it has to land here however the expansion ends - which is why this is not
+-- left to the tween alone to do.
+function Group:_finishExpanding(element, current: UDim)
+    element._slotExpanding = false
+
+    local held = element._pendingSlotHeight
+    element._pendingSlotHeight = nil
+    if held then
+        return UDim.new(0, held)
+    end
+    return current
 end
 
 -- Give a child the width its line owes it. The slot takes it at once, always: the slot is what
@@ -316,8 +349,8 @@ function Group:_setSlotWidth(element, width, animate)
 
     local height = element.main.Size.Y
     if not animate or self.window.hidden or self.window.animating or before <= 0 then
-        element._slotExpanding = false
-        element.main.Size = UDim2.new(1, 0, height.Scale, height.Offset)
+        local settled = self:_finishExpanding(element, height)
+        element.main.Size = UDim2.new(1, 0, settled.Scale, settled.Offset)
         return
     end
 
@@ -334,15 +367,15 @@ function Group:_setSlotWidth(element, width, animate)
         Size = UDim2.new(1, 0, height.Scale, height.Offset),
     })
     element._expandTween = expand
-    expand.Completed:Connect(function()
-        element._slotExpanding = false
-        -- a height its own layout asked for while this was in flight, held back so that writing
-        -- it would not have taken the width with it
-        local settled = element._pendingSlotHeight
-        element._pendingSlotHeight = nil
-        if settled then
-            element.main.Size = UDim2.new(1, 0, 0, settled)
+    expand.Completed:Connect(function(state)
+        -- a cancellation is the tween replacing this one having already set the state up, so
+        -- there is nothing here to end: clearing it now would undo that setup underneath it
+        if state ~= Enum.PlaybackState.Completed then
+            return
         end
+
+        local finished = self:_finishExpanding(element, element.main.Size.Y)
+        element.main.Size = UDim2.new(1, 0, finished.Scale, finished.Offset)
     end)
     expand:Play()
 end
