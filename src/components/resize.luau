@@ -82,6 +82,8 @@ function Resize.new(window)
         Size = UDim2.fromOffset(markRest, markRest),
         Image = markImage,
         ImageColor3 = restColor,
+        -- Animation
+        ImageTransparency = 1, -- In = 0, once the window has finished coming in
         ScaleType = Enum.ScaleType.Slice,
         SliceCenter = markSlice,
         SliceScale = markSliceScale,
@@ -353,6 +355,23 @@ function Resize:_refresh()
     end
     local window = self.window
     self.grip.Visible = window.settings.resizable and not window.minimised and not window.hidden
+end
+
+-- Fade the mark with the window it belongs to. The window comes in a piece at a time and the
+-- grip is the last thing on it, so it arrives after the elements have finished rather than
+-- sitting in the corner of a frame that is still assembling itself.
+function Resize:_setShown(shown: boolean, animate: boolean?)
+    if not self.mark then
+        return
+    end
+
+    local transparency = if shown then 0 else 1
+    if animate == false then
+        self.mark.ImageTransparency = transparency
+        return
+    end
+
+    tween(self.mark, { ImageTransparency = transparency, Size = UDim2.fromOffset(markRest, markRest) }, 0.35)
 end
 
 -- Show or hide the grip. The window keeps whatever size it was dragged to when the grip goes

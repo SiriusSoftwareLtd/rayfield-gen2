@@ -986,6 +986,8 @@ function Window:Hide()
     variables.tweenService:Create(self.windowShadow, fadeInfo, { Transparency = 1 }):Play()
     variables.tweenService:Create(self.windowStroke, fadeInfo, { Transparency = 1 }):Play()
     variables.tweenService:Create(self.bottomFade, fadeInfo, { BackgroundTransparency = 1 }):Play()
+    -- last on, first off: the corner it marks is the first thing the collapse takes away
+    self.resize:_setShown(false)
 
     if self.title then
         variables.tweenService:Create(self.title, fadeInfo, { TextTransparency = 1 }):Play()
@@ -1107,6 +1109,7 @@ function Window:ToggleMinimise()
             end
 
             self:_revealElements(0.035, 0.4)
+            self.resize:_setShown(true)
         end)
 
         task.delay(0.5, function()
@@ -1119,6 +1122,7 @@ function Window:ToggleMinimise()
         -- fade the content + tab pills out instead of cutting them, then hide them once faded
         -- so they don't sit clipped under the collapsed bar
         self:_fadeSelectedElementsOut()
+        self.resize:_setShown(false)
         for _, tab in pairs(self.tabs) do
             if not tab.neglectSelector and tab.topbarItem then
                 tab:_applyVisual("hidden", fadeInfo)
@@ -1865,6 +1869,7 @@ function Window:_quickRestore()
         end
 
         self:_revealElements(0.035, 0.4)
+        self.resize:_setShown(true)
     end)
 
     -- Drag handle grows in with the chrome, same width sweep it uses on first reveal. Position
@@ -1989,6 +1994,8 @@ function Window:_firstShow()
     end)
 
     self:_revealElements(0.03, 2)
+    -- last thing on the window, so it lands once everything it sits over has arrived
+    self.resize:_setShown(true)
 
     task.wait(1)
 

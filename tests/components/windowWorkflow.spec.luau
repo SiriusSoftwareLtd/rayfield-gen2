@@ -1647,6 +1647,7 @@ return function()
             })
             resized.hidden = false
             resized.resize:_refresh()
+            resized.resize:_setShown(true, false)
             return resized
         end
 
@@ -1715,6 +1716,20 @@ return function()
 
             w.resize:SetEnabled(true)
             expect(w.resize.grip.Visible).to.equal(true)
+        end)
+
+        it("brings the mark in after the window it sits on, and takes it off first", function()
+            local w = makeWindow()
+
+            w.resize:_setShown(false, false)
+            expect(w.resize.mark.ImageTransparency).to.equal(1)
+
+            w.resize:_setShown(true, false)
+            expect(w.resize.mark.ImageTransparency).to.equal(0)
+
+            -- the animated path goes through a tween, which the harness lands immediately
+            w.resize:_setShown(false)
+            expect(w.resize.mark.ImageTransparency).to.equal(1)
         end)
 
         it("takes the grip away from a window with no corner to grab", function()
