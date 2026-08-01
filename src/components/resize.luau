@@ -151,9 +151,13 @@ function Resize.new(window)
         return Vector2.new(1 - math.clamp(x, 0, 1), 1 - math.clamp(y, 0, 1))
     end
 
+    -- The mark leans toward the pointer by default. Held still it keeps its resting size and
+    -- only takes the colour, so the grip still answers to being hovered and pressed without the
+    -- corner of the window moving while you are trying to aim at it.
     local function setMark(horizontal: number, vertical: number, color: Color3, duration: number)
+        local still = self.window.settings and self.window.settings.gripAnimation == false
         tween(self.mark, {
-            Size = UDim2.fromOffset(horizontal, vertical),
+            Size = if still then UDim2.fromOffset(markRest, markRest) else UDim2.fromOffset(horizontal, vertical),
             ImageColor3 = color,
         }, duration)
     end
@@ -346,6 +350,14 @@ function Resize.new(window)
     end)
 
     return self
+end
+
+-- Put the mark back to its resting size, for a change of mind about it leaning: without this it
+-- keeps whatever size the last lean left it at until the pointer next touches the grip.
+function Resize:_settleMark()
+    if self.mark then
+        tween(self.mark, { Size = UDim2.fromOffset(markRest, markRest), ImageColor3 = restColor }, 0.18)
+    end
 end
 
 -- Show the grip only where there is a window corner to take hold of.

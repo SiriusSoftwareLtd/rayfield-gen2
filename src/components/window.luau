@@ -604,6 +604,7 @@ function Window.new(properties)
         mouseOverride = true, -- free the cursor while the menu is open (for FPS games that lock it)
         keepOnScreen = true, -- clamp the drag so the window cant be pulled off screen
         resizable = true, -- show the corner grip that drags the window's size
+        gripAnimation = true, -- the grip's mark leans toward the pointer rather than holding still
         welcomeToast = true, -- the "signed in as" toast on first open for a new/changed account
         haptics = false, -- off by default; opt in from settings (buzzes on presses/notifications)
     }
@@ -1578,6 +1579,19 @@ function Window:_buildSettingsUI()
                 self.resize:SetEnabled(state)
             else
                 self.settings.resizable = state
+            end
+            self:SaveSettings()
+        end,
+    })
+
+    self.rfSettings:CreateToggle({
+        name = "Animated resize grip",
+        description = "The corner mark leans toward the pointer. Turn this off to hold it still.",
+        value = self.settings.gripAnimation,
+        callback = function(state)
+            self.settings.gripAnimation = state
+            if self.resize then
+                self.resize:_settleMark()
             end
             self:SaveSettings()
         end,

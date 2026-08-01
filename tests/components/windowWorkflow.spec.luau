@@ -1732,6 +1732,48 @@ return function()
             expect(w.resize.mark.ImageTransparency).to.equal(1)
         end)
 
+        it("holds the mark still when the lean is switched off", function()
+            local w = makeWindow()
+            local mark = w.resize.mark
+
+            w.resize.grip.AbsolutePosition = Vector2.new(400, 400)
+            w.resize.grip.AbsoluteSize = Vector2.new(54, 54)
+            mouse = Vector2.new(410, 410)
+
+            -- on, the mark reaches out toward the pointer
+            w.resize.grip.MouseEnter:Fire()
+            expect(mark.Size.X.Offset > 18).to.equal(true)
+
+            -- off, the corner of the window stops moving while you are aiming at it, though the
+            -- grip still answers to being hovered by taking the colour
+            w.settings.gripAnimation = false
+            w.resize.grip.MouseLeave:Fire()
+            w.resize.grip.MouseEnter:Fire()
+            expect(mark.Size).to.equal(UDim2.fromOffset(18, 18))
+
+            -- the setting is the one in the window's own settings tab, and it persists
+            local toggle
+            for _, element in w.rfSettings.elements do
+                if element.name == "Animated resize grip" then
+                    toggle = element
+                end
+            end
+            expect(toggle).to.be.ok()
+
+            toggle:Set(false)
+            expect(w.settings.gripAnimation).to.equal(false)
+            expect(mark.Size).to.equal(UDim2.fromOffset(18, 18))
+
+            toggle:Set(true)
+            expect(w.settings.gripAnimation).to.equal(true)
+
+            -- and a change of mind puts it back rather than leaving it at its last lean
+            w.resize.grip.MouseEnter:Fire()
+            expect(mark.Size.X.Offset > 18).to.equal(true)
+            w.resize:_settleMark()
+            expect(mark.Size).to.equal(UDim2.fromOffset(18, 18))
+        end)
+
         it("takes the grip away from a window with no corner to grab", function()
             local w = makeWindow()
 
