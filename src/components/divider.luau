@@ -126,7 +126,14 @@ function Divider:Set(text)
 
     self.text = if text ~= nil and text ~= "" then tostring(text) else ""
     self.window:_bindLocale(self.title, "Text", self.text)
-    self.title.Visible = self.text ~= ""
+
+    -- clearing the word has to close the rule back up. The halves are laid out either side of
+    -- the label with a gap between them, so hiding the label alone leaves that gap sitting in
+    -- the middle of the line. The layout skips what it cannot see, so dropping the far half
+    -- leaves the near one to fill the width on its own, which is the plain rule again.
+    local named = self.text ~= ""
+    self.title.Visible = named
+    self.right.Visible = named
 end
 
 function Divider:_setShown(shown, animate)

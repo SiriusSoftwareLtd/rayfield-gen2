@@ -1449,6 +1449,13 @@ return function()
 
             named:Set("")
             expect(named.title.Visible).to.equal(false)
+            -- and the rule closes back up rather than leaving the gap the label sat in
+            expect(named.right.Visible).to.equal(false)
+            expect(named.left.Visible).to.equal(true)
+
+            named:Set("Back again")
+            expect(named.title.Visible).to.equal(true)
+            expect(named.right.Visible).to.equal(true)
 
             -- and one built without a label has nothing to set
             plain:Set("ignored")
@@ -1491,129 +1498,33 @@ return function()
             space:_setShown(true, false)
             space:_setShown(false, false)
         end)
-<<<<<<< HEAD
-=======
-
-        it("puts a line of text on a page, with or without an icon", function()
-            local w = makeWindow()
-            local tab = w:CreateTab({ name = "Main" })
-
-            local label = tab:CreateLabel({ text = "Plain text on its own" })
-            expect(label.__type).to.equal("Label")
-            expect(label.title.Text).to.equal("Plain text on its own")
-            expect(label.iconLabel).to.equal(nil)
-
-            -- a Section is a heading and a description hangs off an element, so neither of them
-            -- can simply say something. This is registered as an element in its own right.
-            expect(table.find(tab.elements, label)).to.be.ok()
-
-            local withIcon = tab:CreateLabel({ text = "With an icon", icon = 123 })
-            expect(withIcon.iconLabel).to.be.ok()
-
-            label:Set("Changed")
-            expect(label.title.Text).to.equal("Changed")
-
-            -- and it takes the name key too, since every other element calls its text that
-            local named = tab:CreateLabel({ name = "By name" })
-            expect(named.title.Text).to.equal("By name")
-        end)
-
-        it("puts a title over a body, and drops either half when it is empty", function()
-            local w = makeWindow()
-            local tab = w:CreateTab({ name = "Main" })
-
-            local paragraph = tab:CreateParagraph({
-                name = "Heading",
-                text = "A body long enough to wrap onto a second line when the window is narrow.",
-            })
-            expect(paragraph.__type).to.equal("Paragraph")
-            expect(paragraph.title.Text).to.equal("Heading")
-            expect(paragraph.title.Visible).to.equal(true)
-            expect(paragraph.body.Visible).to.equal(true)
-
-            -- the card grows with its copy, since the length is not knowable in advance
-            expect(paragraph.main.AutomaticSize).to.equal(Enum.AutomaticSize.Y)
-
-            -- a title on its own is a label with a card around it, so the body takes no room
-            local titleOnly = tab:CreateParagraph({ name = "Just a heading" })
-            expect(titleOnly.body.Visible).to.equal(false)
-
-            local bodyOnly = tab:CreateParagraph({ text = "Just a body" })
-            expect(bodyOnly.title.Visible).to.equal(false)
-
-            paragraph:Set("New body")
-            expect(paragraph.body.Text).to.equal("New body")
-            expect(paragraph.title.Text).to.equal("Heading")
-
-            paragraph:Set(nil, "New heading")
-            expect(paragraph.title.Text).to.equal("New heading")
-            expect(paragraph.body.Text).to.equal("New body")
-
-            paragraph:Set("")
-            expect(paragraph.body.Visible).to.equal(false)
-        end)
-
-        it("keeps text set after the fact through a language change", function()
+        it("keeps a label set after the fact through a language change", function()
             local w = makeWindow()
             w:RegisterTranslations({
                 fr = {
                     ["Built with this"] = "Construit avec ceci",
                     ["Set after the fact"] = "Defini apres coup",
-                    ["Original heading"] = "Titre original",
-                    ["New heading"] = "Nouveau titre",
                 },
             })
 
             local tab = w:CreateTab({ name = "Main" })
-            local label = tab:CreateLabel({ text = "Built with this" })
-            local paragraph = tab:CreateParagraph({ name = "Original heading", text = "Built with this" })
             local divider = tab:CreateDivider({ text = "Built with this" })
-
-            label:Set("Set after the fact")
-            paragraph:Set("Set after the fact", "New heading")
             divider:Set("Set after the fact")
 
             -- the window re-resolves every localised property from the source it was bound to,
             -- so text written straight to the label would be replaced here by a translation of
             -- the copy it no longer shows
             w:SetLocale("fr")
-            expect(label.title.Text).to.equal("Defini apres coup")
-            expect(paragraph.body.Text).to.equal("Defini apres coup")
-            expect(paragraph.title.Text).to.equal("Nouveau titre")
             expect(divider.title.Text).to.equal("Defini apres coup")
 
             -- and setting again while a language is active still lands
-            label:Set("Built with this")
-            expect(label.title.Text).to.equal("Construit avec ceci")
+            divider:Set("Built with this")
+            expect(divider.title.Text).to.equal("Construit avec ceci")
 
             w:SetLocale("en")
-            expect(label.title.Text).to.equal("Built with this")
-            expect(paragraph.body.Text).to.equal("Set after the fact")
+            expect(divider.title.Text).to.equal("Built with this")
         end)
 
-        it("reveals and hides both with the rest of the page", function()
-            local w = makeWindow()
-            local tab = w:CreateTab({ name = "Main" })
-            local label = tab:CreateLabel({ text = "Text", icon = 1 })
-            local paragraph = tab:CreateParagraph({ name = "Heading", text = "Body", icon = 1 })
-
-            label:_setShown(false, false)
-            expect(label.title.TextTransparency).to.equal(1)
-            expect(label.iconLabel.ImageTransparency).to.equal(1)
-
-            label:_setShown(true, false)
-            expect(label.title.TextTransparency < 1).to.equal(true)
-
-            paragraph:_setShown(false, false)
-            expect(paragraph.body.TextTransparency).to.equal(1)
-            expect(paragraph.main.BackgroundTransparency).to.equal(1)
-
-            paragraph:_setShown(true, false)
-            expect(paragraph.body.TextTransparency < 1).to.equal(true)
-            expect(paragraph.title.TextTransparency < 1).to.equal(true)
-        end)
-
->>>>>>> 43c83c0 (Rebind the locale when a divider's label is set)
         it("reorders like every other element", function()
             local w = makeWindow()
             local tab = w:CreateTab({ name = "Main" })

@@ -3,9 +3,15 @@
   "measuredDate": "2026-07-31",
   "command": "make coverage-baseline",
   "threshold": 70.00,
+<<<<<<< HEAD
   "lineCoverage": 82.61,
   "coveredLines": 4536,
   "coverableLines": 5491,
+=======
+  "lineCoverage": 83.12,
+  "coveredLines": 4663,
+  "coverableLines": 5610,
+>>>>>>> 3a26781 (Close the rule back up when a divider's label is cleared)
   "notes": [
     "Generated reports are written to coverage/coverage.txt and coverage/coverage-summary.json.",
     "The enforced Lune coverage scope is discovered dynamically from src by default.",
@@ -44,6 +50,15 @@
       "coverableLines": 13
     },
     {
+<<<<<<< HEAD
+=======
+      "path": "src/components/divider.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 46,
+      "coverableLines": 46
+    },
+    {
+>>>>>>> 3a26781 (Close the rule back up when a divider's label is cleared)
       "path": "src/components/drag.luau",
       "lineCoverage": 46.51,
       "coveredLines": 40,
