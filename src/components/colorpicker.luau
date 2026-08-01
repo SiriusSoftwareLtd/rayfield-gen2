@@ -66,6 +66,12 @@ local maxStops = 20 -- what a ColorSequence itself allows
 -- shadow per stop on a twenty stop sequence.
 local glowBands = 6
 
+-- How far inside the swatch the bands sit. They are square and the swatch is not, so anything
+-- reaching its corners shows as a corner poking out of the curve. Clear of the corner radius
+-- horizontally, and off the top and bottom edges, so the shape stays the swatch's own.
+local glowInsetX = 12
+local glowInsetY = 7
+
 -- Per-mode geometry for the bits that move between layouts. map + hue + alpha stay top-left in
 -- both. "open" rects are where the preview morphs to and where the hex + alpha fields sit;
 -- "height" is the card's open height. Built against the top the controls actually start at, so a
@@ -486,25 +492,37 @@ function ColorPicker:_buildHeader()
 
         -- Bands sitting on the swatch, each the colour the gradient already has there, so they
         -- are invisible against it and only their shadows show. That is what puts the right
-        -- colour under each end rather than one colour under the whole thing.
+        -- colour under each end rather than one colour under the whole thing. They live in a row
+        -- held inside the swatch's corners, since a square band reaching a rounded corner shows
+        -- as a corner sticking out of the curve.
+        self.glowRow = self.window:Create("Frame", {
+            Name = "Glow",
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.fromScale(0.5, 0.5),
+            Size = UDim2.new(1, -glowInsetX * 2, 1, -glowInsetY * 2),
+            BackgroundTransparency = 1,
+            ZIndex = 2,
+
+            Parent = self.preview,
+        })
+
         self.glowBands = {}
         for index = 1, glowBands do
             local band = self.window:Create("Frame", {
-                Name = "Glow",
                 BorderSizePixel = 0,
                 AnchorPoint = Vector2.new(0, 0.5),
                 Position = UDim2.new((index - 1) / glowBands, 0, 0.5, 0),
                 -- a hair wider than its share, so the seams between bands never show
-                Size = UDim2.new(1 / glowBands, 2, 1, -6),
+                Size = UDim2.new(1 / glowBands, 1, 1, 0),
                 BackgroundTransparency = 1, -- follows the swatch's own alpha
                 ZIndex = 2,
 
-                Parent = self.preview,
+                Parent = self.glowRow,
             })
 
             table.insert(self.glowBands, {
                 frame = band,
-                glow = self.window:CreateGlow(band, Color3.fromRGB(255, 255, 255), 20, 1),
+                glow = self.window:CreateGlow(band, Color3.fromRGB(255, 255, 255), 18, 1),
             })
         end
     end
