@@ -441,6 +441,78 @@ end
 -- full-width one stays wide. The AbsoluteSize handler that calls this ignores the transient
 -- widths the window sweeps through as it opens/closes, so this only ever runs on a settled
 -- width (see the guard where it's connected).
+-- The title block's two layouts are a different arrangement of the same labels rather than a
+-- move: one stacks them, the other sits them side by side, and a UIListLayout switches between
+-- the two in a single frame with nothing in between to tween. So the labels are taken off screen
+-- for the swap and brought back once they are where they belong. The track is a move, and it
+-- moves across the whole reflow underneath that fade.
+local labelFadeOut = TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local labelFadeIn = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local trackReflow = TweenInfo.new(0.34, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
+function Slider:_fadeLabels(hidden, info)
+    variables.tweenService:Create(self.title, info, { TextTransparency = if hidden then 1 else 0 }):Play()
+    if self.valueOdo then
+        self.valueOdo:reveal(if hidden then 1 else 0.3, true, info)
+    end
+end
+
+-- The half of a reflow that moves: the element's own height and the track's trip between the
+-- right-hand side and the bottom edge.
+function Slider:_placeTrack(mode, animate)
+    if mode == "narrow" then
+        self:_setMainHeight(70, animate)
+        reflow.morph(self.track, {
+            AnchorPoint = Vector2.new(0.5, 1),
+            Position = UDim2.new(0.5, 0, 1, -14),
+            Size = UDim2.new(1, -30, 0, 14),
+        }, animate, trackReflow)
+    else
+        self:_setMainHeight(65, animate)
+        reflow.morph(self.track, {
+            AnchorPoint = Vector2.new(1, 0.5),
+            Position = UDim2.new(1, -trackInset, 0.5, 0),
+            Size = UDim2.new(0, trackWidth, 0, 14),
+        }, animate, trackReflow)
+    end
+end
+
+-- The half that can only be switched. Nothing here is watchable, so it happens behind the fade.
+function Slider:_placeLabels(mode)
+    if mode == "narrow" then
+        reflow.morph(self.container, {
+            AnchorPoint = Vector2.new(0, 0),
+            Position = UDim2.new(0, titleInset, 0, 14),
+            Size = UDim2.new(1, -titleInset * 2, 0, 16),
+        }, false)
+        self.containerLayout.FillDirection = Enum.FillDirection.Horizontal
+        self.titleFlex.FlexMode = Enum.UIFlexMode.Fill -- title grows, value hugs the right
+        self.valueHost.AutomaticSize = Enum.AutomaticSize.X
+        self.valueHost.Size = UDim2.new(0, 0, 0, 16)
+    else
+        reflow.morph(self.container, {
+            AnchorPoint = Vector2.new(0, 0.5),
+            Position = UDim2.new(0, titleInset, 0.5, 0),
+            Size = UDim2.new(0, titleWidth, 0, 33),
+        }, false)
+        self.containerLayout.FillDirection = Enum.FillDirection.Vertical
+        self.titleFlex.FlexMode = Enum.UIFlexMode.None
+        self.valueHost.AutomaticSize = Enum.AutomaticSize.None
+        self.valueHost.Size = UDim2.new(1, 0, 0, 16)
+    end
+end
+
+-- Land the switched half and bring the labels back, once the fade has taken them off screen.
+-- A second reflow landing mid-fade owns a newer pass, and this one drops rather than fading a
+-- layout back in that has already been replaced.
+function Slider:_finishReflow(pass, mode)
+    if self.window.unloaded or self._reflowPass ~= pass then
+        return
+    end
+    self:_placeLabels(mode)
+    self:_fadeLabels(false, labelFadeIn)
+end
+
 function Slider:_applyLayout()
     if self.minimal then
         return -- bare mode has a fixed slim layout, nothing to reflow
@@ -455,45 +527,21 @@ function Slider:_applyLayout()
 
     -- the first pass builds the layout, so it lands at once; every pass after that is a live
     -- swap under a window being resized, and is watched
-    local animate = settled and not self.window.hidden and not self.window.animating
-
-    if mode == "narrow" then
-        self:_setMainHeight(70, animate)
-
-        reflow.morph(self.container, {
-            AnchorPoint = Vector2.new(0, 0),
-            Position = UDim2.new(0, titleInset, 0, 14),
-            Size = UDim2.new(1, -titleInset * 2, 0, 16),
-        }, animate)
-        self.containerLayout.FillDirection = Enum.FillDirection.Horizontal
-        self.titleFlex.FlexMode = Enum.UIFlexMode.Fill -- title grows, value hugs the right
-        self.valueHost.AutomaticSize = Enum.AutomaticSize.X
-        self.valueHost.Size = UDim2.new(0, 0, 0, 16)
-
-        reflow.morph(self.track, {
-            AnchorPoint = Vector2.new(0.5, 1),
-            Position = UDim2.new(0.5, 0, 1, -14),
-            Size = UDim2.new(1, -30, 0, 14),
-        }, animate)
-    else
-        self:_setMainHeight(65, animate)
-
-        reflow.morph(self.container, {
-            AnchorPoint = Vector2.new(0, 0.5),
-            Position = UDim2.new(0, titleInset, 0.5, 0),
-            Size = UDim2.new(0, titleWidth, 0, 33),
-        }, animate)
-        self.containerLayout.FillDirection = Enum.FillDirection.Vertical
-        self.titleFlex.FlexMode = Enum.UIFlexMode.None
-        self.valueHost.AutomaticSize = Enum.AutomaticSize.None
-        self.valueHost.Size = UDim2.new(1, 0, 0, 16)
-
-        reflow.morph(self.track, {
-            AnchorPoint = Vector2.new(1, 0.5),
-            Position = UDim2.new(1, -trackInset, 0.5, 0),
-            Size = UDim2.new(0, trackWidth, 0, 14),
-        }, animate)
+    if not (settled and not self.window.hidden and not self.window.animating) then
+        self:_placeTrack(mode, false)
+        self:_placeLabels(mode)
+        return
     end
+
+    local pass = (self._reflowPass or 0) + 1
+    self._reflowPass = pass
+
+    self:_fadeLabels(true, labelFadeOut)
+    self:_placeTrack(mode, true)
+
+    task.delay(labelFadeOut.Time, function()
+        self:_finishReflow(pass, mode)
+    end)
 end
 
 function Slider:_format(value)

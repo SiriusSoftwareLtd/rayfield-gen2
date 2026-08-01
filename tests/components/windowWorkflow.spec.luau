@@ -2003,6 +2003,61 @@ return function()
             expect(w.size).to.equal(held)
         end)
 
+        it("reflows a slider between its two layouts when the window crosses the width it needs", function()
+            local w = makeWindow()
+            w.hasShownOnce = true
+            local tab = w:CreateTab({ name = "Main" })
+            local slider = tab:CreateSlider({
+                name = "Volume",
+                range = { 0, 100 },
+                increment = 1,
+                value = 40,
+                forgetState = true,
+            })
+
+            -- built wide, and the first pass lands at once because there is nothing to watch yet
+            slider.main.AbsoluteSize = Vector2.new(455, 65)
+            slider:_applyLayout()
+            expect(slider._layoutMode).to.equal("wide")
+            expect(slider.track.AnchorPoint).to.equal(Vector2.new(1, 0.5))
+            expect(slider.containerLayout.FillDirection).to.equal(Enum.FillDirection.Vertical)
+
+            -- pulled in past what the wide layout needs: the track heads for the bottom edge,
+            -- and the labels land in their row once the fade has taken them off screen
+            slider.main.AbsoluteSize = Vector2.new(360, 65)
+            slider:_applyLayout()
+            expect(slider._layoutMode).to.equal("narrow")
+            expect(slider.track.AnchorPoint).to.equal(Vector2.new(0.5, 1))
+
+            slider:_finishReflow(slider._reflowPass, "narrow")
+            expect(slider.containerLayout.FillDirection).to.equal(Enum.FillDirection.Horizontal)
+            expect(slider.title.TextTransparency).to.equal(0)
+
+            -- and back out again
+            slider.main.AbsoluteSize = Vector2.new(455, 65)
+            slider:_applyLayout()
+            slider:_finishReflow(slider._reflowPass, "wide")
+            expect(slider.track.AnchorPoint).to.equal(Vector2.new(1, 0.5))
+            expect(slider.containerLayout.FillDirection).to.equal(Enum.FillDirection.Vertical)
+        end)
+
+        it("drops a reflow that a newer one has already replaced", function()
+            local w = makeWindow()
+            w.hasShownOnce = true
+            local tab = w:CreateTab({ name = "Main" })
+            local slider = tab:CreateSlider({ name = "Volume", range = { 0, 100 }, value = 40, forgetState = true })
+
+            slider.main.AbsoluteSize = Vector2.new(455, 65)
+            slider:_applyLayout()
+            slider.main.AbsoluteSize = Vector2.new(360, 65)
+            slider:_applyLayout()
+            slider:_finishReflow(slider._reflowPass, "narrow")
+
+            -- a pass the resize has already moved past must not put its layout back on screen
+            slider:_finishReflow(slider._reflowPass - 1, "wide")
+            expect(slider.containerLayout.FillDirection).to.equal(Enum.FillDirection.Horizontal)
+        end)
+
         it("holds the bottom fade above the corner radius as the window grows", function()
             local w = makeWindow()
             local radius = w.bottomFadeCorner.CornerRadius.Offset
