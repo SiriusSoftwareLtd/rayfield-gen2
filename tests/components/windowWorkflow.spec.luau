@@ -2010,6 +2010,75 @@ return function()
             expect(w._userSize).to.equal(nil)
         end)
 
+        it("leaves the window fitted after a press that never moved", function()
+            local w = makeWindow()
+            local fitted = w.size
+
+            -- a click on the grip is not a resize, so it must not pin a size
+            moveTo(400, 300)
+            grab()
+            settle()
+            release()
+            settle()
+
+            expect(w._userSize).to.equal(nil)
+            expect(w.size).to.equal(fitted)
+
+            -- and the window still refits itself when the screen changes, rather than holding
+            -- the size it happened to be when the grip was clicked
+            setViewport(844, 390)
+            w:_applyWindowSize()
+            expect(w.size).never.to.equal(fitted)
+            expect(w._userSize).to.equal(nil)
+        end)
+
+        it("keeps a mouse resize away from touches on a device carrying both", function()
+            local w = makeWindow()
+
+            moveTo(400, 300)
+            grab()
+            moveTo(600, 500)
+            settle()
+            local held = w.size
+
+            -- a finger on the screen during a mouse drag is not this resize, and neither is its
+            -- release. Both used to go straight through, since a mouse grab holds no input.
+            local finger = { UserInputType = { Name = "Touch" }, Position = Vector3.new(1200, 1200, 0) }
+            helpers.services.UserInputService.InputChanged:Fire(finger)
+            settle()
+            expect(w.size).to.equal(held)
+
+            helpers.services.UserInputService.InputEnded:Fire(finger)
+            moveTo(700, 600)
+            settle()
+            expect(w.size).never.to.equal(held) -- the mouse still has it
+
+            release()
+        end)
+
+        it("keeps the size from a drag that interrupts a reset", function()
+            local w = makeWindow()
+            w:_applyUserSize(Vector2.new(900, 640))
+
+            -- double click starts the glide back to the fitted size
+            moveTo(400, 300)
+            grab()
+            release()
+            grab()
+
+            -- but a fresh drag arrives before it lands, and the size that drag chooses is the
+            -- one the window keeps. The reset it interrupted must not fire underneath it.
+            moveTo(400, 300)
+            grab()
+            moveTo(700, 600)
+            settle()
+            release()
+            settle()
+
+            expect(w._userSize).never.to.equal(nil)
+            expect(w.size.X.Offset > 475).to.equal(true)
+        end)
+
         it("drops a grab that goes stale under it", function()
             local w = makeWindow()
             moveTo(400, 300)

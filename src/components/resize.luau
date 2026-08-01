@@ -102,6 +102,10 @@ function Resize.new(window)
     -- resize they had nothing to do with.
     local held: InputObject? = nil
 
+    -- Whether this grab came from a finger at all. A mouse resize leaves `held` empty, so
+    -- without it a touch on a device carrying both could still move and end the resize.
+    local touching = false
+
     -- How far the pointer may travel and still count as a press rather than a drag. A resize
     -- that only moved a pixel or two was never meant to be one, and a resize that moved further
     -- must not arm the double click, or the next grab resets the window instead of resizing it.
@@ -113,6 +117,11 @@ function Resize.new(window)
     local pressedAt: Vector2? = nil
     local startSize = Vector2.zero
     local resetOnSettle = false
+
+    -- Whether this grab has earned the right to pin a size. A press that never travelled is a
+    -- click, and pinning on a click leaves the window holding a size the user never chose,
+    -- which then survives the next viewport change instead of refitting.
+    local committed = false
 
     -- Where the window is heading and where it currently is. Splitting the two is what makes
     -- the glide possible: the cursor moves the target, the frame loop chases it.
@@ -214,11 +223,15 @@ function Resize.new(window)
             -- exponential smoothing on a rate, so the glide is frame-rate independent
             local alpha = 1 - math.exp(-delta * followRate)
             visual += (target - visual) * alpha
-            apply(visual)
+            if committed then
+                apply(visual)
+            end
 
             if not resizing and (target - visual).Magnitude <= settleEpsilon then
                 visual = target
-                apply(target)
+                if committed then
+                    apply(target)
+                end
                 stopFollowing()
 
                 -- a glide back to the fitted size ends with the override let go, so the window
@@ -233,6 +246,12 @@ function Resize.new(window)
 
     local function beginResize(at: Vector2)
         resizing = true
+        -- a press that lands during the glide back to the fitted size takes the window over, so
+        -- the reset it interrupted must not still be waiting to fire when this one settles
+        resetOnSettle = false
+        -- nothing is pinned until the pointer has travelled far enough to be a drag rather than
+        -- a click, or a click on the grip would leave the window holding its own size for good
+        committed = false
         pressedAt = at
         startPointer = at
         startSize = currentSize()
@@ -247,6 +266,7 @@ function Resize.new(window)
         end
         resizing = false
         held = nil
+        touching = false
 
         -- a press that stayed put is a click, and two of those in quick succession are the
         -- reset. One that travelled was a resize, and must not arm it.
@@ -289,6 +309,7 @@ function Resize.new(window)
             lastClick = -math.huge
             resizing = false
             resetOnSettle = true
+            committed = true
             target = self.window:_fittedSize()
             restMark()
             startFollowing()
@@ -297,7 +318,8 @@ function Resize.new(window)
         -- armed on release instead, and only if the pointer stayed put. Arming here counted
         -- every press as the first half of a double click, including presses that became drags.
         lastClick = -math.huge
-        held = if inputType == "Touch" then input else nil
+        touching = inputType == "Touch"
+        held = if touching then input else nil
 
         beginResize(pointerOf(input))
     end)
@@ -348,15 +370,27 @@ function Resize.new(window)
             return
         end
 
-        -- a second finger on the screen sends its own events; only the one that started this
-        -- resize gets to move it
-        if held and input ~= held then
+        -- a second finger on the screen sends its own events, and so does a finger during a
+        -- mouse resize on a device carrying both. Only what started this resize gets to move it.
+        if touching then
+            if input ~= held then
+                return
+            end
+        elseif inputType ~= "MouseMovement" then
             return
+        end
+
+        local at = pointerOf(input)
+        if not committed then
+            if (at - startPointer).Magnitude <= stillDistance then
+                return
+            end
+            committed = true
         end
 
         -- twice the distance dragged: the window is centre-anchored, so both edges move and the
         -- corner under the cursor only covers half of whatever the size gains
-        local moved = (pointerOf(input) - startPointer) * 2
+        local moved = (at - startPointer) * 2
         target = self.window:_boundUserSize(startSize + moved)
     end)
 
@@ -366,8 +400,12 @@ function Resize.new(window)
             return
         end
 
-        -- and only the finger that started it gets to end it
-        if held and input ~= held then
+        -- and only what started it gets to end it
+        if touching then
+            if input ~= held then
+                return
+            end
+        elseif inputType ~= "MouseButton1" then
             return
         end
 
