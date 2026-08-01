@@ -1601,6 +1601,41 @@ return function()
             uis.GetMouseLocation = mouse
         end)
 
+        it("glows in the colour the gradient has at each end", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local picker = tab:CreateColorPicker({
+                name = "Fill",
+                gradient = true,
+                color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 255)),
+                }),
+                forgetState = true,
+            })
+
+            -- a UIShadow carries one colour, so the glow is bands across the swatch, each taking
+            -- the colour the gradient has where it sits
+            expect(#picker.glowBands).to.equal(6)
+
+            local first = picker.glowBands[1].glow.Color
+            local last = picker.glowBands[6].glow.Color
+            expect(first.R > first.B).to.equal(true) -- red end
+            expect(last.B > last.R).to.equal(true) -- blue end
+
+            -- move the sequence and the glow follows it
+            picker:Set(ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 255)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)),
+            }))
+            expect(picker.glowBands[1].glow.Color.B > picker.glowBands[1].glow.Color.R).to.equal(true)
+
+            -- and a plain picker still has the one shadow it always had
+            local plain = tab:CreateColorPicker({ name = "Plain", forgetState = true })
+            expect(plain.glowBands).to.equal(nil)
+            expect(plain.previewShadow).to.be.ok()
+        end)
+
         it("shows the whole gradient on the swatch, not the stop being edited", function()
             local w = makeWindow()
             local tab = w:CreateTab({ name = "Main" })

@@ -60,6 +60,12 @@ local stopButtonGap = 10
 local minStops = 2
 local maxStops = 20 -- what a ColorSequence itself allows
 
+-- A UIShadow carries one colour, so a gradient's glow is several of them: bands laid across the
+-- swatch, each taking the colour the gradient has where it sits. Enough of them that the glow
+-- reads as travelling along the swatch, few enough that it is a handful of shadows and not a
+-- shadow per stop on a twenty stop sequence.
+local glowBands = 6
+
 -- Per-mode geometry for the bits that move between layouts. map + hue + alpha stay top-left in
 -- both. "open" rects are where the preview morphs to and where the hex + alpha fields sit;
 -- "height" is the card's open height. Built against the top the controls actually start at, so a
@@ -477,6 +483,30 @@ function ColorPicker:_buildHeader()
         self.previewGradient = self.window:Create("UIGradient", {
             Parent = self.preview,
         })
+
+        -- Bands sitting on the swatch, each the colour the gradient already has there, so they
+        -- are invisible against it and only their shadows show. That is what puts the right
+        -- colour under each end rather than one colour under the whole thing.
+        self.glowBands = {}
+        for index = 1, glowBands do
+            local band = self.window:Create("Frame", {
+                Name = "Glow",
+                BorderSizePixel = 0,
+                AnchorPoint = Vector2.new(0, 0.5),
+                Position = UDim2.new((index - 1) / glowBands, 0, 0.5, 0),
+                -- a hair wider than its share, so the seams between bands never show
+                Size = UDim2.new(1 / glowBands, 2, 1, -6),
+                BackgroundTransparency = 1, -- follows the swatch's own alpha
+                ZIndex = 2,
+
+                Parent = self.preview,
+            })
+
+            table.insert(self.glowBands, {
+                frame = band,
+                glow = self.window:CreateGlow(band, Color3.fromRGB(255, 255, 255), 20, 1),
+            })
+        end
     end
 
     self.previewShadow = self.window:CreateGlow(self.preview, self.value, 20, 1)
@@ -733,6 +763,26 @@ function ColorPicker:_renderStops()
     -- gradient is what the picker is for and it is all you can see once the card is closed
     if self.previewGradient then
         self.previewGradient.Color = self.stripGradient.Color
+    end
+
+    self:_renderGlow()
+end
+
+-- Each band takes the colour the gradient has across it, and the same transparency as the swatch,
+-- so it stays invisible against the swatch at any alpha and only its shadow is seen.
+function ColorPicker:_renderGlow()
+    if not self.glowBands then
+        return
+    end
+
+    local shown = 1 - self.alpha
+    for index, band in self.glowBands do
+        local at = (index - 0.5) / glowBands
+        local color = colorAtTime(self.stops, at)
+        band.frame.BackgroundColor3 = color
+        band.frame.BackgroundTransparency = if self.window.hidden then 1 else shown
+        band.glow.Color = color
+        band.glow.Transparency = if self._isOpen or not self.window.hidden then 1 - 0.4 * self.alpha else 1
     end
 end
 
@@ -1397,7 +1447,9 @@ function ColorPicker:_render(mode)
         if not self.gradient then
             self.preview.BackgroundColor3 = self.value
         end
-        self.previewShadow.Color = self.value
+        if not self.gradient then
+            self.previewShadow.Color = self.value
+        end
         if not self.window.hidden then
             self.preview.BackgroundTransparency = previewT
             self.previewShadow.Transparency = shadowT
@@ -1415,7 +1467,7 @@ function ColorPicker:_render(mode)
         -- the preview + its glow morph colour and opacity together on the softer follow tween
         variables.tweenService:Create(self.alphaBar, followInfo, { BackgroundColor3 = self.value }):Play()
         local previewGoal = if self.gradient then {} else { BackgroundColor3 = self.value }
-        local shadowGoal = { Color = self.value }
+        local shadowGoal = if self.gradient then {} else { Color = self.value }
         if not self.window.hidden then
             previewGoal.BackgroundTransparency = previewT
             shadowGoal.Transparency = shadowT
@@ -1423,6 +1475,8 @@ function ColorPicker:_render(mode)
         variables.tweenService:Create(self.preview, followInfo, previewGoal):Play()
         variables.tweenService:Create(self.previewShadow, followInfo, shadowGoal):Play()
     end
+
+    self:_renderGlow()
 
     -- dont fight the user while they're typing in a field
     if not self.hexInput:IsFocused() then
@@ -1718,11 +1772,19 @@ function ColorPicker:_setShown(shown, animate)
         w:_revealCommon(self, animate)
         -- the preview shows the colour at its alpha, so its opacity tracks alpha even in the header
         w:_reveal(self.preview, { BackgroundTransparency = 1 - self.alpha }, animate)
-        w:_reveal(self.previewShadow, { Transparency = 1 - 0.4 * self.alpha }, animate)
+        w:_reveal(self.previewShadow, { Transparency = if self.gradient then 1 else 1 - 0.4 * self.alpha }, animate)
+        for _, band in self.glowBands or {} do
+            w:_reveal(band.frame, { BackgroundTransparency = 1 - self.alpha }, animate)
+            w:_reveal(band.glow, { Transparency = 1 - 0.4 * self.alpha }, animate)
+        end
     else
         w:_hideCommon(self, animate)
         w:_reveal(self.preview, { BackgroundTransparency = 1 }, animate)
         w:_reveal(self.previewShadow, { Transparency = 1 }, animate)
+        for _, band in self.glowBands or {} do
+            w:_reveal(band.frame, { BackgroundTransparency = 1 }, animate)
+            w:_reveal(band.glow, { Transparency = 1 }, animate)
+        end
         -- if the window hides while we're open, collapse so we dont reopen mid-air
         if self._isOpen then
             self:_close()
