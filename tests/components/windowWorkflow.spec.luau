@@ -949,6 +949,162 @@ return function()
 
     -- The primary flow: a dev sets autoSave/autoLoad and never opens the config manager.
     -- A change to an element must autosave, and a fresh window must autoLoad it back.
+    describe("component window collapse choreography", function()
+        local collapsed
+
+        local function makeWindow()
+            collapsed = Window.new({
+                name = "Collapse Window",
+                subtitle = "Gen2", -- the chrome the choreography drives, so it has to be there
+                icon = 93364949241311,
+                configuration = { autoSave = false, autoLoad = false },
+            })
+            collapsed.hidden = false
+            return collapsed
+        end
+
+        afterEach(function()
+            if collapsed and not collapsed.unloaded then
+                collapsed:Unload()
+            end
+            collapsed = nil
+        end)
+
+        -- Everything the collapse touches is a function of the frame's live height, so these
+        -- drive that height directly rather than waiting on a spring the harness never steps.
+        -- widths interpolated the same way the frame does, so the shorter side is honest
+        local function at(window, height)
+            local open, pill = window.size.Y.Offset, 50
+            local progress = math.clamp((open - height) / (open - pill), 0, 1)
+            local width = window.size.X.Offset + (185 - window.size.X.Offset) * progress
+            window:_applyCollapseProgress(width, height)
+        end
+
+        it("takes its corner radius from the height the frame actually has", function()
+            local w = makeWindow()
+            local open = w.size.Y.Offset
+            local resting = w.theme.CornerRoundness.Offset
+            w.hidden = true -- this one is about the collapse; the return is weighted, see below
+
+            at(w, open)
+            expect(w.windowCorner.CornerRadius.Offset).to.equal(resting)
+
+            -- at the pill it is exactly half the shorter side, which is as round as that shape
+            -- goes, so the silhouette lands on a true pill
+            at(w, 50)
+            expect(math.abs(w.windowCorner.CornerRadius.Offset - 25) < 0.01).to.equal(true)
+
+            -- and halfway it is carrying a big radius rather than square corners: the window
+            -- takes the pill's shape early and lets its size catch up. An earlier version of
+            -- this held roughly 22px here, which on a 330 by 275 frame is visually square, and
+            -- the whole collapse read as a box until the very last moment.
+            at(w, (open + 50) / 2)
+            local middle = w.windowCorner.CornerRadius.Offset
+            expect(middle > 60).to.equal(true)
+            expect(middle > resting * 3).to.equal(true)
+        end)
+
+        it("squares the corner off as the window opens, not at the end of the spring", function()
+            local w = makeWindow()
+            local open = w.size.Y.Offset
+
+            -- closing: round early, so the window takes the pill's shape and lets its size
+            -- catch up
+            w.hidden = true
+            at(w, (open + 50) / 2)
+            local closing = w.windowCorner.CornerRadius.Offset
+
+            -- opening: at the same frame size the corner is already much closer to resting. A
+            -- spring is nearly full size long before it has finished settling, and a corner
+            -- that tracks its progress straight stays visibly round through that whole tail.
+            w.hidden = false
+            at(w, (open + 50) / 2)
+            local opening = w.windowCorner.CornerRadius.Offset
+
+            expect(opening < closing).to.equal(true)
+
+            -- and by the time the frame looks open, the corner looks open too
+            at(w, open * 0.9)
+            expect(w.windowCorner.CornerRadius.Offset < 30).to.equal(true)
+        end)
+
+        it("puts every derived property at rest when the frame is open", function()
+            local w = makeWindow()
+            at(w, w.size.Y.Offset)
+
+            expect(w.windowShadow.Transparency).to.equal(0.6)
+            expect(w.windowStroke.Transparency).to.equal(0.95)
+            expect(w.bottomFade.BackgroundTransparency).to.equal(0)
+            expect(w.title.TextTransparency).to.equal(0)
+            expect(w.subtitle.TextTransparency).to.equal(0.7)
+            expect(w.topbar.Visible).to.equal(true)
+
+            -- and the pill's own face is entirely gone while there is a window to look at
+            if w.collapsedTitle then
+                expect(w.collapsedTitle.TextTransparency).to.equal(1)
+            end
+        end)
+
+        it("puts every derived property at its collapsed value on the pill", function()
+            local w = makeWindow()
+            at(w, 50)
+
+            expect(w.windowShadow.Transparency).to.equal(1)
+            expect(w.windowStroke.Transparency).to.equal(1)
+            expect(w.bottomFade.BackgroundTransparency).to.equal(1)
+            expect(w.title.TextTransparency).to.equal(1)
+            expect(w.topbar.Visible).to.equal(false)
+
+            -- the pill's face is the one thing that arrives rather than leaves
+            if w.collapsedTitle then
+                expect(w.collapsedTitle.TextTransparency).to.equal(0)
+                expect(w.collapsedSubtitle.TextTransparency).to.equal(0.5)
+            end
+        end)
+
+        it("gives the same answer for a height whichever way it was reached", function()
+            local w = makeWindow()
+            local half = (w.size.Y.Offset + 50) / 2
+
+            -- on the way down
+            at(w, w.size.Y.Offset)
+            at(w, half)
+            local goingDown = {
+                corner = w.windowCorner.CornerRadius.Offset,
+                stroke = w.windowStroke.Transparency,
+                title = w.title.TextTransparency,
+                face = w.collapsedTitle and w.collapsedTitle.TextTransparency,
+            }
+
+            -- and on the way back up, interrupted at exactly the same place
+            at(w, 50)
+            at(w, half)
+
+            expect(w.windowCorner.CornerRadius.Offset).to.equal(goingDown.corner)
+            expect(w.windowStroke.Transparency).to.equal(goingDown.stroke)
+            expect(w.title.TextTransparency).to.equal(goingDown.title)
+            if w.collapsedTitle then
+                expect(w.collapsedTitle.TextTransparency).to.equal(goingDown.face)
+            end
+        end)
+
+        it("holds the page only while there is a frame big enough for it", function()
+            local w = makeWindow()
+
+            at(w, w.size.Y.Offset)
+            expect(w.elements.Visible).to.equal(true)
+
+            -- past the threshold the page comes off rather than being squeezed
+            at(w, 100)
+            expect(w.elements.Visible).to.equal(false)
+            expect(w.tabList.Visible).to.equal(false)
+
+            -- and back on the moment there is room again, on the same number
+            at(w, w.size.Y.Offset)
+            expect(w.elements.Visible).to.equal(true)
+        end)
+    end)
+
     describe("config round trip without the config manager", function()
         local variables = helpers.requireUtility("variables")
         local filesystem = helpers.requireUtility("filesystem")
