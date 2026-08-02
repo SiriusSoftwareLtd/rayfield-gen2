@@ -31,6 +31,11 @@ Window.__index = Window
 -- Default entrance-reveal tween (elements override with their own where needed)
 local revealInfo = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 
+-- The window frame moves on a spring rather than a tween, so the collapse and the return have a
+-- speed instead of a duration, and either can be interrupted without snapping. See
+-- utility/spring for why that matters.
+local spring = require(script.Parent.Parent.utility.spring)
+
 -- The collapsed "pill" main morphs into on Hide, top-anchored the way the old standalone
 -- restore button used to sit.
 local collapsedSize = UDim2.fromOffset(185, 50)
@@ -946,14 +951,26 @@ function Window:Hide()
     -- remember where the window sat so Show grows it back to the same spot
     self._restorePosition = self.main.Position
 
+    -- Freeze the page at the pixel size it is, and let the window clip it, before anything
+    -- starts moving.
+    --
+    -- The page is sized against the window, so shrinking it to a pill re-measures every row,
+    -- re-wraps every label and re-runs the whole list layout on every frame of the collapse.
+    -- That work is what the move stutters on, and none of it is worth doing for contents that
+    -- are on their way out. Held at a fixed size they are simply cropped by the frame closing
+    -- over them instead.
+    self:_freezePage(true)
+
     local home, size = self:_collapsedRect()
 
-    local fadeInfo = TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-    -- one continuous move for the whole collapse: size and position tween together on the
-    -- same curve so they stay perfectly in sync, no seam between separate legs
-    local moveInfo = TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut)
-    local cornerInfo = TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut)
-    local faceInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    -- The contents go quickly, well before the frame has shrunk far enough to squash them.
+    -- Held any longer and you watch the page being crushed inside the closing frame.
+    local fadeInfo = TweenInfo.new(0.08, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    -- The corners are held square while the frame is still window sized and only rounded once
+    -- it is small. Rounding on the same clock as the move turns a half shrunk window into a
+    -- big featureless blob, which is the part that reads as unfinished.
+    local cornerInfo = TweenInfo.new(0.14, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local faceInfo = TweenInfo.new(0.12, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
     -- shrink the drag bar back down the same way it grows in on first reveal, instead of
     -- just cutting it
@@ -1003,30 +1020,48 @@ function Window:Hide()
 
     -- collapse into the pill in one continuous move - size and position tweened together
     -- so they stay perfectly in sync throughout
-    variables.tweenService:Create(self.main, moveInfo, { Size = size, Position = home }):Play()
-    variables.tweenService:Create(self.windowCorner, cornerInfo, { CornerRadius = UDim.new(1, 0) }):Play()
+    -- Stiff and dead damped on the way out: leaving should not wobble. The anticipation is
+    -- the small gather away from the pill before it goes, which is what stops the collapse
+    -- reading as the window simply being switched off.
+    self:_springTo(size, home, {
+        stiffness = 480,
+        damping = 1,
+        anticipation = 95,
+        onSettle = function()
+            if not self.hidden then
+                return
+            end
+            self.collapsedInteract.Visible = true
+            self.animating = false
+            self._revealing = false
+        end,
+    })
 
     -- once the chrome's faded, drop it and the scrolling content so nothing squashes/pokes
     -- out as the frame shrinks around it, then bring the collapsed face up over the top
-    task.delay(0.18, function()
+    task.delay(0.06, function()
+        if not self.hidden then
+            return
+        end
+        variables.tweenService:Create(self.windowCorner, cornerInfo, { CornerRadius = UDim.new(1, 0) }):Play()
+    end)
+
+    task.delay(0.08, function()
         if not self.hidden then
             return
         end
         self.topbar.Visible = false
         self.elements.Visible = false
         self.tabList.Visible = false
-
-        chrome.setCollapsedShown(self, true, faceInfo)
     end)
 
-    -- once the move's settled the pill is done morphing: hand clicks to it
-    task.delay(0.35, function()
+    -- The pill's own face comes up over the tail of the move rather than the moment the
+    -- window's contents leave, so the shape and what is written on it arrive together.
+    task.delay(0.11, function()
         if not self.hidden then
             return
         end
-        self.collapsedInteract.Visible = true
-        self.animating = false
-        self._revealing = false
+        chrome.setCollapsedShown(self, true, faceInfo)
     end)
 end
 
@@ -1707,23 +1742,39 @@ function Window:_quickRestore()
     local target = self:_clampedPosition(self._restorePosition or UDim2.new(0.5, 0, 0.5, 0))
     self._restorePosition = target
 
-    local growInfo = TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut)
-    local cornerInfo = TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.InOut)
-    local fadeInfo = TweenInfo.new(0.28, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+    -- The corners come off well before the frame finishes growing. Un-rounding on the same
+    -- clock as the growth leaves a large empty squircle sitting there for a third of the
+    -- animation, which is the single thing that makes this read as unfinished.
+    local cornerInfo = TweenInfo.new(0.13, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local fadeInfo = TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
     -- Phase 1: nothing but the pill morphing back into the window frame. The collapsed face
     -- fades off, main grows + un-rounds. No chrome, no content - so you never see the topbar,
     -- tabs or bottom fade floating over a frame that isn't a window yet.
-    chrome.setCollapsedShown(self, false, TweenInfo.new(0.15, Enum.EasingStyle.Quint, Enum.EasingDirection.Out))
-    variables.tweenService:Create(self.main, growInfo, { Size = self.size, Position = target }):Play()
+    chrome.setCollapsedShown(self, false, TweenInfo.new(0.08, Enum.EasingStyle.Quint, Enum.EasingDirection.Out))
+
+    -- Critically damped coming back: it decelerates into its size and stops there. Any less
+    -- and it carries past and settles back, which reads as the window wobbling into place
+    -- rather than arriving at it.
+    self:_springTo(self.size, target, {
+        stiffness = 440,
+        damping = 1,
+        onSettle = function()
+            if self.hidden then
+                return
+            end
+            self.animating = false
+            self._revealing = false
+        end,
+    })
     variables.tweenService:Create(self.windowCorner, cornerInfo, { CornerRadius = self.theme.CornerRoundness }):Play()
 
-    -- Phase 2: once the frame actually reads as a window, fade its chrome in and stagger the
-    -- open tab's elements. Other tabs snap ready off-screen - nobody's looking, so no animation.
-    task.delay(0.22, function()
+    -- Phase 2: the topbar comes back first, while the frame is still growing. It is a fixed
+    -- height bar, so showing it costs nothing to lay out, and it is what makes a growing
+    -- rectangle read as a window rather than as a blank card waiting to be filled.
+    task.delay(0.05, function()
         self.topbar.Visible = true
         self.tabList.Visible = true
-        self.elements.Visible = true
 
         variables.tweenService:Create(self.windowShadow, fadeInfo, { Transparency = 0.6 }):Play()
         variables.tweenService:Create(self.windowStroke, fadeInfo, { Transparency = 0.95 }):Play()
@@ -1762,26 +1813,38 @@ function Window:_quickRestore()
             end
         end
 
-        self:_revealElements(0.035, 0.4)
+        -- Coming back from the pill fills the page a little slower than a first open does.
+        -- The window is already familiar by then, so the page arriving unhurried reads as
+        -- settling rather than as waiting. Tighter than this and it stops being a sequence.
+    end)
+
+    -- Phase 3: the page. Held frozen and cropped until the frame is nearly home, so the only
+    -- layout pass it does is this one rather than one on every frame of the grow.
+    task.delay(0.12, function()
+        if self.hidden then
+            return -- hidden again before the page came back; the next show restores it
+        end
+        self:_freezePage(false)
+        self.elements.Visible = true
+
+        -- Coming back from the pill fills the page a little slower than a first open does.
+        -- The window is already familiar by then, so the page arriving unhurried reads as
+        -- settling rather than as waiting.
+        self:_revealElements(0.035, 0.45)
     end)
 
     -- Drag handle grows in with the chrome, same width sweep it uses on first reveal. Position
     -- is recalculated against the full restored size - if the window was minimised (a shorter
     -- bar-hang offset) before hiding, it would otherwise reappear at the old, wrong height.
-    task.delay(0.22, function()
+    task.delay(0.1, function()
         self.drag.drag.Position =
             UDim2.new(target.X.Scale, target.X.Offset, target.Y.Scale, target.Y.Offset + self.size.Y.Offset / 2 + 15)
         self.drag.dragCosmetic.Size = UDim2.fromOffset(0, 4)
         self.drag.dragCosmetic.BackgroundTransparency = 1
         self.drag.drag.Visible = true
         variables.tweenService
-            :Create(self.drag.dragCosmetic, growInfo, { Size = UDim2.fromOffset(100, 4), BackgroundTransparency = 0.7 })
+            :Create(self.drag.dragCosmetic, fadeInfo, { Size = UDim2.fromOffset(100, 4), BackgroundTransparency = 0.7 })
             :Play()
-    end)
-
-    task.delay(0.6, function()
-        self.animating = false
-        self._revealing = false
     end)
 end
 
@@ -2416,6 +2479,146 @@ end
 -- The rect main morphs into once collapsed: the same top-centre spot the old standalone
 -- restore pill used to sit at, translated into main's own centre-anchored space (main never
 -- changes AnchorPoint, so its Position always addresses its centre, not its top edge).
+-- Hold the page at its current pixel size, or hand it back to the window. Called around
+-- anything that resizes the window while its contents are on screen.
+function Window:_freezePage(frozen: boolean)
+    if frozen then
+        if self._pageSize then
+            return -- already held; a second freeze would capture the frozen size as the real one
+        end
+        self._pageSize = self.elements.Size
+        self.elements.Size = UDim2.fromOffset(self.elements.AbsoluteSize.X, self.elements.AbsoluteSize.Y)
+        self.main.ClipsDescendants = true
+        return
+    end
+
+    if self._pageSize then
+        self.elements.Size = self._pageSize
+        self._pageSize = nil
+    end
+    self.main.ClipsDescendants = false
+end
+
+-- Where a UDim2 actually lands, in pixels. The springs work in one flat space so a move that
+-- crosses from a scale-anchored spot to a pixel-anchored one is still one continuous path.
+local function viewportSize(): Vector2
+    local camera = variables.workspace.CurrentCamera
+    return if camera then camera.ViewportSize else Vector2.new(1920, 1080)
+end
+
+local function toPixels(value: UDim2, view: Vector2): Vector2
+    return Vector2.new(view.X * value.X.Scale + value.X.Offset, view.Y * value.Y.Scale + value.Y.Offset)
+end
+
+-- Drive the frame to a size and a place on a spring.
+--
+-- `stiffness` is how hard it pulls, `damping` is a fraction of critical: 1 arrives dead, under 1
+-- overshoots a little and settles back. `anticipation` is a shove away from the target before it
+-- goes, in pixels per second, which is the gather before a movement that easing cannot express.
+--
+-- Retargeting mid-flight keeps the current velocity, so closing a window that is still opening
+-- turns it around rather than starting a fresh animation from wherever it had got to.
+function Window:_springTo(size: UDim2, position: UDim2, options)
+    options = options or {}
+    local view = viewportSize()
+    local sizeTarget, positionTarget = toPixels(size, view), toPixels(position, view)
+
+    local stiffness = options.stiffness or 300
+    local damping = options.damping or 1
+
+    if not self._motion then
+        self._motion = {
+            size = spring.new(toPixels(self.main.Size, view), stiffness, damping),
+            position = spring.new(toPixels(self.main.Position, view), stiffness, damping),
+        }
+    end
+
+    local motion = self._motion
+    motion.size:tune(stiffness, damping)
+    motion.position:tune(stiffness, damping)
+    motion.size:setTarget(sizeTarget)
+    motion.position:setTarget(positionTarget)
+    motion.sizeGoal, motion.positionGoal = size, position
+    motion.onSettle = options.onSettle
+
+    -- A spring settles when it settles, so nothing here is allowed to depend on it having done
+    -- so. This is the backstop: if the frame loop never runs, is throttled, or the move is
+    -- somehow still going long after it should be, the frame is put where it was headed and the
+    -- settle work runs anyway. Without it a dropped loop leaves the window flagged as animating,
+    -- which means permanently unclickable.
+    local token = (motion.token or 0) + 1
+    motion.token = token
+    task.delay(options.timeout or 0.7, function()
+        if self._motion and self._motion.token == token then
+            self:_stopMotion()
+        end
+    end)
+
+    local anticipation = options.anticipation
+    if anticipation and anticipation > 0 then
+        local away = motion.position.position - positionTarget
+        if away.Magnitude > 1 then
+            motion.position:impulse(away.Unit * anticipation)
+        end
+        local grow = motion.size.position - sizeTarget
+        if grow.Magnitude > 1 then
+            motion.size:impulse(grow.Unit * anticipation * 0.6)
+        end
+    end
+
+    if self._motionConnection then
+        return -- already running; it will pick the new targets up on its next step
+    end
+
+    self._motionConnection = self:Connect(variables.runService.RenderStepped, function(delta: number)
+        local running = self._motion
+        if not running or self.unloaded then
+            self:_stopMotion()
+            return
+        end
+
+        local nextSize = running.size:step(delta)
+        local nextPosition = running.position:step(delta)
+        self.main.Size = UDim2.fromOffset(math.round(nextSize.X), math.round(nextSize.Y))
+        self.main.Position = UDim2.fromOffset(math.round(nextPosition.X), math.round(nextPosition.Y))
+
+        -- a pixel of slack: past that the difference is not on screen, and holding out for
+        -- exact equality leaves the spring running for frames nobody can see
+        if running.size:settled(1) and running.position:settled(1) then
+            self:_stopMotion()
+        end
+    end)
+end
+
+-- Stop driving the frame and hand the properties back as the plain UDim2 they are meant to be,
+-- so anything that reads them afterwards sees the canonical value rather than the pixels the
+-- spring happened to land on.
+function Window:_stopMotion()
+    if self._motionConnection then
+        self:Disconnect(self._motionConnection)
+        self._motionConnection = nil
+    end
+
+    local motion = self._motion
+    if not motion then
+        return
+    end
+
+    if not self.unloaded and motion.sizeGoal and motion.positionGoal then
+        self.main.Size = motion.sizeGoal
+        self.main.Position = motion.positionGoal
+        local view = viewportSize()
+        motion.size:snap(toPixels(motion.sizeGoal, view))
+        motion.position:snap(toPixels(motion.positionGoal, view))
+    end
+
+    local onSettle = motion.onSettle
+    motion.onSettle = nil
+    if onSettle then
+        onSettle()
+    end
+end
+
 function Window:_collapsedRect()
     local size = collapsedSize
     local home = UDim2.new(
