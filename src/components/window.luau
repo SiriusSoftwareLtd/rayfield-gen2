@@ -90,9 +90,13 @@ local collapseChoreography = {
     face = { from = 0.72, to = 1 }, -- the pill's own icon and text, the other way round
 }
 
--- Past this the frame is too small to hold the page, so the topbar, the tabs and the contents
--- come off rather than being squeezed.
-local contentsGone = 0.55
+-- Past this the frame is too small to hold the page, so the tabs and the contents come off
+-- rather than being squeezed.
+local pageGone = 0.55
+
+-- The topbar goes later: its own contents fade out across the first part of the move, and it is
+-- the only thing a minimised window has to show in the first place.
+local topbarGone = 0.62
 
 -- One stiffness for both directions, so out and back are the same motion reversed. Critically
 -- damped, so neither overshoots its resting size.
@@ -1008,6 +1012,10 @@ function Window:Hide()
     self.hidden = true
     self.collapsedInteract.Visible = false -- re-shown once the collapse settles, below
 
+    -- captured before the flag is cleared just below: a window collapsing from its minimised
+    -- bar has no page, and must not flash one on as it goes
+    local wasMinimised = self.minimised
+
     -- closing while minimised closes properly rather than leaving a stale minimised state -
     -- Show always grows back to the full (non-minimised) layout, so the flag and icon need
     -- to agree with that
@@ -1060,6 +1068,7 @@ function Window:Hide()
     self:_springTo(size, home, {
         stiffness = collapseStiffness,
         damping = 1,
+        contentsWhenOpen = not wasMinimised,
         onSettle = function()
             if not self.hidden then
                 return
@@ -2479,12 +2488,28 @@ end
 -- Called from the frame loop, and once at each end of the move so the resting state is exact
 -- rather than wherever the last frame happened to land.
 function Window:_applyCollapseProgress(width: number, height: number)
-    local openHeight = self.size.Y.Offset
-    local pillHeight = collapsedSize.Y.Offset
+    local motion = self._motion
+
+    -- Measured between this move's own two ends rather than between the pill and a full sized
+    -- window. A minimised window is 66 tall against the pill's 50, so against the full 500 it
+    -- would start its collapse at 0.96 already: the title would blank on the first frame, the
+    -- corner would jump, the pill's label would pop on, and the whole thing would be a snap
+    -- followed by a 16 pixel shuffle.
+    local openHeight = motion and motion.openHeight or self.size.Y.Offset
+    local pillHeight = motion and motion.pillHeight or collapsedSize.Y.Offset
     local progress = collapseProgress(height, openHeight, pillHeight)
     self._collapseProgress = progress
 
     local choreography = collapseChoreography
+
+    -- A window with a page has 450 pixels of vertical shrink to carry its chrome away. A window
+    -- that was already minimised has 16, and the rest of the move is the bar squeezing sideways
+    -- from 475 to 185. Run the chrome out over the same slice of that and the title and the
+    -- action icons slide into each other while both are still legible, which is a mess in a way
+    -- a fade alone cannot fix. So when there is no page, everything on the bar leaves in the
+    -- first fifth of the travel and what is left is a clean shape morphing into the pill.
+    local hasPage = if motion then motion.contentsWhenOpen ~= false else true
+    local squeeze = if hasPage then 1 else 0.45
 
     -- The shape. Radius comes out of the height the frame actually has, so the silhouette is
     -- right at every intermediate size and lands on a true pill without a second curve to keep
@@ -2513,7 +2538,7 @@ function Window:_applyCollapseProgress(width: number, height: number)
 
     local function fade(instance, property, entry)
         if instance then
-            instance[property] = lerp(entry.rest, 1, phase(progress, entry.from, entry.to))
+            instance[property] = lerp(entry.rest, 1, phase(progress, entry.from * squeeze, entry.to * squeeze))
         end
     end
 
@@ -2548,19 +2573,48 @@ function Window:_applyCollapseProgress(width: number, height: number)
     -- The page and the bar above it come off once the frame is too small to hold them, and go
     -- back on the moment it is big enough again. A threshold on the same number rather than a
     -- delay, so it is correct however fast this is going and whichever way it is headed.
-    local roomForContents = progress < contentsGone
-    if self.topbar.Visible ~= roomForContents then
-        self.topbar.Visible = roomForContents
-        self.tabList.Visible = roomForContents
-        self.elements.Visible = roomForContents
+    -- The page only belongs to this move at all if the open end of it had one. Collapsing a
+    -- window that was already minimised must not flash its page on at the start.
+    local roomForPage = hasPage and progress < pageGone
+    if self.elements.Visible ~= roomForPage then
+        self.elements.Visible = roomForPage
+        self.tabList.Visible = roomForPage
 
         -- Coming back, the page fills the moment there is somewhere to put it. Tied to the
         -- frame rather than to a delay, so it cannot arrive before the window is ready for it
         -- however the move was tuned.
-        if roomForContents and not self.hidden then
+        if roomForPage and not self.hidden then
             self:_revealElements(0.03, 0.4)
         end
     end
+
+    -- The topbar is the one part a minimised window still shows, so it is held on its own
+    -- threshold and stays until its contents have finished fading rather than going with the
+    -- page it does not belong to.
+    local roomForTopbar = progress < topbarGone * squeeze
+    if self.topbar.Visible ~= roomForTopbar then
+        self.topbar.Visible = roomForTopbar
+    end
+end
+
+-- Pick the frame up from wherever it actually is, unless a move is already under way.
+--
+-- A move in flight keeps its position and its velocity, which is what lets a collapse be
+-- reversed without restarting. An idle one must not: anything else may have moved the frame
+-- since the spring last ran, and minimising does exactly that with its own tweens. Resuming
+-- from what the spring last remembered writes that stale geometry straight to the frame on the
+-- first step, which reads as the window snapping to some other size before the animation has
+-- even begun.
+function Window:_syncMotionToFrame(): boolean
+    local motion = self._motion
+    if not motion or self._motionConnection then
+        return false
+    end
+
+    local view = viewportSize()
+    motion.size:snap(toPixels(self.main.Size, view))
+    motion.position:snap(toPixels(self.main.Position, view))
+    return true
 end
 
 -- Drive the frame to a size and a place on a spring.
@@ -2587,12 +2641,32 @@ function Window:_springTo(size: UDim2, position: UDim2, options)
     end
 
     local motion = self._motion
+
+    self:_syncMotionToFrame()
+
     motion.size:tune(stiffness, damping)
     motion.position:tune(stiffness, damping)
     motion.size:setTarget(sizeTarget)
     motion.position:setTarget(positionTarget)
     motion.sizeGoal, motion.positionGoal = size, position
     motion.onSettle = options.onSettle
+
+    -- The two ends of this particular move, so everything derived from it is measured against
+    -- what is actually happening rather than against a full sized window that may not be one of
+    -- them. Taller end is the open one whichever direction we are going.
+    -- from Size rather than AbsoluteSize: the frame is always sized in offsets here, and
+    -- AbsoluteSize is only recomputed by the engine after a write, so it reports the previous
+    -- frame to anything that reads it in the same step that set it
+    local startHeight = self.main.Size.Y.Offset
+    if startHeight <= 0 then
+        startHeight = self.main.AbsoluteSize.Y
+    end
+    motion.openHeight = math.max(startHeight, sizeTarget.Y)
+    motion.pillHeight = math.min(startHeight, sizeTarget.Y)
+
+    -- Whether the open end of this move shows a page at all. False collapsing a window that was
+    -- already minimised, since there is no page to bring back on the way in or out.
+    motion.contentsWhenOpen = options.contentsWhenOpen ~= false
 
     -- A spring settles when it settles, so nothing here is allowed to depend on it having done
     -- so. This is the backstop: if the frame loop never runs, is throttled, or the move is
@@ -2666,11 +2740,21 @@ function Window:_stopMotion()
     if not self.unloaded and motion.sizeGoal and motion.positionGoal then
         self.main.Size = motion.sizeGoal
         self.main.Position = motion.positionGoal
-        self:_applyCollapseProgress(self.main.AbsoluteSize.X, self.main.AbsoluteSize.Y)
+        -- from the spring's own target rather than the frame's AbsoluteSize: that is only
+        -- recomputed by the engine after the write, so reading it here gets the previous frame
+        -- and settles the derived properties one step short of where they belong
+        local landed = motion.size.target
+        self:_applyCollapseProgress(landed.X, landed.Y)
         local view = viewportSize()
         motion.size:snap(toPixels(motion.sizeGoal, view))
         motion.position:snap(toPixels(motion.positionGoal, view))
     end
+
+    -- Spent, so the backstop that was armed for this move cannot fire later and put the frame
+    -- back on a goal that has since stopped being true. Without this, settling normally still
+    -- leaves a timer running: minimise the window inside that window of time and it snaps back
+    -- to full size on its own, with nothing on screen to explain why.
+    motion.token = nil
 
     local onSettle = motion.onSettle
     motion.onSettle = nil

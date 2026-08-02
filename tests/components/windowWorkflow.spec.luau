@@ -657,10 +657,14 @@ return function()
             local w = makeWindow()
             expect(w.windowStroke.Transparency).to.equal(1)
 
+            -- the stroke is derived from how far the frame has travelled rather than tweened
+            -- alongside it, so these drive the motion to its end the way a frame loop would
             w:Show()
+            w:_stopMotion()
             expect(w.windowStroke.Transparency).to.equal(0.95)
 
             w:Hide()
+            w:_stopMotion()
             expect(w.windowStroke.Transparency).to.equal(1)
         end)
 
@@ -1086,6 +1090,99 @@ return function()
             if w.collapsedTitle then
                 expect(w.collapsedTitle.TextTransparency).to.equal(goingDown.face)
             end
+        end)
+
+        it("starts a move from where the frame actually is, not where it last left it", function()
+            local w = makeWindow()
+            w.hidden = false
+
+            -- one move, so the springs exist and hold where they finished
+            w:Hide()
+            w:_stopMotion()
+            local remembered = w._motion.size.position.Y
+
+            -- something else moves the frame without the spring's knowledge, which is exactly
+            -- what minimising does: its own tweens, straight onto main.Size
+            w.main.Size = UDim2.fromOffset(w.size.X.Offset, 66)
+            expect(remembered).never.to.equal(66)
+
+            expect(w:_syncMotionToFrame()).to.equal(true)
+            expect(w._motion.size.position.Y).to.equal(66)
+        end)
+
+        it("disarms the settle backstop once a move has landed", function()
+            local w = makeWindow()
+            w.hidden = false
+
+            w:Hide()
+            w:_stopMotion()
+
+            -- the backstop exists so a dropped frame loop cannot leave the window flagged as
+            -- animating forever. Once the move has landed it has to be spent: left armed it
+            -- fires later and writes that move's goal back onto the frame, so anything that
+            -- moved the window in between, minimising most of all, is silently undone.
+            expect(w._motion.token).to.equal(nil)
+        end)
+
+        it("leaves a move already in flight alone so it can be reversed, not restarted", function()
+            local w = makeWindow()
+            w.hidden = false
+            w:Hide()
+            w:_stopMotion()
+
+            -- pretend the loop is running: mid flight the spring's own position and speed are
+            -- the whole point, and picking the frame up again would throw both away
+            w._motionConnection = {}
+            w._motion.size:snap(Vector2.new(300, 300))
+            w.main.Size = UDim2.fromOffset(475, 66)
+
+            expect(w:_syncMotionToFrame()).to.equal(false)
+            expect(w._motion.size.position.Y).to.equal(300)
+            w._motionConnection = nil
+        end)
+
+        it("collapses a minimised window across its own travel, not the full window's", function()
+            local w = makeWindow()
+            w.hidden = false
+            w:_stopMotion()
+
+            -- a minimised window is 66 tall and the pill is 50, so the whole move is 16 pixels.
+            -- Measured against a full 500 tall window it would start at 0.96 already: the title
+            -- would blank on the first frame and the pill's label would be up before anything
+            -- had moved.
+            w.minimised = true
+            w.main.Size = UDim2.fromOffset(w.size.X.Offset, 66)
+            w:Hide()
+
+            local motion = w._motion
+            expect(motion.openHeight).to.equal(66)
+            expect(motion.pillHeight).to.equal(50)
+
+            -- at the start of that move the bar still looks like itself
+            w:_applyCollapseProgress(w.size.X.Offset, 66)
+            expect(w.title.TextTransparency < 0.1).to.equal(true)
+            expect(w.topbar.Visible).to.equal(true)
+
+            -- but it clears fast. A minimised bar has 16 pixels of vertical travel and 290 of
+            -- horizontal, so the title and the action icons would slide into each other while
+            -- both were still legible if they left on the same schedule a full window uses.
+            -- A quarter of the way through, the writing on it has already gone
+            w:_applyCollapseProgress(402, 62)
+            expect(w.title.TextTransparency).to.equal(1)
+
+            -- and the bar itself follows shortly after, leaving a clean shape to morph
+            w:_applyCollapseProgress(360, 60)
+            expect(w.topbar.Visible).to.equal(false)
+
+            -- and the page never comes back on the way, because that window had none to show
+            expect(w.elements.Visible).to.equal(false)
+            w:_applyCollapseProgress(w.size.X.Offset, 64)
+            expect(w.elements.Visible).to.equal(false)
+
+            -- by the end it is a pill like any other
+            w:_stopMotion()
+            expect(w.title.TextTransparency).to.equal(1)
+            expect(w.topbar.Visible).to.equal(false)
         end)
 
         it("holds the page only while there is a frame big enough for it", function()
