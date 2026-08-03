@@ -35,7 +35,19 @@ export type Spring = typeof(setmetatable(
 -- delta the frame happened to take drifts on a slow machine and can leave the rails entirely
 -- after a hitch, which is exactly when it is most visible.
 local fixedStep = 1 / 240
-local maxSteps = 12
+
+-- The longest frame the spring will account for in full. Enough substeps to cover it at the
+-- fixed step, so a slow frame advances the spring by as much time as actually passed rather
+-- than by as much as the cap allowed. Twelve steps only covered 50ms, so at anything under 20
+-- FPS the spring ran slower than the clock while the backstop that ends the move kept running
+-- on wall time: it came due with the window still travelling and snapped it to the end.
+--
+-- Past a quarter of a second the frame is a hitch rather than a frame rate, and the missing
+-- time is dropped deliberately. Catching up on half a second in one go is a teleport whichever
+-- way it is integrated.
+-- Capping the frame is what bounds the work: a quarter of a second is 60 steps of arithmetic on
+-- two vectors, twice per window, and only while something is actually moving.
+spring.maxFrame = 0.25
 
 -- `damping` as a fraction of critical for the given stiffness: 1 arrives without overshooting,
 -- below 1 overshoots and settles back, above 1 crawls in. Expressing it this way means the two
@@ -70,8 +82,12 @@ function spring.impulse(self: Spring, velocity: Vector2)
 end
 
 function spring.step(self: Spring, delta: number): Vector2
-    local steps = math.clamp(math.ceil(delta / fixedStep), 1, maxSteps)
-    local step = math.min(delta, maxSteps * fixedStep) / steps
+    -- All of the frame, up to the hitch cap, spread over as many fixed steps as it takes. The
+    -- step size stays at the fixed one rather than growing with the frame, so the integration
+    -- is as stable on a slow machine as a fast one.
+    local elapsed = math.clamp(delta, 0, spring.maxFrame)
+    local steps = math.max(math.ceil(elapsed / fixedStep), 1)
+    local step = elapsed / steps
 
     for _ = 1, steps do
         local acceleration = (self.target - self.position) * self.stiffness - self.velocity * self.damping

@@ -1026,6 +1026,11 @@ function Window:Hide()
         return
     end
 
+    -- Whether this call is turning a restore that is already in the air around, rather than
+    -- starting a fresh collapse. Read here because animating is raised further down, and once
+    -- it is it answers yes for every hide, including the ordinary ones.
+    local reversing = self.animating
+
     -- drop out of search first so we grow back into the normal tab view on next show. tabList
     -- stays hidden here since the collapse hides it anyway; Show re-enables it.
     if self._searching then
@@ -1060,7 +1065,7 @@ function Window:Hide()
     -- Not while a restore is still running: the frame is somewhere between the pill and where
     -- it was headed, and that spot in mid air is not a place to come back to. The restore was
     -- already aiming at the right one, so it is left alone.
-    if not self.animating then
+    if not reversing then
         self._restorePosition = self.main.Position
     end
 

@@ -1256,6 +1256,36 @@ return function()
             w:_stopMotion()
         end)
 
+        it("comes back to where it was left after being moved", function()
+            local w = makeWindow()
+            w.hidden = false
+            w.hasShownOnce = true
+
+            -- dragged off centre, then hidden
+            local moved = UDim2.fromOffset(820, 140)
+            w.main.Position = moved
+            w.main.Size = UDim2.fromOffset(w.size.X.Offset, w.size.Y.Offset)
+            w:Hide()
+
+            expect(w._restorePosition).to.equal(moved)
+
+            -- and back to the same spot, not the centre and not a stale one from earlier. Pulled
+            -- onto the screen on the way, since the fit can have changed while it was away
+            w:_stopMotion()
+            w:Show()
+            expect(w._motion.positionGoal).to.equal(w:_clampedPosition(moved))
+            expect(w._motion.positionGoal).never.to.equal(UDim2.fromScale(0.5, 0.5))
+            w:_stopMotion()
+
+            -- moved again, hidden again: the second hide has to record the second spot
+            w.hidden = false
+            local again = UDim2.fromOffset(200, 600)
+            w.main.Position = again
+            w:Hide()
+            expect(w._restorePosition).to.equal(again)
+            w:_stopMotion()
+        end)
+
         it("still waits for an animation that cannot be redirected", function()
             local w = makeWindow()
             w.hidden = false

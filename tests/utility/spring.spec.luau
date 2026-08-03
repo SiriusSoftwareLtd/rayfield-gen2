@@ -106,6 +106,63 @@ return function()
             expect(calledEarly).to.equal(false)
         end)
 
+        it("advances by as much time as the frame actually took", function()
+            -- One second of wall clock, spent in frames of very different lengths. However it
+            -- is cut up, the spring has to end up in the same place, or the clock it runs on is
+            -- not the one the rest of the window is using.
+            local function after(frameLength: number)
+                local motion = spring.new(Vector2.zero, 300, 1)
+                motion:setTarget(Vector2.new(400, 0))
+                for _ = 1, math.round(1 / frameLength) do
+                    motion:step(frameLength)
+                end
+                return motion.position.X
+            end
+
+            local smooth = after(1 / 60)
+            local slow = after(1 / 10) -- 10 FPS, longer than the old 50ms ceiling
+            local awful = after(1 / 5) -- 5 FPS
+
+            expect(math.abs(slow - smooth) < 1).to.equal(true)
+            expect(math.abs(awful - smooth) < 1).to.equal(true)
+
+            -- and it stays stable rather than being flung by the long steps
+            expect(smooth > 399).to.equal(true)
+            expect(awful < 401).to.equal(true)
+        end)
+
+        it("settles in the same wall clock time however bad the frame rate is", function()
+            -- The move is ended by a backstop counting seconds off the clock. A spring that
+            -- advances less than a second per second comes due still travelling, and the window
+            -- is snapped to its target in front of whoever is watching.
+            local function secondsToSettle(frameLength: number)
+                local motion = spring.new(Vector2.zero, 300, 1)
+                motion:setTarget(Vector2.new(400, 0))
+
+                local elapsed = 0
+                while not motion:settled(1) and elapsed < 10 do
+                    motion:step(frameLength)
+                    elapsed += frameLength
+                end
+                return elapsed
+            end
+
+            local smooth = secondsToSettle(1 / 60)
+            expect(math.abs(secondsToSettle(1 / 10) - smooth) < 0.15).to.equal(true)
+            expect(math.abs(secondsToSettle(1 / 5) - smooth) < 0.25).to.equal(true)
+        end)
+
+        it("treats a hitch as a hitch rather than catching up on all of it", function()
+            local motion = spring.new(Vector2.zero, 300, 1)
+            motion:setTarget(Vector2.new(400, 0))
+
+            -- a frame that took whole seconds is a stall, not a frame rate. Covering all of it
+            -- in one go is a teleport however it is integrated, so the rest is dropped
+            motion:step(5)
+            expect(motion.position.X < 400).to.equal(true)
+            expect(motion:settled(1)).to.equal(false)
+        end)
+
         it("snaps dead on demand", function()
             local motion = spring.new(Vector2.zero, 300, 1)
             motion:setTarget(Vector2.new(400, 0))
