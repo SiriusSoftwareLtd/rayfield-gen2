@@ -113,6 +113,9 @@ local topbarGone = 0.62
 -- stiffness, so a pace one and a half times quicker is 2.25 times the number.
 local collapseStiffness = 470
 
+-- How long the page takes to slide when a tab is picked, before the speed setting is applied.
+local pageTweenTime = 0.4
+
 local function pacedStiffness(): number
     return motion.stiffness(collapseStiffness)
 end
@@ -565,7 +568,10 @@ function Window.new(properties)
         TouchInputEnabled = false,
 
         EasingStyle = Enum.EasingStyle.Exponential,
-        TweenTime = 0.4,
+        -- A UIPageLayout runs its own slide rather than going through the tween handle, so the
+        -- speed has to be written onto it. From motion rather than the flat number, or a window
+        -- built after another one changed the pace would start on the pace nobody is using.
+        TweenTime = motion.duration(pageTweenTime),
 
         Parent = self.elements,
     })
@@ -1005,14 +1011,18 @@ end
 
 function Window:Hide()
     -- idempotent: a second Hide while collapsed would capture the pill spot as the
-    -- restore position and teleport the window there on the next Show.
-    --
-    -- The hidden flag is set the moment a collapse starts rather than when it finishes, so it
-    -- carries that on its own and animating does not need to be in here. Turning a restore
-    -- around while it is still running is a thing people do - they hit the toggle twice - and
-    -- the spring is built to be retargeted mid flight, so blocking it here was the only reason
-    -- the window could not follow.
+    -- restore position and teleport the window there on the next Show. The hidden flag is set
+    -- the moment a collapse starts rather than when it finishes, so it carries that on its own.
     if self.hidden then
+        return
+    end
+
+    -- Turning a collapse or a restore around mid flight is a thing people do - they hit the
+    -- toggle twice - and the spring is built to be retargeted, so animating on its own is not a
+    -- reason to refuse. Only the spring can be redirected though: the first-show reveal and the
+    -- minimise both drive main.Size with a tween, and starting a spring on the same property
+    -- while one of those is running leaves two things writing it every frame.
+    if self.animating and not self:_canRetarget() then
         return
     end
 
@@ -1113,10 +1123,10 @@ function Window:Hide()
     })
 end
 
--- Whichever way the window is currently going, this asks for the other one. Mid move that is a
--- reversal rather than a rejection: Hide and Show each guard on the hidden flag, which flips at
--- the start of a move rather than the end, so the same call that would be ignored as a repeat
--- still turns an opposite one around.
+-- Whichever way the window is currently going, this asks for the other one. Part way through a
+-- collapse that is a reversal rather than a rejection, since the hidden flag flips at the start
+-- of a move rather than the end: the same call that would be ignored as a repeat still turns an
+-- opposite one around, as long as it is the spring doing the moving.
 function Window:ToggleHide()
     if self.hidden then
         self:Show()
@@ -1571,11 +1581,24 @@ function Window:_buildSettingsUI()
 
     -- another window's slider, or a script calling SetAnimationSpeed, moves the same number this
     -- one is showing, so it follows rather than sitting on a pace nothing is animating at
-    motion.subscribe(self, function(speed)
-        if self.animationSpeedSlider and not self.unloaded then
+    local function applySpeed(speed: number)
+        if self.unloaded then
+            return
+        end
+        if self.animationSpeedSlider then
             self.animationSpeedSlider:Set(math.round(speed * 100), true)
         end
-    end)
+        -- the page slide is the one animation the tween handle never sees, so it is moved here
+        if self.elementsLayout then
+            self.elementsLayout.TweenTime = motion.duration(pageTweenTime)
+        end
+    end
+
+    motion.subscribe(self, applySpeed)
+
+    -- once now as well: the page layout is built before the saved settings are read, so a window
+    -- opening into a speed someone else already chose would otherwise slide at the stock pace
+    applySpeed(motion.getSpeed())
 
     self.rfSettings:CreateSection({ name = "Window" })
 
@@ -1767,10 +1790,13 @@ end
 
 function Window:Show()
     -- idempotent: replaying the restore on a visible window teleports it to a stale position.
-    -- As with Hide, the hidden flag alone says that, and it is already false the whole way
-    -- through a collapse, so a Show part way through one turns it around instead of being
-    -- dropped on the floor.
     if not self.hidden then
+        return
+    end
+
+    -- and as with Hide, a collapse still in the air can be turned around, but anything driving
+    -- the frame with a tween has to be left to finish
+    if self.animating and not self:_canRetarget() then
         return
     end
     self.animating = true
@@ -2856,6 +2882,14 @@ end
 -- Stop driving the frame and hand the properties back as the plain UDim2 they are meant to be,
 -- so anything that reads them afterwards sees the canonical value rather than the pixels the
 -- spring happened to land on.
+-- Whether the thing currently moving the frame is the collapse spring, which can be handed a new
+-- target and will bend towards it from wherever it is. Anything else animating main.Size does it
+-- with a tween, and a tween cannot be redirected: it would keep writing the property every frame
+-- alongside the spring, and the two would fight over it until the tween ran out.
+function Window:_canRetarget(): boolean
+    return self._motionConnection ~= nil
+end
+
 function Window:_stopMotion()
     if self._motionConnection then
         self:Disconnect(self._motionConnection)

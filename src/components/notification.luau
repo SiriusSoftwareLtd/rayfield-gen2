@@ -14,6 +14,7 @@ local utility = script.Parent.Parent.utility
 
 -- Variables
 local variables = require(utility.variables)
+local motion = require(utility.motion)
 local functions = require(utility.functions)
 local constants = require(utility.constants)
 local hapticEngine = require(utility.HapticEngine)
@@ -286,7 +287,7 @@ function Notification:_show()
     variables.tweenService:Create(self.stroke, fadeLong, { Transparency = 0.95 }):Play()
     variables.tweenService:Create(self.shadow, fadeShort, { Transparency = 0.6 }):Play()
 
-    task.wait(0.05)
+    task.wait(motion.duration(0.05))
     if self._dismissed or not self.main.Parent then
         return -- dismissed mid-stagger; dont fight the exit fade
     end
@@ -294,7 +295,7 @@ function Notification:_show()
         variables.tweenService:Create(self.iconLabel, fadeShort, { ImageTransparency = 0 }):Play()
     end
 
-    task.wait(0.05)
+    task.wait(motion.duration(0.05))
     if self._dismissed or not self.main.Parent then
         return
     end

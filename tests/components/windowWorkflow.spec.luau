@@ -1256,6 +1256,30 @@ return function()
             w:_stopMotion()
         end)
 
+        it("still waits for an animation that cannot be redirected", function()
+            local w = makeWindow()
+            w.hidden = false
+            w.hasShownOnce = true
+
+            -- The minimise and the first-show reveal both drive main.Size with a tween, and a
+            -- tween cannot be handed a new target: it would carry on writing the property every
+            -- frame with the spring writing it too. Only the spring can be turned around, so
+            -- animating on its own stops being a reason to refuse only while one is running.
+            w.animating = true
+            w._motionConnection = nil
+            expect(w:_canRetarget()).to.equal(false)
+
+            w:Hide()
+            expect(w.hidden).to.equal(false)
+            expect(w._motion).to.equal(nil)
+
+            -- and with the spring in the air it goes through
+            w.animating = false
+            w:Hide()
+            w:_stopMotion()
+            expect(w.hidden).to.equal(true)
+        end)
+
         it("keeps the ends of a move it is only reversing", function()
             local w = makeWindow()
             w.hidden = false
@@ -1492,6 +1516,81 @@ return function()
             -- handle divides by the speed again. That put these tweens on the square of the
             -- pace while the delay beside them only had the one, and the two came apart.
             expect(math.abs(normal / quick - 2) < 1e-6).to.equal(true)
+        end)
+
+        it("paces the notification and toast staggers with the fades beside them", function()
+            local w = makeWindow()
+
+            -- record what gets waited on without changing what happens
+            local function waitsDuring(run)
+                local seen = {}
+                local realWait = task.wait;
+                (task :: any).wait = function(seconds)
+                    if seconds ~= nil then
+                        table.insert(seen, seconds)
+                    end
+                    return realWait(seconds)
+                end
+                local ok, err = pcall(run);
+                (task :: any).wait = realWait
+                assert(ok, err)
+                return seen
+            end
+
+            local function has(seen, value)
+                for _, entry in seen do
+                    if math.abs(entry - value) < 1e-9 then
+                        return true
+                    end
+                end
+                return false
+            end
+
+            w:SetAnimationSpeed(1)
+            expect(has(
+                waitsDuring(function()
+                    w:Notify({ title = "Stock" })
+                end),
+                0.05
+            )).to.equal(true)
+
+            -- the fades around these are scaled through the tween handle, so a stagger that
+            -- stays put drifts away from them: at twice the pace the card is done fading in
+            -- before the icon behind it has been told to start
+            w:SetAnimationSpeed(2)
+            local quick = waitsDuring(function()
+                w:Notify({ title = "Quick" })
+            end)
+            expect(has(quick, 0.025)).to.equal(true)
+            expect(has(quick, 0.05)).to.equal(false)
+
+            local toastWaits = waitsDuring(function()
+                w:Toast({ title = "Quick" })
+            end)
+            expect(has(toastWaits, 0.025)).to.equal(true)
+            expect(has(toastWaits, 0.05)).to.equal(false)
+        end)
+
+        it("moves the page slide with the pace as well", function()
+            local w = makeWindow()
+            w:SetAnimationSpeed(1)
+
+            local stock = w.elementsLayout.TweenTime
+            expect(stock > 0).to.equal(true)
+
+            -- a UIPageLayout runs its own slide rather than going through the tween handle, so
+            -- at any other pace the tab pill would change speed and the page under it would not
+            w:SetAnimationSpeed(2)
+            expect(math.abs(w.elementsLayout.TweenTime - stock / 2) < 1e-9).to.equal(true)
+
+            -- and a window built while another one is already running quick starts there too,
+            -- rather than on the pace nothing is using
+            local later = Window.new({
+                name = "Later Window",
+                configuration = { autoSave = false, autoLoad = false },
+            })
+            expect(math.abs(later.elementsLayout.TweenTime - stock / 2) < 1e-9).to.equal(true)
+            later:Unload()
         end)
 
         it("paces the collapse as well as the tweens", function()
