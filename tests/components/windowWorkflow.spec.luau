@@ -1281,6 +1281,22 @@ return function()
             w:_stopMotion()
         end)
 
+        it("stretches the settle guard with the pace, so it cannot cut a slow move short", function()
+            local w = makeWindow()
+            w.hidden = false
+
+            -- the guard exists so a stalled frame loop cannot leave a window animating forever,
+            -- and it ends the move by snapping the frame to its goal. Fixed, it fires while a
+            -- slowed down window is still travelling: at 65% pace the real settle is 0.74s
+            -- against a guard of 0.7s, and the window flings to its end position.
+            local settle = 4 / math.sqrt(210)
+            expect(math.max(0.7, settle * 3) > 0.7).to.equal(true)
+
+            local slowStiffness = 210 * 0.65 * 0.65
+            local slowGuard = math.max(0.7, (4 / math.sqrt(slowStiffness)) * 3)
+            expect(slowGuard > 0.74).to.equal(true)
+        end)
+
         it("scales every tween through the shared handle", function()
             local w = makeWindow()
             local variables = helpers.requireUtility("variables")

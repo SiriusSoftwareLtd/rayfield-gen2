@@ -2718,9 +2718,16 @@ function Window:_springTo(size: UDim2, position: UDim2, options)
     -- somehow still going long after it should be, the frame is put where it was headed and the
     -- settle work runs anyway. Without it a dropped loop leaves the window flagged as animating,
     -- which means permanently unclickable.
+    -- Scaled to the move rather than fixed. A spring's nominal settle time is roughly four
+    -- time constants, but landing within a pixel of a 450 pixel move takes closer to seven, and
+    -- the animation speed setting stretches both. A guard that does not stretch with them fires
+    -- while the window is still travelling and snaps it to the end, which is the one thing it
+    -- exists to avoid: at 65% pace the real settle is 0.74s against a fixed guard of 0.7s.
+    local guard = options.timeout or math.max(0.7, settleTime(stiffness) * 3)
+
     local token = (motion.token or 0) + 1
     motion.token = token
-    task.delay(options.timeout or 0.7, function()
+    task.delay(guard, function()
         if self._motion and self._motion.token == token then
             self:_stopMotion()
         end
