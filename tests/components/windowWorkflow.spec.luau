@@ -949,6 +949,269 @@ return function()
 
     -- The primary flow: a dev sets autoSave/autoLoad and never opens the config manager.
     -- A change to an element must autosave, and a fresh window must autoLoad it back.
+    describe("component slider handle bounds", function()
+        local bounded
+
+        local function makeWindow()
+            bounded = Window.new({
+                name = "Slider Window",
+                configuration = { autoSave = false, autoLoad = false },
+            })
+            bounded.hidden = false
+            return bounded
+        end
+
+        afterEach(function()
+            if bounded and not bounded.unloaded then
+                bounded:Unload()
+            end
+            bounded = nil
+        end)
+
+        -- The fill is the whole track at the top of the range and reaches the middle of the
+        -- pill at the bottom, with the pill sitting half a pill past it. These read that
+        -- relationship rather than pixels on screen, since the harness lays nothing out.
+        local function offsetOf(slider)
+            return slider.handle.Position.X.Offset
+        end
+
+        -- The fill as a fraction of the track, plus the pixels added or taken off it
+        local function fillOf(slider)
+            return slider.progress.Size.X.Scale, slider.progress.Size.X.Offset
+        end
+
+        it("keeps the pill inside the track at both ends of the range", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local slider = tab:CreateSlider({
+                name = "Volume",
+                range = { 0, 100 },
+                value = 50,
+                forgetState = true,
+            })
+
+            local width = slider.handle.Size.X.Offset
+
+            -- at the top the fill is the whole track, so the bar reads as full, and the pill
+            -- sits flush on the end of it rather than past it
+            slider:Set(100)
+            local scale, offset = fillOf(slider)
+            expect(scale).to.equal(1)
+            expect(math.abs(offset) <= 1).to.equal(true)
+            expect(offsetOf(slider)).to.equal(0)
+
+            -- at the bottom the fill reaches the middle of the pill, so the pill has green
+            -- behind its left half and none of it shows beside the pill. Half a pill past that
+            -- is the pill's own right edge, which puts its left edge on the start of the track.
+            slider:Set(0)
+            scale, offset = fillOf(slider)
+            expect(scale).to.equal(0)
+            expect(math.abs(offset - width / 2) <= 1).to.equal(true)
+            expect(math.abs(offsetOf(slider) - width / 2) <= 1).to.equal(true)
+
+            -- and in between, both slide together
+            slider:Set(50)
+            scale, offset = fillOf(slider)
+            expect(scale).to.equal(0.5)
+            expect(math.abs(offset - width / 4) <= 1).to.equal(true)
+            expect(math.abs(offsetOf(slider) - width / 4) <= 1).to.equal(true)
+        end)
+
+        it("moves the pill with it when it grows for a drag", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local slider = tab:CreateSlider({
+                name = "Volume",
+                range = { 0, 100 },
+                value = 0,
+                forgetState = true,
+            })
+
+            local rest = slider.handle.Size.X.Offset
+            local _, restFill = fillOf(slider)
+            expect(math.abs(restFill - rest / 2) <= 1).to.equal(true)
+
+            -- holding grows the pill, and both the fill and the pill are measured off its
+            -- width, so both have to move with it or the pill hangs off the start of the track
+            slider:_setHeld(true)
+            local held = slider.handle.Size.X.Offset
+            local _, heldFill = fillOf(slider)
+            expect(held > rest).to.equal(true)
+            expect(math.abs(heldFill - held / 2) <= 1).to.equal(true)
+            expect(math.abs(offsetOf(slider) - held / 2) <= 1).to.equal(true)
+
+            slider:_setHeld(false)
+            local _, backFill = fillOf(slider)
+            expect(math.abs(backFill - rest / 2) <= 1).to.equal(true)
+            expect(math.abs(offsetOf(slider) - rest / 2) <= 1).to.equal(true)
+        end)
+
+        it("holds a minimal slider to the same bounds", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local row = tab:CreateGroup()
+            local slider = row:CreateSlider({
+                name = "Bare",
+                range = { 0, 1 },
+                value = 1,
+                minimal = true,
+                forgetState = true,
+            })
+
+            local width = slider.handle.Size.X.Offset
+            local scale, offset = fillOf(slider)
+            expect(scale).to.equal(1)
+            expect(math.abs(offset) <= 1).to.equal(true)
+
+            slider:Set(0)
+            scale, offset = fillOf(slider)
+            expect(scale).to.equal(0)
+            expect(math.abs(offset - width / 2) <= 1).to.equal(true)
+        end)
+
+        -- The harness lays nothing out, so the track is given a size and a place on screen and
+        -- the pointer is moved over it by hand.
+        local function placeTrack(slider, left, width)
+            slider.track.AbsolutePosition = Vector2.new(left, 0)
+            slider.track.AbsoluteSize = Vector2.new(width, 20)
+        end
+
+        local function pointAt(x)
+            helpers.services.UserInputService._setMouseLocation(Vector2.new(x, 10))
+        end
+
+        it("maps the pointer onto the same inset path the pill travels", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local slider = tab:CreateSlider({
+                name = "Volume",
+                range = { 0, 100 },
+                increment = 1,
+                value = 50,
+                forgetState = true,
+            })
+
+            local track = 222
+            placeTrack(slider, 0, track)
+            slider:_setHeld(true) -- a real drag grows the pill before the first update
+            local width = slider._handleWidth
+
+            -- the pill's centre when the slider reads its lowest value. Pointing straight at it
+            -- is what grabbing the pill does, and it must not move the value.
+            pointAt(width / 2)
+            slider:_updateFromMouse()
+            expect(slider.value).to.equal(0)
+
+            -- and its centre at the highest
+            pointAt(track - width / 2)
+            slider:_updateFromMouse()
+            expect(slider.value).to.equal(100)
+
+            -- the end caps hold no part of that path, so they clamp to the ends of the range
+            pointAt(2)
+            slider:_updateFromMouse()
+            expect(slider.value).to.equal(0)
+            pointAt(track - 2)
+            slider:_updateFromMouse()
+            expect(slider.value).to.equal(100)
+
+            -- the middle of the track is the middle of the path either way, so it is the middle
+            -- of the range under both mappings and only pins that the inset one is centred
+            pointAt(track / 2)
+            slider:_updateFromMouse()
+            expect(slider.value).to.equal(50)
+        end)
+
+        it("falls back to the whole track when the pill is wider than it", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local slider = tab:CreateSlider({
+                name = "Volume",
+                range = { 0, 100 },
+                increment = 1,
+                value = 0,
+                forgetState = true,
+            })
+
+            -- a track too narrow to hold the pill leaves no inset path to map onto, and the
+            -- span would go negative and flip the slider. The whole track is used instead.
+            placeTrack(slider, 0, 20)
+            slider:_setHeld(true)
+            expect(slider._handleWidth > 20).to.equal(true)
+
+            pointAt(10)
+            slider:_updateFromMouse()
+            expect(slider.value).to.equal(50)
+
+            pointAt(20)
+            slider:_updateFromMouse()
+            expect(slider.value).to.equal(100)
+        end)
+
+        it("keeps the held transition off every property a drag update writes", function()
+            local w = makeWindow()
+            local tab = w:CreateTab({ name = "Main" })
+            local slider = tab:CreateSlider({
+                name = "Volume",
+                range = { 0, 100 },
+                increment = 1,
+                value = 20,
+                forgetState = true,
+            })
+
+            placeTrack(slider, 0, 222)
+
+            -- Every tween put on the pill by whatever runs inside, one entry per tween, so the
+            -- properties can be read per tween rather than as one pile.
+            local service = helpers.services.TweenService
+            local function tweensOnHandle(run)
+                local seen = {}
+                local realCreate = service.Create
+                service.Create = function(this, instance, info, goals)
+                    if instance == slider.handle then
+                        table.insert(seen, goals)
+                    end
+                    return realCreate(this, instance, info, goals)
+                end
+                local ok, err = pcall(run)
+                service.Create = realCreate
+                assert(ok, err)
+                return seen
+            end
+
+            local held = tweensOnHandle(function()
+                slider:_setHeld(true)
+            end)
+
+            local follow = tweensOnHandle(function()
+                pointAt(160)
+                slider:_updateFromMouse()
+            end)
+
+            -- the tween carrying the grow, which is the one that has to survive a drag
+            local grow
+            for _, goals in ipairs(held) do
+                if goals.Size then
+                    grow = goals
+                end
+            end
+            expect(grow ~= nil).to.equal(true)
+            expect(grow.BackgroundTransparency ~= nil).to.equal(true)
+
+            -- Roblox cancels a running tween when a later one takes a property off it, so any
+            -- property in both would let the first drag update stop the grow partway and leave
+            -- the pill stuck between its two sizes.
+            local moved = false
+            for _, goals in ipairs(follow) do
+                for key in pairs(goals) do
+                    moved = true
+                    expect(grow[key] == nil).to.equal(true)
+                end
+            end
+            expect(moved).to.equal(true) -- the update did move the pill, so the check meant something
+        end)
+    end)
+
     describe("config round trip without the config manager", function()
         local variables = helpers.requireUtility("variables")
         local filesystem = helpers.requireUtility("filesystem")
@@ -1372,12 +1635,14 @@ return function()
             helpers.services.UserInputService._setMouseLocation(Vector2.new(150, 80))
             slider.interact.InputBegan:Fire({ UserInputType = Enum.UserInputType.MouseButton1 })
             expect(slider.dragging).to.equal(true)
-            expect(slider.value).to.equal(25) -- (150 - 100) / 200 of the range
+            -- 50px into a 200px track, less the half pill at each end the pill's centre cannot
+            -- reach: (150 - 100 - 41 / 2) / (200 - 41) of the range, snapped to the increment
+            expect(slider.value).to.equal(19)
 
             helpers.services.UserInputService._setMouseLocation(Vector2.new(200, 80))
             helpers.services.RunService.RenderStepped:Fire()
-            expect(slider.value).to.equal(50)
-            expect(seen[1]).to.equal(25)
+            expect(slider.value).to.equal(50) -- the middle of the track is the middle of the path
+            expect(seen[1]).to.equal(19)
             expect(seen[2]).to.equal(50)
 
             helpers.services.UserInputService.InputEnded:Fire({ UserInputType = Enum.UserInputType.MouseButton1 })
