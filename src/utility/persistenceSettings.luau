@@ -21,7 +21,6 @@ type SettingsWindow = {
         keepOnScreen: boolean,
         welcomeToast: boolean,
         haptics: boolean,
-        animationSpeed: number,
     },
 }
 
@@ -50,7 +49,9 @@ function persistenceSettings.saveSettings(window: SettingsWindow): boolean
         keepOnScreen = window.settings.keepOnScreen,
         welcomeToast = window.settings.welcomeToast,
         haptics = window.settings.haptics,
-        animationSpeed = window.settings.animationSpeed,
+        -- read from motion, not from the window. The speed is library wide, so a window holding
+        -- its own copy would write whatever it was told last over the one actually in use.
+        animationSpeed = motion.getSpeed(),
     }
 
     local ok, encoded = pcall(variables.httpService.JSONEncode, variables.httpService, data)
@@ -139,8 +140,7 @@ function persistenceSettings.loadSettings(window: SettingsWindow): boolean
     -- interface at a speed nothing can be dismissed at
     if type(settings.animationSpeed) == "number" and settings.animationSpeed == settings.animationSpeed then
         local low, high = motion.range()
-        window.settings.animationSpeed = math.clamp(settings.animationSpeed, low, high)
-        motion.setSpeed(window.settings.animationSpeed)
+        motion.setSpeed(math.clamp(settings.animationSpeed, low, high))
     end
 
     if type(settings.haptics) == "boolean" then

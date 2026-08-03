@@ -12,6 +12,7 @@
 
 local utility = script.Parent.Parent.utility
 local variables = require(utility.variables)
+local motion = require(utility.motion)
 local constants = require(utility.constants)
 local locale = require(utility.locale)
 local action = require(script.Parent.action)
@@ -162,7 +163,7 @@ function search.open(window)
 
     -- strip swaps for the field
     setTabsShown(window, false, swapInfo)
-    task.delay(swapInfo.Time, function()
+    task.delay(motion.duration(swapInfo.Time), function()
         if window._searching then
             window.tabList.Visible = false
         end
@@ -195,7 +196,7 @@ function search.close(window, config)
     end
 
     setPillShown(window, false, swapInfo)
-    task.delay(swapInfo.Time, function()
+    task.delay(motion.duration(swapInfo.Time), function()
         if not window._searching then
             window.searchPill.Visible = false
         end

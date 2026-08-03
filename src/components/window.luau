@@ -683,7 +683,10 @@ function Window.new(properties)
         keepOnScreen = true, -- clamp the drag so the window cant be pulled off screen
         welcomeToast = true, -- the "signed in as" toast on first open for a new/changed account
         haptics = false, -- off by default; opt in from settings (buzzes on presses/notifications)
-        animationSpeed = 1, -- 1 is the pace the interface was designed at, higher is quicker
+        -- animation speed is deliberately not here. It is one number for the whole library, and
+        -- a copy per window is a copy that can go stale: change it on one window and the other
+        -- still holds the old value, then writes it back over the shared one the next time it
+        -- saves anything at all. motion owns it, and everything reads it from there.
     }
 
     self:LoadSettings()
@@ -1002,8 +1005,14 @@ end
 
 function Window:Hide()
     -- idempotent: a second Hide while collapsed would capture the pill spot as the
-    -- restore position and teleport the window there on the next Show
-    if self.animating or self.hidden then
+    -- restore position and teleport the window there on the next Show.
+    --
+    -- The hidden flag is set the moment a collapse starts rather than when it finishes, so it
+    -- carries that on its own and animating does not need to be in here. Turning a restore
+    -- around while it is still running is a thing people do - they hit the toggle twice - and
+    -- the spring is built to be retargeted mid flight, so blocking it here was the only reason
+    -- the window could not follow.
+    if self.hidden then
         return
     end
 
@@ -1036,8 +1045,14 @@ function Window:Hide()
         image.assign(self.minimiseAction.iconLabel, "Image", constants.icons.minimise) -- back to the minimise icon
     end
 
-    -- remember where the window sat so Show grows it back to the same spot
-    self._restorePosition = self.main.Position
+    -- remember where the window sat so Show grows it back to the same spot.
+    --
+    -- Not while a restore is still running: the frame is somewhere between the pill and where
+    -- it was headed, and that spot in mid air is not a place to come back to. The restore was
+    -- already aiming at the right one, so it is left alone.
+    if not self.animating then
+        self._restorePosition = self.main.Position
+    end
 
     local home, size = self:_collapsedRect()
 
@@ -1045,7 +1060,13 @@ function Window:Hide()
     -- they are derived from the frame every step of the way, in _applyCollapseProgress. What is
     -- left here is the handful of things it is cheaper to tween than to drive, sized off the
     -- move's own characteristic time so they stay in proportion with it.
-    local settle = settleTime(pacedStiffness())
+    -- From the unscaled stiffness on purpose. pacedStiffness has the speed in it already, and
+    -- a settle time goes with one over the square root of that, so a duration taken from it is
+    -- divided by the speed once before the tween handle divides it again. Two divisions makes
+    -- these tweens run at the square of the pace while the delay beside them only gets one, and
+    -- the two come apart the moment the speed leaves 1. The base number goes in, the handle
+    -- applies the speed, and motion.duration applies the same thing to the delay.
+    local settle = settleTime(collapseStiffness)
     local fadeInfo = TweenInfo.new(settle * 0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
     -- shrink the drag bar back down the same way it grows in on first reveal, instead of
@@ -1053,7 +1074,7 @@ function Window:Hide()
     variables.tweenService
         :Create(self.drag.dragCosmetic, fadeInfo, { Size = UDim2.fromOffset(0, 4), BackgroundTransparency = 1 })
         :Play()
-    task.delay(settle * 0.4, function()
+    task.delay(motion.duration(settle * 0.4), function()
         if not self.hidden then
             return
         end
@@ -1092,10 +1113,11 @@ function Window:Hide()
     })
 end
 
+-- Whichever way the window is currently going, this asks for the other one. Mid move that is a
+-- reversal rather than a rejection: Hide and Show each guard on the hidden flag, which flips at
+-- the start of a move rather than the end, so the same call that would be ignored as a repeat
+-- still turns an opposite one around.
 function Window:ToggleHide()
-    if self.animating then
-        return
-    end
     if self.hidden then
         self:Show()
     else
@@ -1140,7 +1162,7 @@ function Window:ToggleMinimise()
 
         -- once the window's grown back, fade the content and tab pills in rather than
         -- snapping them visible
-        task.delay(0.2, function()
+        task.delay(motion.duration(0.2), function()
             if self.minimised or self.hidden then
                 return -- re-minimised or hidden mid animation
             end
@@ -1157,7 +1179,7 @@ function Window:ToggleMinimise()
             self:_revealElements(0.035, 0.4)
         end)
 
-        task.delay(0.5, function()
+        task.delay(motion.duration(0.5), function()
             self.animating = false
         end)
     else
@@ -1173,7 +1195,7 @@ function Window:ToggleMinimise()
             end
         end
 
-        task.delay(0.3, function()
+        task.delay(motion.duration(0.3), function()
             if not self.minimised then
                 return -- restored mid animation
             end
@@ -1202,7 +1224,7 @@ function Window:ToggleMinimise()
             })
             :Play()
 
-        task.delay(0.5, function()
+        task.delay(motion.duration(0.5), function()
             self.animating = false
         end)
     end
@@ -1540,13 +1562,20 @@ function Window:_buildSettingsUI()
         range = { 25, 300 },
         increment = 5,
         suffix = "%",
-        value = math.round(self.settings.animationSpeed * 100),
+        value = math.round(motion.getSpeed() * 100),
         callback = function(value)
-            self.settings.animationSpeed = value / 100
-            motion.setSpeed(self.settings.animationSpeed)
+            motion.setSpeed(value / 100)
             self:SaveSettings()
         end,
     })
+
+    -- another window's slider, or a script calling SetAnimationSpeed, moves the same number this
+    -- one is showing, so it follows rather than sitting on a pace nothing is animating at
+    motion.subscribe(self, function(speed)
+        if self.animationSpeedSlider and not self.unloaded then
+            self.animationSpeedSlider:Set(math.round(speed * 100), true)
+        end
+    end)
 
     self.rfSettings:CreateSection({ name = "Window" })
 
@@ -1728,7 +1757,7 @@ function Window:_revealElements(perElementDelay, budget)
             element:_setShown(true, true)
             staggered += 1
             if staggered <= maxStaggered then
-                task.wait(perElementDelay)
+                task.wait(motion.duration(perElementDelay))
             end
         else
             element:_setShown(true, false) -- off-screen: no point animating what isn't visible
@@ -1737,8 +1766,11 @@ function Window:_revealElements(perElementDelay, budget)
 end
 
 function Window:Show()
-    -- idempotent: replaying the restore on a visible window teleports it to a stale position
-    if self.animating or not self.hidden then
+    -- idempotent: replaying the restore on a visible window teleports it to a stale position.
+    -- As with Hide, the hidden flag alone says that, and it is already false the whole way
+    -- through a collapse, so a Show part way through one turns it around instead of being
+    -- dropped on the floor.
+    if not self.hidden then
         return
     end
     self.animating = true
@@ -1785,7 +1817,9 @@ function Window:_quickRestore()
 
     -- as on the way out, the chrome, the corner and the pill's face are derived from the frame
     -- rather than tweened; these are the leftovers, sized off the move's characteristic time
-    local settle = settleTime(pacedStiffness())
+    -- unscaled, for the reason given on the way out: the tween handle applies the speed, so a
+    -- duration that already has it in would carry it twice
+    local settle = settleTime(collapseStiffness)
     local fadeInfo = TweenInfo.new(settle * 0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
     local dragInfo = TweenInfo.new(settle, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
@@ -1805,9 +1839,18 @@ function Window:_quickRestore()
         end,
     })
 
+    -- This restore's number, taken after the move is issued. Both blocks below fade chrome onto
+    -- a window they assume is still opening, over properties the collapse driver writes every
+    -- frame. Closing again before they land would have them fighting it, so they check that the
+    -- move they belong to is still the one running.
+    local restoreToken = self._motionSequence
+
     -- Phase 2: once the frame actually reads as a window, fade its chrome in and stagger the
     -- open tab's elements. Other tabs snap ready off-screen - nobody's looking, so no animation.
-    task.delay(0.22, function()
+    task.delay(motion.duration(0.22), function()
+        if self._motionSequence ~= restoreToken then
+            return
+        end
         self.topbar.Visible = true
         self.tabList.Visible = true
         self.elements.Visible = true
@@ -1855,7 +1898,10 @@ function Window:_quickRestore()
     -- Drag handle grows in with the chrome, same width sweep it uses on first reveal. Position
     -- is recalculated against the full restored size - if the window was minimised (a shorter
     -- bar-hang offset) before hiding, it would otherwise reappear at the old, wrong height.
-    task.delay(0.22, function()
+    task.delay(motion.duration(0.22), function()
+        if self._motionSequence ~= restoreToken then
+            return
+        end
         self.drag.drag.Position =
             UDim2.new(target.X.Scale, target.X.Offset, target.Y.Scale, target.Y.Offset + self.size.Y.Offset / 2 + 15)
         self.drag.dragCosmetic.Size = UDim2.fromOffset(0, 4)
@@ -1881,7 +1927,7 @@ function Window:_firstShow()
             { BackgroundTransparency = 0, Size = self.size }
         )
         :Play()
-    task.wait(0.85) -- let the frame actually read as a window before anything shows on top of it
+    task.wait(motion.duration(0.85)) -- let the frame actually read as a window before anything shows on top of it
     variables.tweenService
         :Create(
             self.windowShadow,
@@ -1903,7 +1949,7 @@ function Window:_firstShow()
             { BackgroundTransparency = 0 }
         )
         :Play()
-    task.wait(0.3)
+    task.wait(motion.duration(0.3))
 
     if self.icon then
         variables.tweenService
@@ -1923,7 +1969,7 @@ function Window:_firstShow()
             )
             :Play()
     end
-    task.wait(0.1)
+    task.wait(motion.duration(0.1))
     if self.subtitle then
         variables.tweenService
             :Create(
@@ -1936,7 +1982,7 @@ function Window:_firstShow()
 
     for _, action in ipairs(self.actionContainer:GetChildren()) do
         if action:IsA("Frame") then
-            task.wait(0.02)
+            task.wait(motion.duration(0.02))
             variables.tweenService
                 :Create(
                     action.ImageLabel,
@@ -1951,7 +1997,7 @@ function Window:_firstShow()
         tag:_setShown(true, TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out))
     end
 
-    task.wait(0.2)
+    task.wait(motion.duration(0.2))
 
     task.spawn(function()
         for _, tab in pairs(self.tabs) do
@@ -1963,14 +2009,14 @@ function Window:_firstShow()
                 )
                 tab:_spinGradients()
 
-                task.wait(0.15)
+                task.wait(motion.duration(0.15))
             end
         end
     end)
 
     self:_revealElements(0.03, 2)
 
-    task.wait(1)
+    task.wait(motion.duration(1))
 
     -- the fit can change between construction and now (a late camera banks a new size), so
     -- re-derive the bar's spot rather than trusting the construction-time position
@@ -2015,11 +2061,12 @@ end
 -- and two windows open at once animating at different speeds would read as a fault.
 function Window:SetAnimationSpeed(speed: number)
     motion.setSpeed(speed)
-    self.settings.animationSpeed = motion.getSpeed()
 
-    -- keep the settings slider showing the truth, including when the value was clamped
+    -- every settings slider follows through the subscription set up when it was built, so this
+    -- only has to set the one number. Set again here for the case where the value was clamped
+    -- to what it already was, which is not a change and so notifies nobody.
     if self.animationSpeedSlider then
-        self.animationSpeedSlider:Set(math.round(self.settings.animationSpeed * 100), true)
+        self.animationSpeedSlider:Set(math.round(motion.getSpeed() * 100), true)
     end
 
     self:SaveSettings()
@@ -2245,7 +2292,7 @@ function Window:_flashResult(element, ok)
     -- token so a quick re-set restarts the flash instead of an old revert cutting it short
     element._flashToken = (element._flashToken or 0) + 1
     local token = element._flashToken
-    task.delay(0.22, function()
+    task.delay(motion.duration(0.22), function()
         if element._flashToken ~= token then
             return
         end
@@ -2708,12 +2755,33 @@ function Window:_springTo(size: UDim2, position: UDim2, options)
     if startHeight <= 0 then
         startHeight = self.main.AbsoluteSize.Y
     end
-    motion.openHeight = math.max(startHeight, sizeTarget.Y)
-    motion.pillHeight = math.min(startHeight, sizeTarget.Y)
+
+    -- Turning the move that is already running around keeps the ends it was measured against.
+    -- Taking them from where the frame happens to be would collapse the range onto the part of
+    -- the travel that is left: half way through 500 to 50 the frame is around 275, and a range
+    -- rebuilt as 500 to 275 reports that same frame as fully collapsed. Every derived property
+    -- would jump to its pill state and then walk back out of it.
+    --
+    -- It is the same move if the new target is one of the two ends already being travelled
+    -- between. Anything else is a separate one - collapsing from the minimised bar starts from
+    -- a height neither end holds - and gets a range of its own.
+    local reversing = self._motionConnection ~= nil
+        and motion.openHeight ~= nil
+        and (math.abs(sizeTarget.Y - motion.openHeight) <= 1 or math.abs(sizeTarget.Y - motion.pillHeight) <= 1)
+
+    if not reversing then
+        motion.openHeight = math.max(startHeight, sizeTarget.Y)
+        motion.pillHeight = math.min(startHeight, sizeTarget.Y)
+    end
 
     -- Whether the open end of this move shows a page at all. False collapsing a window that was
-    -- already minimised, since there is no page to bring back on the way in or out.
-    motion.contentsWhenOpen = options.contentsWhenOpen ~= false
+    -- already minimised, since there is no page to bring back on the way in or out. Held across
+    -- a reversal with the ends it belongs to: it is a fact about them, and letting it flip mid
+    -- move would change how much of the travel the chrome leaves over, and pull a page onto a
+    -- bar that never had one.
+    if not reversing then
+        motion.contentsWhenOpen = options.contentsWhenOpen ~= false
+    end
 
     -- A spring settles when it settles, so nothing here is allowed to depend on it having done
     -- so. This is the backstop: if the frame loop never runs, is throttled, or the move is
@@ -2905,6 +2973,7 @@ end
 
 function Window:Unload()
     self.unloaded = true
+    motion.unsubscribe(self) -- stop the speed reaching a slider that is on its way to being destroyed
     -- drop our effects and release the gui they hung on, but leave the enabled flag alone -
     -- another window may still be open and haptics arent ours to switch off for it
     hapticEngine.teardown()

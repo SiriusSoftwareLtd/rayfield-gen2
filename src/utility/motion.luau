@@ -43,11 +43,33 @@ local function rescale(info: TweenInfo): TweenInfo
     )
 end
 
+-- Anything displaying the speed, keyed by whoever registered it so it can drop itself when it
+-- goes away. The speed is one library wide number, so a second window's slider would otherwise
+-- sit showing the pace the library stopped animating at.
+local listeners: { [any]: (number) -> () } = {}
+
+function motion.subscribe(key: any, callback: (speed: number) -> ())
+    listeners[key] = callback
+end
+
+function motion.unsubscribe(key: any)
+    listeners[key] = nil
+end
+
 function motion.setSpeed(value: number)
     if type(value) ~= "number" or value ~= value then
         return -- nan included: it would poison every duration downstream
     end
-    speed = math.clamp(value, minimum, maximum)
+
+    local clamped = math.clamp(value, minimum, maximum)
+    if clamped == speed then
+        return
+    end
+    speed = clamped
+
+    for _, callback in listeners do
+        task.spawn(callback, speed) -- spawned so one bad listener cannot stop the others
+    end
 end
 
 function motion.getSpeed(): number
@@ -61,6 +83,18 @@ end
 -- A duration scaled to the current speed.
 function motion.info(info: TweenInfo): TweenInfo
     return rescale(info)
+end
+
+-- The same scaling for a plain number of seconds, for the waits that exist to run one animation
+-- after another. A tween's duration is scaled by the handle every animation is created through,
+-- but a task.delay sitting beside it is not, so off 1x the delay and the tween it is waiting for
+-- disagree: the popup would be destroyed a second before its fade finished, and the chrome would
+-- fade back in over a window still on its way open.
+--
+-- This is for sequencing only. A wait that holds something on screen long enough to read, or
+-- that retries a download, is not animation and does not belong here.
+function motion.duration(seconds: number): number
+    return seconds / speed
 end
 
 -- A spring stiffness scaled to the current speed. Squared because a spring's settle time goes

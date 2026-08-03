@@ -14,6 +14,7 @@ local utility = script.Parent.Parent.utility
 
 -- Variables
 local variables = require(utility.variables)
+local motion = require(utility.motion)
 local functions = require(utility.functions)
 local moveable = require(utility.moveable)
 local locale = require(utility.locale)
@@ -153,7 +154,7 @@ function Button:_buildFull()
 
         self:_runCallback()
 
-        task.wait(0.11)
+        task.wait(motion.duration(0.11))
 
         variables.tweenService
             :Create(
@@ -246,7 +247,7 @@ function Button:_buildCompact()
 
         self:_runCallback()
 
-        task.wait(0.11)
+        task.wait(motion.duration(0.11))
 
         variables.tweenService
             :Create(

@@ -1213,6 +1213,104 @@ return function()
             expect(w.topbar.Visible).to.equal(false)
         end)
 
+        -- Mid flight, as the window is during a real collapse: the frame loop running, and the
+        -- animating flag still up. The harness runs task.delay straight away, so the settle
+        -- guard has already landed the move by the time Hide returns and both have to be put
+        -- back by hand.
+        local function inFlight(w)
+            w.hasShownOnce = true -- else Show plays the first-open intro rather than the restore
+            w._motionConnection = { Disconnect = function() end }
+            w.animating = true
+        end
+
+        it("turns a collapse around mid flight instead of dropping the call", function()
+            local w = makeWindow()
+            w.hidden = false
+            w.main.Size = UDim2.fromOffset(w.size.X.Offset, w.size.Y.Offset)
+            w:Hide()
+            expect(w.hidden).to.equal(true)
+
+            inFlight(w)
+            local collapsing = w._motion.sizeGoal
+
+            -- hitting the toggle again while it is still closing asks for the opposite, which
+            -- the spring is built to take. Rejecting it because something is animating was the
+            -- only reason the window could not follow.
+            w:Show()
+            expect(w.hidden).to.equal(false)
+            expect(w._motion.sizeGoal).never.to.equal(collapsing)
+
+            -- but asking for the same direction twice is still a repeat, not a reversal
+            local restoring = w._motion.sizeGoal
+            w:Show()
+            expect(w._motion.sizeGoal).to.equal(restoring)
+
+            -- and the same the other way round
+            w:Hide()
+            expect(w.hidden).to.equal(true)
+            local closing = w._motion.sizeGoal
+            w:Hide()
+            expect(w._motion.sizeGoal).to.equal(closing)
+
+            w._motionConnection = nil
+            w:_stopMotion()
+        end)
+
+        it("keeps the ends of a move it is only reversing", function()
+            local w = makeWindow()
+            w.hidden = false
+            w.main.Size = UDim2.fromOffset(w.size.X.Offset, w.size.Y.Offset)
+            w:Hide()
+
+            local open, pill = w._motion.openHeight, w._motion.pillHeight
+            expect(open).to.equal(w.size.Y.Offset)
+            expect(pill).to.equal(50)
+
+            -- half way down, and the chrome is half way out with it
+            inFlight(w)
+            local middle = (open + pill) / 2
+            w.main.Size = UDim2.fromOffset(w.size.X.Offset, middle)
+            w:_applyCollapseProgress(w.size.X.Offset, middle)
+            expect(math.abs(w._collapseProgress - 0.5) < 1e-6).to.equal(true)
+
+            -- Reversing from here must measure against the same two ends. Rebuilding them from
+            -- where the frame is standing would make this very frame the open one, so the same
+            -- 275 pixels that just read as half way would read as fully collapsed, and every
+            -- derived property would snap to its pill state before walking back out of it.
+            w:Show()
+            expect(w._motion.openHeight).to.equal(open)
+            expect(w._motion.pillHeight).to.equal(pill)
+
+            w:_applyCollapseProgress(w.size.X.Offset, middle)
+            expect(math.abs(w._collapseProgress - 0.5) < 1e-6).to.equal(true)
+
+            w._motionConnection = nil
+            w:_stopMotion()
+        end)
+
+        it("gives a move to a different pair of ends a range of its own", function()
+            local w = makeWindow()
+            w.hidden = false
+            w.minimised = true
+            w.main.Size = UDim2.fromOffset(w.size.X.Offset, 66)
+            w:Hide()
+
+            expect(w._motion.openHeight).to.equal(66)
+            expect(w._motion.contentsWhenOpen).to.equal(false)
+
+            -- Show grows back to the full window rather than to the bar, so this is not the
+            -- move that was running: it needs its own ends, and its own answer about the page.
+            inFlight(w)
+            w.main.Size = UDim2.fromOffset(400, 58)
+            w:Show()
+            expect(w._motion.openHeight).to.equal(w.size.Y.Offset)
+            expect(w._motion.pillHeight).to.equal(58)
+            expect(w._motion.contentsWhenOpen).to.equal(true)
+
+            w._motionConnection = nil
+            w:_stopMotion()
+        end)
+
         it("holds the page only while there is a frame big enough for it", function()
             local w = makeWindow()
 
@@ -1257,18 +1355,74 @@ return function()
 
             w:SetAnimationSpeed(2)
             expect(w:GetAnimationSpeed()).to.equal(2)
-            expect(w.settings.animationSpeed).to.equal(2)
+            expect(motion.getSpeed()).to.equal(2)
         end)
 
         it("holds the setting to what it was actually given, not what was asked for", function()
             local w = makeWindow()
             local _, high = motion.range()
 
-            -- clamped, and the setting has to agree with the clamp rather than keep the ask,
-            -- or the next save writes back a value the interface is not running at
+            -- clamped, and what is read back has to agree with the clamp rather than keep the
+            -- ask, or the next save writes back a value the interface is not running at
             w:SetAnimationSpeed(500)
-            expect(w.settings.animationSpeed).to.equal(high)
             expect(w:GetAnimationSpeed()).to.equal(high)
+            expect(motion.getSpeed()).to.equal(high)
+        end)
+
+        it("keeps a second window off a pace of its own", function()
+            local first = makeWindow()
+            local second = Window.new({
+                name = "Second Paced Window",
+                configuration = { autoSave = false, autoLoad = false },
+            })
+
+            first:SetAnimationSpeed(1)
+            expect(second.animationSpeedSlider.value).to.equal(100)
+
+            -- The speed is one number for the whole library. A window keeping its own copy is a
+            -- copy that goes stale the moment another window moves it, and the stale one writes
+            -- itself back over the shared value the next time that window saves anything.
+            first:SetAnimationSpeed(2)
+            expect(second:GetAnimationSpeed()).to.equal(2)
+            expect(second.animationSpeedSlider.value).to.equal(200)
+
+            -- and it goes the other way: neither window is the owner
+            second:SetAnimationSpeed(0.5)
+            expect(first:GetAnimationSpeed()).to.equal(0.5)
+            expect(first.animationSpeedSlider.value).to.equal(50)
+
+            second:Unload()
+
+            -- an unloaded window stops listening rather than reaching for a destroyed slider
+            first:SetAnimationSpeed(1.5)
+            expect(second.animationSpeedSlider.value).to.equal(50)
+        end)
+
+        it("saves the pace the library is running at, not a window's copy of it", function()
+            local persistenceSettings = helpers.requireUtility("persistenceSettings")
+            local w = makeWindow()
+
+            w:SetAnimationSpeed(1)
+
+            -- a window that has not touched the setting itself still has to write the shared
+            -- value, since saving any other setting writes the whole file
+            motion.setSpeed(2.5)
+            local saved
+            local realWrite = persistenceSettings.saveSettings
+            expect(realWrite).to.be.ok()
+
+            local decoded
+            local httpService = helpers.services.HttpService
+            local realEncode = httpService.JSONEncode
+            httpService.JSONEncode = function(this, data)
+                decoded = data
+                return realEncode(this, data)
+            end
+            saved = persistenceSettings.saveSettings(w)
+            httpService.JSONEncode = realEncode
+
+            expect(saved).to.equal(true)
+            expect(decoded.animationSpeed).to.equal(2.5)
         end)
 
         it("keeps the settings slider showing the truth", function()
@@ -1287,6 +1441,57 @@ return function()
             local _, high = motion.range()
             w:SetAnimationSpeed(99)
             expect(w.animationSpeedSlider.value).to.equal(math.round(high * 100))
+        end)
+
+        it("keeps a sequencing wait on the same clock as the tween it waits for", function()
+            -- A tween's duration is scaled by the handle every animation goes through, but a
+            -- task.delay sitting beside one is a plain number and is not. Off 1x they came
+            -- apart: the popup was destroyed before its fade finished, and the chrome faded
+            -- back in over a window still on its way open. Both take the same scaling now, so
+            -- a delay and a tween of the same nominal length stay equal at any pace.
+            for _, pace in { 0.25, 0.5, 1, 1.5, 3 } do
+                motion.setSpeed(pace)
+                local scaled = motion.info(TweenInfo.new(0.4))
+                expect(math.abs(motion.duration(0.4) - scaled.Time) < 1e-9).to.equal(true)
+            end
+        end)
+
+        it("applies the pace to the collapse's own tweens exactly once", function()
+            local w = makeWindow()
+
+            -- the first tween the collapse puts on the drag bar, which is sized off the move's
+            -- characteristic time
+            local function fadeTime()
+                local service = helpers.services.TweenService
+                local realCreate = service.Create
+                local seen
+                service.Create = function(this, instance, info, goals)
+                    if instance == w.drag.dragCosmetic and seen == nil then
+                        seen = info.Time
+                    end
+                    return realCreate(this, instance, info, goals)
+                end
+
+                w.hidden = false
+                w:Hide()
+                service.Create = realCreate
+                w:_stopMotion()
+                return seen
+            end
+
+            w:SetAnimationSpeed(1)
+            local normal = fadeTime()
+            w:SetAnimationSpeed(2)
+            local quick = fadeTime()
+
+            expect(normal).to.be.ok()
+            expect(quick).to.be.ok()
+
+            -- A spring's settle time goes with one over the square root of its stiffness, so a
+            -- duration taken from an already paced stiffness has the speed in it before the
+            -- handle divides by the speed again. That put these tweens on the square of the
+            -- pace while the delay beside them only had the one, and the two came apart.
+            expect(math.abs(normal / quick - 2) < 1e-6).to.equal(true)
         end)
 
         it("paces the collapse as well as the tweens", function()

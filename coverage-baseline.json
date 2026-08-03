@@ -3,9 +3,9 @@
   "measuredDate": "2026-08-03",
   "command": "make coverage-baseline",
   "threshold": 70.00,
-  "lineCoverage": 82.90,
-  "coveredLines": 4718,
-  "coverableLines": 5691,
+  "lineCoverage": 83.00,
+  "coveredLines": 4745,
+  "coverableLines": 5717,
   "notes": [
     "Generated reports are written to coverage/coverage.txt and coverage/coverage-summary.json.",
     "The enforced Lune coverage scope is discovered dynamically from src by default.",
@@ -21,9 +21,9 @@
     },
     {
       "path": "src/components/button.luau",
-      "lineCoverage": 92.65,
-      "coveredLines": 63,
-      "coverableLines": 68
+      "lineCoverage": 92.75,
+      "coveredLines": 64,
+      "coverableLines": 69
     },
     {
       "path": "src/components/chrome.luau",
@@ -33,9 +33,9 @@
     },
     {
       "path": "src/components/colorpicker.luau",
-      "lineCoverage": 55.58,
-      "coveredLines": 234,
-      "coverableLines": 421
+      "lineCoverage": 55.69,
+      "coveredLines": 235,
+      "coverableLines": 422
     },
     {
       "path": "src/components/descriptor.luau",
@@ -51,9 +51,9 @@
     },
     {
       "path": "src/components/dropdown.luau",
-      "lineCoverage": 78.95,
-      "coveredLines": 315,
-      "coverableLines": 399
+      "lineCoverage": 79.00,
+      "coveredLines": 316,
+      "coverableLines": 400
     },
     {
       "path": "src/components/group.luau",
@@ -81,15 +81,15 @@
     },
     {
       "path": "src/components/popup.luau",
-      "lineCoverage": 93.70,
-      "coveredLines": 223,
-      "coverableLines": 238
+      "lineCoverage": 93.72,
+      "coveredLines": 224,
+      "coverableLines": 239
     },
     {
       "path": "src/components/search.luau",
-      "lineCoverage": 88.06,
-      "coveredLines": 118,
-      "coverableLines": 134
+      "lineCoverage": 88.15,
+      "coveredLines": 119,
+      "coverableLines": 135
     },
     {
       "path": "src/components/section.luau",
@@ -129,15 +129,15 @@
     },
     {
       "path": "src/components/toggle.luau",
-      "lineCoverage": 87.31,
-      "coveredLines": 117,
-      "coverableLines": 134
+      "lineCoverage": 87.41,
+      "coveredLines": 118,
+      "coverableLines": 135
     },
     {
       "path": "src/components/window.luau",
-      "lineCoverage": 80.21,
-      "coveredLines": 896,
-      "coverableLines": 1117
+      "lineCoverage": 80.46,
+      "coveredLines": 906,
+      "coverableLines": 1126
     },
     {
       "path": "src/init.luau",
@@ -274,8 +274,8 @@
     {
       "path": "src/utility/motion.luau",
       "lineCoverage": 100.00,
-      "coveredLines": 20,
-      "coverableLines": 20
+      "coveredLines": 32,
+      "coverableLines": 32
     },
     {
       "path": "src/utility/moveable.luau",
@@ -328,8 +328,8 @@
     {
       "path": "src/utility/persistenceSettings.luau",
       "lineCoverage": 100.00,
-      "coveredLines": 64,
-      "coverableLines": 64
+      "coveredLines": 63,
+      "coverableLines": 63
     },
     {
       "path": "src/utility/persistenceWrite.luau",
