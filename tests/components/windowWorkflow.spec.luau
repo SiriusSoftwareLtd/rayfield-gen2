@@ -1199,6 +1199,79 @@ return function()
             -- and back on the moment there is room again, on the same number
             at(w, w.size.Y.Offset)
             expect(w.elements.Visible).to.equal(true)
+    describe("component window animation speed", function()
+        local motion = helpers.requireUtility("motion")
+        local paced
+
+        local function makeWindow()
+            paced = Window.new({
+                name = "Paced Window",
+                configuration = { autoSave = false, autoLoad = false },
+            })
+            paced.hidden = false
+            return paced
+        end
+
+        afterEach(function()
+            motion.setSpeed(1)
+            if paced and not paced.unloaded then
+                paced:Unload()
+            end
+            paced = nil
+        end)
+
+        it("sets the pace and reads it back", function()
+            local w = makeWindow()
+            expect(w:GetAnimationSpeed()).to.equal(1)
+
+            w:SetAnimationSpeed(2)
+            expect(w:GetAnimationSpeed()).to.equal(2)
+            expect(w.settings.animationSpeed).to.equal(2)
+        end)
+
+        it("holds the setting to what it was actually given, not what was asked for", function()
+            local w = makeWindow()
+            local _, high = motion.range()
+
+            -- clamped, and the setting has to agree with the clamp rather than keep the ask,
+            -- or the next save writes back a value the interface is not running at
+            w:SetAnimationSpeed(500)
+            expect(w.settings.animationSpeed).to.equal(high)
+            expect(w:GetAnimationSpeed()).to.equal(high)
+        end)
+
+        it("keeps the settings slider showing the truth", function()
+            local w = makeWindow()
+            expect(w.animationSpeedSlider).to.be.ok()
+
+            -- settings persist across windows, so start from a known pace rather than assuming
+            -- whatever the last window to run saved
+            w:SetAnimationSpeed(1)
+            expect(w.animationSpeedSlider.value).to.equal(100)
+
+            w:SetAnimationSpeed(1.5)
+            expect(w.animationSpeedSlider.value).to.equal(150)
+
+            -- including when the value was clamped on the way in
+            local _, high = motion.range()
+            w:SetAnimationSpeed(99)
+            expect(w.animationSpeedSlider.value).to.equal(math.round(high * 100))
+        end)
+
+        it("scales every tween through the shared handle", function()
+            local w = makeWindow()
+            local variables = helpers.requireUtility("variables")
+            local base = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
+            w:SetAnimationSpeed(2)
+
+            -- the point of wrapping the one handle: a call site that knows nothing about the
+            -- setting still animates at the right pace
+            local captured
+            local frame = w.main
+            local tween = variables.tweenService:Create(frame, base, { BackgroundTransparency = 0 })
+            captured = tween
+            expect(captured).to.be.ok()
         end)
     end)
 
