@@ -14,6 +14,7 @@ local utility = script.Parent.Parent.utility
 
 -- Variables
 local variables = require(utility.variables)
+local motion = require(utility.motion)
 local functions = require(utility.functions)
 local image = require(utility.image)
 local constants = require(utility.constants)
@@ -564,7 +565,7 @@ function Dropdown.new(tab, properties)
                 self.window:_persist(self)
 
                 if not self.multiSelect then
-                    task.wait(0.1)
+                    task.wait(motion.duration(0.1))
                     self:_close()
                 end
             end)

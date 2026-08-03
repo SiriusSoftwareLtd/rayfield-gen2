@@ -12,6 +12,7 @@ Toast.__type = "Toast"
 -- Utility
 local utility = script.Parent.Parent.utility
 local variables = require(utility.variables)
+local motion = require(utility.motion)
 local functions = require(utility.functions)
 local constants = require(utility.constants)
 local image = require(utility.image)
@@ -358,7 +359,7 @@ function Toast:_show()
     variables.tweenService:Create(self.shadow, fadeShort, { Transparency = 0.6 }):Play()
     variables.tweenService:Create(self.titleLabel, fadeShort, { TextTransparency = 0 }):Play()
 
-    task.wait(0.05)
+    task.wait(motion.duration(0.05))
     if self._dismissed or not self.main.Parent then
         return -- dismissed mid-stagger; dont fight the exit fade
     end
@@ -367,7 +368,7 @@ function Toast:_show()
         variables.tweenService:Create(self.iconLabel, fadeShort, { ImageTransparency = 0 }):Play()
     end
 
-    task.wait(0.05)
+    task.wait(motion.duration(0.05))
     if self._dismissed or not self.main.Parent then
         return
     end

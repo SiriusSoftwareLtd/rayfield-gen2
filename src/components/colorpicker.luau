@@ -14,6 +14,7 @@ local utility = script.Parent.Parent.utility
 
 -- Variables
 local variables = require(utility.variables)
+local motion = require(utility.motion)
 local functions = require(utility.functions)
 local moveable = require(utility.moveable)
 local constants = require(utility.constants)
@@ -1118,7 +1119,7 @@ function ColorPicker:_close()
 
     -- once the controls have faded, drop them out of input so a transparent field below the
     -- collapsed header cant grab the cursor
-    task.delay(fadeInfo.Time, function()
+    task.delay(motion.duration(fadeInfo.Time), function()
         if not self._isOpen then
             self:_setControlsVisible(false)
         end

@@ -16,6 +16,7 @@ Popup.__type = "Popup"
 -- Utility
 local utility = script.Parent.Parent.utility
 local variables = require(utility.variables)
+local motion = require(utility.motion)
 local functions = require(utility.functions)
 local constants = require(utility.constants)
 local locale = require(utility.locale)
@@ -793,7 +794,7 @@ function Popup:Close()
         variables.tweenService:Create(entry.instance, fadeShort, { [entry.prop] = 1 }):Play()
     end
 
-    task.delay(fadeShort.Time, function()
+    task.delay(motion.duration(fadeShort.Time), function()
         self.window:DestroySubtree(self.screenGui)
     end)
 end

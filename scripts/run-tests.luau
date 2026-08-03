@@ -766,8 +766,23 @@ Vector2 = roblox.Vector2
 Vector3 = roblox.Vector3
 
 TweenInfo = {
-    new = function(...)
-        return { ... }
+    -- Named fields as well as the positional ones, so code that reads a TweenInfo back is
+    -- testable. Defaults match the real datatype's.
+    new = function(time, easingStyle, easingDirection, repeatCount, reverses, delayTime)
+        return {
+            time,
+            easingStyle,
+            easingDirection,
+            repeatCount,
+            reverses,
+            delayTime,
+            Time = if time ~= nil then time else 1,
+            EasingStyle = easingStyle or Enum.EasingStyle.Quad,
+            EasingDirection = easingDirection or Enum.EasingDirection.Out,
+            RepeatCount = repeatCount or 0,
+            Reverses = reverses or false,
+            DelayTime = delayTime or 0,
+        }
     end,
 }
 
