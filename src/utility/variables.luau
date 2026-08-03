@@ -6,6 +6,7 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 local runtime = require(script.Parent.runtime)
+local motion = require(script.Parent.motion)
 local constants = require(script.Parent.constants)
 local log = require(script.Parent.log)
 local fileSystemManager = require(script.Parent.filesystemManager)
@@ -27,6 +28,27 @@ export type VariablesState = RuntimeState & {
 }
 
 local variables = table.clone(runtime) :: VariablesState
+
+-- Every animation in the library is created through this one handle, so scaling the duration
+-- here is what lets a single speed setting reach all of them without each of the hundred or so
+-- call sites having to know it exists. Create is the only method any of them use; anything else
+-- falls through to the real service untouched.
+local realTweenService = runtime.tweenService
+variables.tweenService = setmetatable({
+    Create = function(_, instance: Instance, info: TweenInfo, goals: { [string]: any })
+        return realTweenService:Create(instance, motion.info(info), goals)
+    end,
+}, {
+    __index = function(_, key)
+        local value = (realTweenService :: any)[key]
+        if type(value) == "function" then
+            return function(_, ...)
+                return value(realTweenService, ...)
+            end
+        end
+        return value
+    end,
+}) :: any
 log.setSecureModeSource(function()
     return variables.secureMode
 end)

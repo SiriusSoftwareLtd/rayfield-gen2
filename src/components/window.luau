@@ -14,6 +14,7 @@ local constants = require(utility.constants)
 local locale = require(utility.locale)
 local log = require(utility.log)
 local hapticEngine = require(utility.HapticEngine)
+local motion = require(utility.motion)
 local windowSizing = require(utility.windowSizing)
 local chrome = require(script.Parent.chrome)
 local search = require(script.Parent.search)
@@ -595,6 +596,7 @@ function Window.new(properties)
         keepOnScreen = true, -- clamp the drag so the window cant be pulled off screen
         welcomeToast = true, -- the "signed in as" toast on first open for a new/changed account
         haptics = false, -- off by default; opt in from settings (buzzes on presses/notifications)
+        animationSpeed = 1, -- 1 is the pace the interface was designed at, higher is quicker
     }
 
     self:LoadSettings()
@@ -1472,6 +1474,20 @@ function Window:_buildSettingsUI()
         end,
     })
 
+    self.animationSpeedSlider = self.rfSettings:CreateSlider({
+        name = "Animation speed",
+        description = "How quickly the interface moves. 100% is the pace it was designed at.",
+        range = { 25, 300 },
+        increment = 5,
+        suffix = "%",
+        value = math.round(self.settings.animationSpeed * 100),
+        callback = function(value)
+            self.settings.animationSpeed = value / 100
+            motion.setSpeed(self.settings.animationSpeed)
+            self:SaveSettings()
+        end,
+    })
+
     self.rfSettings:CreateSection({ name = "Window" })
 
     self.rfSettings:CreateToggle({
@@ -1924,6 +1940,27 @@ function Window:_firstShow()
             minWidth = 220, -- match the old license card's width for that roomy right-hand space
         })
     end
+end
+
+-- How quickly the interface animates. 1 is the pace it was designed at, higher is quicker, and
+-- it is clamped to something still usable at both ends.
+--
+-- Library wide on purpose: it is a preference about motion rather than a property of one menu,
+-- and two windows open at once animating at different speeds would read as a fault.
+function Window:SetAnimationSpeed(speed: number)
+    motion.setSpeed(speed)
+    self.settings.animationSpeed = motion.getSpeed()
+
+    -- keep the settings slider showing the truth, including when the value was clamped
+    if self.animationSpeedSlider then
+        self.animationSpeedSlider:Set(math.round(self.settings.animationSpeed * 100), true)
+    end
+
+    self:SaveSettings()
+end
+
+function Window:GetAnimationSpeed(): number
+    return motion.getSpeed()
 end
 
 function Window:GetPath()

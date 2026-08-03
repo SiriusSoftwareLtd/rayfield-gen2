@@ -5,6 +5,7 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+local motion = require(script.Parent.motion)
 local variables = require(script.Parent.variables)
 local filesystem = require(script.Parent.filesystem)
 local paths = require(script.Parent.persistencePaths)
@@ -20,6 +21,7 @@ type SettingsWindow = {
         keepOnScreen: boolean,
         welcomeToast: boolean,
         haptics: boolean,
+        animationSpeed: number,
     },
 }
 
@@ -29,6 +31,7 @@ type DecodedSettings = {
     keepOnScreen: unknown?,
     welcomeToast: unknown?,
     haptics: unknown?,
+    animationSpeed: unknown?,
 }
 
 function persistenceSettings.getSettingsPath(): (string, string)
@@ -47,6 +50,7 @@ function persistenceSettings.saveSettings(window: SettingsWindow): boolean
         keepOnScreen = window.settings.keepOnScreen,
         welcomeToast = window.settings.welcomeToast,
         haptics = window.settings.haptics,
+        animationSpeed = window.settings.animationSpeed,
     }
 
     local ok, encoded = pcall(variables.httpService.JSONEncode, variables.httpService, data)
@@ -129,6 +133,14 @@ function persistenceSettings.loadSettings(window: SettingsWindow): boolean
 
     if type(settings.welcomeToast) == "boolean" then
         window.settings.welcomeToast = settings.welcomeToast
+    end
+
+    -- clamped rather than trusted: a hand edited config should not be able to freeze the
+    -- interface at a speed nothing can be dismissed at
+    if type(settings.animationSpeed) == "number" and settings.animationSpeed == settings.animationSpeed then
+        local low, high = motion.range()
+        window.settings.animationSpeed = math.clamp(settings.animationSpeed, low, high)
+        motion.setSpeed(window.settings.animationSpeed)
     end
 
     if type(settings.haptics) == "boolean" then

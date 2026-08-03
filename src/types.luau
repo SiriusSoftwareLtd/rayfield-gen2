@@ -320,6 +320,9 @@ export type Window = {
     ListConfigs: (self: Window) -> { string },
     DeleteConfig: (self: Window, name: string) -> boolean,
     GetPath: (self: Window) -> (string, string),
+    -- library wide, not per window: 1 is the pace the interface was designed at
+    SetAnimationSpeed: (self: Window, speed: number) -> (),
+    GetAnimationSpeed: (self: Window) -> number,
     Get: (self: Window, flag: string) -> any,
     Set: (self: Window, flag: string, value: any) -> boolean,
     Unload: (self: Window) -> (),

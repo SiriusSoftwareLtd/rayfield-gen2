@@ -1,11 +1,11 @@
 {
   "scope": "src",
-  "measuredDate": "2026-07-31",
+  "measuredDate": "2026-08-03",
   "command": "make coverage-baseline",
   "threshold": 70.00,
-  "lineCoverage": 82.61,
-  "coveredLines": 4536,
-  "coverableLines": 5491,
+  "lineCoverage": 82.68,
+  "coveredLines": 4579,
+  "coverableLines": 5538,
   "notes": [
     "Generated reports are written to coverage/coverage.txt and coverage/coverage-summary.json.",
     "The enforced Lune coverage scope is discovered dynamically from src by default.",
@@ -99,8 +99,8 @@
     },
     {
       "path": "src/components/slider.luau",
-      "lineCoverage": 85.59,
-      "coveredLines": 196,
+      "lineCoverage": 86.90,
+      "coveredLines": 199,
       "coverableLines": 229
     },
     {
@@ -135,9 +135,9 @@
     },
     {
       "path": "src/components/window.luau",
-      "lineCoverage": 79.00,
-      "coveredLines": 775,
-      "coverableLines": 981
+      "lineCoverage": 79.07,
+      "coveredLines": 786,
+      "coverableLines": 994
     },
     {
       "path": "src/init.luau",
@@ -272,6 +272,12 @@
       "coverableLines": 23
     },
     {
+      "path": "src/utility/motion.luau",
+      "lineCoverage": 100.00,
+      "coveredLines": 20,
+      "coverableLines": 20
+    },
+    {
       "path": "src/utility/moveable.luau",
       "lineCoverage": 100.00,
       "coveredLines": 18,
@@ -322,8 +328,8 @@
     {
       "path": "src/utility/persistenceSettings.luau",
       "lineCoverage": 100.00,
-      "coveredLines": 59,
-      "coverableLines": 59
+      "coveredLines": 64,
+      "coverableLines": 64
     },
     {
       "path": "src/utility/persistenceWrite.luau",
@@ -351,9 +357,9 @@
     },
     {
       "path": "src/utility/variables.luau",
-      "lineCoverage": 87.50,
-      "coveredLines": 21,
-      "coverableLines": 24
+      "lineCoverage": 75.76,
+      "coveredLines": 25,
+      "coverableLines": 33
     },
     {
       "path": "src/utility/windowSizing.luau",
