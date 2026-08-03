@@ -82,6 +82,19 @@ local function handleOffset(ratio: number, width: number): UDim2
     return UDim2.new(1, (1 - ratio) * width / 2, 0.5, 0)
 end
 
+-- The pill's centre travels from half a pill in to half a pill from the end, so the pointer has to
+-- be mapped over that same inset span rather than the whole track. Mapping it over the whole track
+-- would put the pill's resting centre at a non-zero ratio, and the value would jump the moment a
+-- drag started from the pill itself. Clamping covers the end caps: anywhere left of the first half
+-- pill is the minimum, anywhere right of the last half pill is the maximum.
+local function ratioFromPointer(x: number, left: number, track: number, width: number): number
+    local span = track - width
+    if span <= 0 then
+        return math.clamp((x - left) / track, 0, 1)
+    end
+    return math.clamp((x - left - width / 2) / span, 0, 1)
+end
+
 function Slider.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
 
@@ -101,6 +114,10 @@ function Slider.new(tab, properties)
 
         dragging = false,
         minimal = properties.minimal or properties.Minimal or false, -- track only, no name/value
+
+        -- Where the pill is headed, which is where it already sits outside a drag. Both the fill
+        -- geometry and the pointer mapping read it, so they cannot disagree about the pill's width.
+        _handleWidth = handleRest.X,
     }, Slider)
 
     -- catch a malformed range up front, before the clamp/snap math throws something cryptic
@@ -513,9 +530,11 @@ end
 function Slider:_renderProgress(info)
     local span = self.range[2] - self.range[1]
     local ratio = if span ~= 0 then math.clamp((self.value - self.range[1]) / span, 0, 1) else 0
-    self._ratio = ratio
 
-    local width = self.handle.Size.X.Offset
+    -- The target width, not the live one. While the held tween is running the pill's real width is
+    -- somewhere between the two sizes, and positioning off that would aim at a width it is about to
+    -- leave. _setHeld sets this to where the pill is going before handing the move over.
+    local width = self._handleWidth
     local size, handle = fillSize(ratio, width), handleOffset(ratio, width)
     if info then
         variables.tweenService:Create(self.progress, info, { Size = size }):Play()
@@ -532,8 +551,12 @@ function Slider:_updateFromMouse()
         return
     end
 
-    local ratio =
-        math.clamp((variables.userInputService:GetMouseLocation().X - self.track.AbsolutePosition.X) / width, 0, 1)
+    local ratio = ratioFromPointer(
+        variables.userInputService:GetMouseLocation().X,
+        self.track.AbsolutePosition.X,
+        width,
+        self._handleWidth
+    )
     local value = snapTo(self.range, self.increment, self.range[1] + ratio * (self.range[2] - self.range[1]))
 
     if value ~= self.value then
@@ -563,32 +586,25 @@ function Slider:_endDrag()
     self.window:_persist(self)
 end
 
+-- Two tweens run over the pill during a drag: this one, growing it and lighting it up, and the one
+-- _renderProgress starts to follow the value. Roblox cancels an earlier tween when a later one
+-- takes the same property, so if both wrote Position the first drag update would kill the grow
+-- halfway and leave the pill at an in-between size. They are split by property instead: the held
+-- state owns Size and the transparencies, _renderProgress owns Position and the fill. Handing the
+-- move to _renderProgress here keeps that true while still putting the pill where the new width
+-- wants it.
 function Slider:_setHeld(held)
-    if held then
-        variables.tweenService
-            :Create(self.handle, heldInfo, {
-                Size = UDim2.fromOffset(handleHeld.X, handleHeld.Y),
-                Position = handleOffset(self._ratio or 0, handleHeld.X),
-                BackgroundTransparency = 0.7,
-            })
-            :Play()
-        variables.tweenService
-            :Create(self.progress, heldInfo, { Size = fillSize(self._ratio or 0, handleHeld.X) })
-            :Play()
-        variables.tweenService:Create(self.handleStroke, heldInfo, { Transparency = 0.6 }):Play()
-    else
-        variables.tweenService
-            :Create(self.handle, heldInfo, {
-                Size = UDim2.fromOffset(handleRest.X, handleRest.Y),
-                Position = handleOffset(self._ratio or 0, handleRest.X),
-                BackgroundTransparency = 0,
-            })
-            :Play()
-        variables.tweenService
-            :Create(self.progress, heldInfo, { Size = fillSize(self._ratio or 0, handleRest.X) })
-            :Play()
-        variables.tweenService:Create(self.handleStroke, heldInfo, { Transparency = 1 }):Play()
-    end
+    local target = if held then handleHeld else handleRest
+    self._handleWidth = target.X
+
+    variables.tweenService
+        :Create(self.handle, heldInfo, {
+            Size = UDim2.fromOffset(target.X, target.Y),
+            BackgroundTransparency = if held then 0.7 else 0,
+        })
+        :Play()
+    variables.tweenService:Create(self.handleStroke, heldInfo, { Transparency = if held then 0.6 else 1 }):Play()
+    self:_renderProgress(heldInfo)
 end
 
 -- pcall + debounced error-flash via Window:_runGuarded (fires every drag frame)
