@@ -2727,7 +2727,15 @@ function Window:_springTo(size: UDim2, position: UDim2, options)
     -- exists to avoid: at 65% pace the real settle is 0.74s against a fixed guard of 0.7s.
     local guard = options.timeout or math.max(0.7, settleTime(stiffness) * 3)
 
-    local token = (motion.token or 0) + 1
+    -- Counted on the window and never reset, so a token is only ever issued once.
+    --
+    -- Taking it from the motion's own field meant it went back to nil when a move landed and
+    -- the next move was issued token 1 again, which is the number a guard still pending from
+    -- the previous move was holding. It matched, fired, and snapped the live move to its goal.
+    -- Opening and closing quickly is enough to overlap them, and the window appears to teleport
+    -- between its two states rather than animate.
+    self._motionSequence = (self._motionSequence or 0) + 1
+    local token = self._motionSequence
     motion.token = token
     task.delay(guard, function()
         if self._motion and self._motion.token == token then

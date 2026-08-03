@@ -1110,6 +1110,34 @@ return function()
             expect(w._motion.size.position.Y).to.equal(66)
         end)
 
+        it("never issues the same guard token twice", function()
+            local w = makeWindow()
+            w.hidden = false
+            w.hasShownOnce = true -- so Show takes the spring path rather than the intro
+
+            -- Each move arms a guard that ends it by snapping the frame to its goal, and every
+            -- guard checks its token before doing so. Taking that number from the motion meant
+            -- it reset to nil when a move landed, so the next move was issued the same number a
+            -- guard still pending from the previous one was holding: it matched, fired, and cut
+            -- the live move short. Open and close quickly and the window teleports between its
+            -- states rather than animating.
+            local seen = {}
+            for _ = 1, 6 do
+                w:Hide()
+                expect(seen[w._motionSequence]).to.equal(nil)
+                seen[w._motionSequence] = true
+                w:_stopMotion()
+
+                w:Show()
+                expect(seen[w._motionSequence]).to.equal(nil)
+                seen[w._motionSequence] = true
+                w:_stopMotion()
+            end
+
+            -- and it counts rather than cycling, so it cannot come back round to a live one
+            expect(w._motionSequence >= 12).to.equal(true)
+        end)
+
         it("disarms the settle backstop once a move has landed", function()
             local w = makeWindow()
             w.hidden = false
