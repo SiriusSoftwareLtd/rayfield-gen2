@@ -109,7 +109,9 @@ local topbarGone = 0.62
 -- Read through motion rather than used raw, so the animation speed setting reaches the collapse
 -- as well. A spring's settle time goes with the square root of its stiffness, which is why that
 -- scaling cannot simply divide the way a tween's duration does.
-local collapseStiffness = 210
+-- 470 rather than 210 because a spring's settle time goes with the square root of its
+-- stiffness, so a pace one and a half times quicker is 2.25 times the number.
+local collapseStiffness = 470
 
 local function pacedStiffness(): number
     return motion.stiffness(collapseStiffness)
