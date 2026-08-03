@@ -105,7 +105,15 @@ local topbarGone = 0.62
 -- This is the only number that sets the pace of the whole thing. The springs take it directly and
 -- the handful of leftover tweens size themselves off it through settleTime, so moving it moves
 -- the entire animation together rather than leaving half of it behind.
+--
+-- Read through motion rather than used raw, so the animation speed setting reaches the collapse
+-- as well. A spring's settle time goes with the square root of its stiffness, which is why that
+-- scaling cannot simply divide the way a tween's duration does.
 local collapseStiffness = 210
+
+local function pacedStiffness(): number
+    return motion.stiffness(collapseStiffness)
+end
 
 -- Roughly how long a critically damped spring of that stiffness takes to arrive. Anything still
 -- on a tween sizes itself off this, so retuning the spring moves the whole animation together
@@ -1035,7 +1043,7 @@ function Window:Hide()
     -- they are derived from the frame every step of the way, in _applyCollapseProgress. What is
     -- left here is the handful of things it is cheaper to tween than to drive, sized off the
     -- move's own characteristic time so they stay in proportion with it.
-    local settle = settleTime(collapseStiffness)
+    local settle = settleTime(pacedStiffness())
     local fadeInfo = TweenInfo.new(settle * 0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
     -- shrink the drag bar back down the same way it grows in on first reveal, instead of
@@ -1068,7 +1076,7 @@ function Window:Hide()
     -- and not of pace: critical damping for no overshoot, and a stiffness whose settle time
     -- lands where moveInfo's duration did.
     self:_springTo(size, home, {
-        stiffness = collapseStiffness,
+        stiffness = pacedStiffness(),
         damping = 1,
         contentsWhenOpen = not wasMinimised,
         onSettle = function()
@@ -1775,7 +1783,7 @@ function Window:_quickRestore()
 
     -- as on the way out, the chrome, the corner and the pill's face are derived from the frame
     -- rather than tweened; these are the leftovers, sized off the move's characteristic time
-    local settle = settleTime(collapseStiffness)
+    local settle = settleTime(pacedStiffness())
     local fadeInfo = TweenInfo.new(settle * 0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
     local dragInfo = TweenInfo.new(settle, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
@@ -1784,7 +1792,7 @@ function Window:_quickRestore()
     -- tabs or bottom fade floating over a frame that isn't a window yet.
     chrome.setCollapsedShown(self, false, TweenInfo.new(0.15, Enum.EasingStyle.Quint, Enum.EasingDirection.Out))
     self:_springTo(self.size, target, {
-        stiffness = collapseStiffness,
+        stiffness = pacedStiffness(),
         damping = 1,
         onSettle = function()
             if self.hidden then

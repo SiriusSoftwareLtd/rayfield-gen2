@@ -1199,6 +1199,9 @@ return function()
             -- and back on the moment there is room again, on the same number
             at(w, w.size.Y.Offset)
             expect(w.elements.Visible).to.equal(true)
+        end)
+    end)
+
     describe("component window animation speed", function()
         local motion = helpers.requireUtility("motion")
         local paced
@@ -1256,6 +1259,26 @@ return function()
             local _, high = motion.range()
             w:SetAnimationSpeed(99)
             expect(w.animationSpeedSlider.value).to.equal(math.round(high * 100))
+        end)
+
+        it("paces the collapse as well as the tweens", function()
+            local w = makeWindow()
+            w.hidden = false
+            w:SetAnimationSpeed(1)
+
+            w:Hide()
+            local normal = w._motion.size.stiffness
+            w:_stopMotion()
+
+            -- a spring's settle time goes with the square root of its stiffness, so twice the
+            -- pace is four times the stiffness. Without this the collapse would carry on at its
+            -- own speed while every tween around it moved with the setting.
+            w:Show()
+            w:_stopMotion()
+            w:SetAnimationSpeed(2)
+            w:Hide()
+            expect(math.abs(w._motion.size.stiffness - normal * 4) < 1e-6).to.equal(true)
+            w:_stopMotion()
         end)
 
         it("scales every tween through the shared handle", function()
