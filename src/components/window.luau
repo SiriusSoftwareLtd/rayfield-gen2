@@ -38,6 +38,8 @@ local revealInfo = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingD
 local collapsedSize = UDim2.fromOffset(185, 50)
 local collapsedIconSize = UDim2.fromOffset(50, 50)
 local collapsedTop = UDim2.new(0.5, 0, 0, 20)
+local topToastOpenPosition = UDim2.new(0.5, 0, 0, 12)
+local topToastClosedPosition = UDim2.new(0.5, 0, 0, collapsedTop.Y.Offset + collapsedSize.Y.Offset + 12)
 
 -- Width of the top-centre toast stack container. Toasts hug their own content and centre
 -- within it, so this just needs to be at least the toast's own max width.
@@ -108,6 +110,12 @@ end
 
 local function firstColor(value)
     return if typeof(value) == "ColorSequence" then value.Keypoints[1].Value else value
+end
+
+local function setTopToastPosition(window)
+    if window._toastsTop then
+        window._toastsTop.Position = if window.hidden then topToastClosedPosition else topToastOpenPosition
+    end
 end
 
 -- A subtle raised edge for a fill: lighten a dark fill, darken a light one.
@@ -956,7 +964,9 @@ function Window:Toast(properties)
         container = self:Create("Frame", {
             Name = "Toasts",
             Size = UDim2.new(0, maxToastWidth, 1, -24),
-            Position = if isTop then UDim2.new(0.5, 0, 0, 12) else UDim2.new(0.5, 0, 1, -12),
+            Position = if isTop
+                then if self.hidden then topToastClosedPosition else topToastOpenPosition
+                else UDim2.new(0.5, 0, 1, -12),
             AnchorPoint = if isTop then Vector2.new(0.5, 0) else Vector2.new(0.5, 1),
             BackgroundTransparency = 1,
             ZIndex = constants.zIndex.toast,
@@ -1013,6 +1023,7 @@ function Window:Hide()
     self.animating = true
     self._revealing = true
     self.hidden = true
+    setTopToastPosition(self)
     self.collapsedInteract.Visible = false -- re-shown once the collapse settles, below
 
     -- closing while minimised closes properly rather than leaving a stale minimised state -
@@ -1938,6 +1949,7 @@ function Window:Show()
 
     self.hidden = false
     self.minimised = false
+    setTopToastPosition(self)
 
     -- a ChangeTheme landed while we were collapsed; apply it before anything fades back in
     if self._themeRefreshPending then

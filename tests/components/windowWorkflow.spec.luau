@@ -890,6 +890,7 @@ return function()
 
             it("defaults to top with top-centre anchor and alignment", function()
                 local w = makeWindow()
+                w.hidden = false
                 w:Toast({ title = "A", duration = 1 })
                 expect(w._toastsTop).to.be.ok()
                 expect(w._toastsBottom).never.to.be.ok()
@@ -898,6 +899,20 @@ return function()
                 local layout = findLayout(w._toastsTop)
                 expect(layout).to.be.ok()
                 expect(layout.VerticalAlignment).to.equal(Enum.VerticalAlignment.Top)
+            end)
+
+            it("moves the top stack below the collapsed window", function()
+                local w = makeWindow()
+                w:Toast({ title = "A", duration = 60 })
+                expect(w._toastsTop.Position).to.equal(UDim2.new(0.5, 0, 0, 82))
+
+                w.hidden = false
+                w:Hide()
+                expect(w._toastsTop.Position).to.equal(UDim2.new(0.5, 0, 0, 82))
+
+                w.animating = false
+                w:Show()
+                expect(w._toastsTop.Position).to.equal(UDim2.new(0.5, 0, 0, 12))
             end)
 
             it("supports bottom with bottom-centre anchor and alignment", function()
