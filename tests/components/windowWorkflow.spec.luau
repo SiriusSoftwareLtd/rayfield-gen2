@@ -874,9 +874,11 @@ return function()
 
         describe("toast position", function()
             local originalWait = task.wait
+            local originalDelay = task.delay
 
             afterEach(function()
                 task.wait = originalWait
+                task.delay = originalDelay
             end)
 
             local function findLayout(container)
@@ -901,17 +903,31 @@ return function()
                 expect(layout.VerticalAlignment).to.equal(Enum.VerticalAlignment.Top)
             end)
 
-            it("moves the top stack below the collapsed window", function()
+            it("keeps the top stack below the pill until restore finishes", function()
                 local w = makeWindow()
                 w:Toast({ title = "A", duration = 60 })
                 expect(w._toastsTop.Position).to.equal(UDim2.new(0.5, 0, 0, 82))
 
                 w.hidden = false
+                w.hasShownOnce = true
                 w:Hide()
                 expect(w._toastsTop.Position).to.equal(UDim2.new(0.5, 0, 0, 82))
 
+                local delayed = {}
+                task.delay = function(duration, callback, ...)
+                    table.insert(delayed, { duration = duration, callback = callback, args = table.pack(...) })
+                end
+
                 w.animating = false
                 w:Show()
+                expect(w._toastsTop.Position).to.equal(UDim2.new(0.5, 0, 0, 82))
+
+                for _, item in delayed do
+                    if item.duration == 0.35 then
+                        item.callback(table.unpack(item.args, 1, item.args.n))
+                    end
+                end
+
                 expect(w._toastsTop.Position).to.equal(UDim2.new(0.5, 0, 0, 12))
             end)
 

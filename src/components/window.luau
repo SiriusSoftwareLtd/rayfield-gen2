@@ -1949,7 +1949,20 @@ function Window:Show()
 
     self.hidden = false
     self.minimised = false
-    setTopToastPosition(self)
+
+    -- Keep top toasts below the collapsed pill until the restore morph has finished. Moving
+    -- them immediately lets an existing toast overlap the pill while the 0.35s restore tween
+    -- is still in progress.
+    if self.hasShownOnce and self._toastsTop then
+        self._toastsTop.Position = topToastClosedPosition
+        task.delay(0.35, function()
+            if not self.hidden and not self.unloaded then
+                setTopToastPosition(self)
+            end
+        end)
+    else
+        setTopToastPosition(self)
+    end
 
     -- a ChangeTheme landed while we were collapsed; apply it before anything fades back in
     if self._themeRefreshPending then
