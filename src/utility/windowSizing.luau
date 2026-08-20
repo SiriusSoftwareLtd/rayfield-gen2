@@ -40,6 +40,18 @@ local minPlausibleViewport = 200
 windowSizing.defaultSize = defaultSize
 windowSizing.minSize = minSize
 
+-- Topbar, tab list and padding: everything above the elements frame, which window.luau sizes
+-- (1, -chromeHeight) and the tab page fills. Elements that need to know how much room the page
+-- can give them ask pageHeight rather than restating this.
+windowSizing.chromeHeight = 106
+
+-- The page a window of this height can show. Nil height means the window hasn't been sized yet,
+-- so answer with the smallest page there can be rather than nothing.
+function windowSizing.pageHeight(windowHeight: number?): number
+    local height = if windowHeight and windowHeight > 0 then windowHeight else minSize.Y
+    return math.max(height - windowSizing.chromeHeight, 0)
+end
+
 -- How much height we had to give up, 0 on a screen tall enough and 1 once pinned to the floor.
 local function heightDeficit(height: number): number
     return math.clamp((defaultSize.Y - height) / (defaultSize.Y - minSize.Y), 0, 1)

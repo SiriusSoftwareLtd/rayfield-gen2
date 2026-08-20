@@ -19,6 +19,7 @@ local image = require(utility.image)
 local constants = require(utility.constants)
 local locale = require(utility.locale)
 local hapticEngine = require(utility.HapticEngine)
+local windowSizing = require(utility.windowSizing)
 
 local chevronIcon = constants.icons.chevron
 local checkIcon = constants.icons.check
@@ -31,6 +32,38 @@ local flatRadius = UDim.new(0, 7)
 
 local searchCollapsedHeight = 30
 local searchExpandedHeight = 38
+
+-- Option row geometry. The open height is added up from these, so a cap written as a bare
+-- number cant drift out of step with the rows its meant to be counting.
+local optionHeight = 38
+local optionGap = 5
+local listPadding = 2 -- above and below the rows, so the first and last strokes clear the clip
+
+-- Everything the card owes around its rows: the header pill it sits under, the gap between
+-- them, and its own padding.
+local headerHeight = 41
+local headerGap = 6
+local cardPaddingTop = 7
+local cardPaddingBottom = 6
+local cardPadding = cardPaddingTop + cardPaddingBottom
+
+-- Most rows we'll ever show at once. Past this the list scrolls rather than the card growing.
+local maxVisibleOptions = 4
+
+-- The chrome above the elements frame (window.luau sizes it 1, -106), which the tab page fills.
+-- Taken off the window's height that gives the page, and off windowSizing's floor it gives the
+-- smallest page there can be - what a card falls back to before the window has a size.
+local windowChromeHeight = 106
+local minPageHeight = windowSizing.minSize.Y - windowChromeHeight
+
+-- The row of bulk actions a multi-select card carries above its list.
+local actionsHeight = 22
+local hintTween = TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+local hoverTween = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
+-- How visible the scrollbar is while there is list left to reach. Faint on purpose: it is there
+-- to say the list carries on, not to be furniture.
+local scrollbarShown = 0.4
 local searchTween = TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 
 local function dedupStrings(arr)
@@ -130,12 +163,13 @@ function Dropdown.new(tab, properties)
     self.window:_registerControl(self)
 
     -- Outer wrapper: transparent, just holds the two cards and animates its height
-    -- open <-> closed. Clips so the options card is hidden while collapsed.
+    -- open <-> closed. It does not clip: a UIStroke is drawn outside the frame it belongs to,
+    -- and both cards fill this exactly, so a clip here takes the border off both of them. The
+    -- options card cant overflow it anyway, since its height is this one's less the header.
     self.main = self.window:Create("Frame", {
         Size = UDim2.new(1, -20, 0, 41),
         BorderSizePixel = 0,
         Name = self.name,
-        ClipsDescendants = true,
         BackgroundTransparency = 1,
 
         Parent = self.tab.tabPage,
@@ -153,7 +187,9 @@ function Dropdown.new(tab, properties)
         Parent = self.main,
     }, { BackgroundTransparency = "ElementTransparency" })
 
-    self.stroke = self.window:StyleElementPanel(self.top)
+    -- the same stroke every other element gets. The panel below keeps the tinted one, so the
+    -- card only stops matching its neighbours once it's actually open.
+    self.stroke = self.window:StyleElementBody(self.top)
     self.hoverOverlay = self.window:CreateHoverOverlay(self.top)
     self.flashTarget = self.top -- main is a transparent wrapper, so the error-flash tints the pill
 
@@ -260,13 +296,15 @@ function Dropdown.new(tab, properties)
     })
 
     -- Options card: a second (full-width) pill below the header, revealed as the wrapper
-    -- grows. Anchored to the wrapper's bottom (top edge sits 6px under the header) so the
-    -- clip hides it while collapsed.
+    -- grows. Anchored to the wrapper's bottom (top edge sits 6px under the header), and it
+    -- clips its own contents: collapsed it is zero height, so the search bar and the list are
+    -- cut off here while its own border still draws outside it, like every other element's.
     self.panel = self.window:Create("Frame", {
         AnchorPoint = Vector2.new(1, 1),
         Position = UDim2.new(1, 0, 1, 0),
-        Size = UDim2.new(1, 0, 1, -47),
+        Size = UDim2.new(1, 0, 1, -(headerHeight + headerGap)),
         BorderSizePixel = 0,
+        ClipsDescendants = true,
         BackgroundColor3 = Color3.fromRGB(255, 255, 255),
         ZIndex = 1,
 
@@ -291,13 +329,14 @@ function Dropdown.new(tab, properties)
     })
 
     self.window:Create("UIPadding", {
-        PaddingTop = UDim.new(0, 7),
-        PaddingBottom = UDim.new(0, 6),
+        PaddingTop = UDim.new(0, cardPaddingTop),
+        PaddingBottom = UDim.new(0, cardPaddingBottom),
 
         Parent = self.panel,
     })
 
     self:_buildSearch()
+    self:_buildActions()
 
     self.list = self.window:Create("ScrollingFrame", {
         Active = true,
@@ -309,9 +348,9 @@ function Dropdown.new(tab, properties)
         CanvasSize = UDim2.new(),
         ScrollBarImageColor3 = Color3.fromRGB(240, 240, 240),
         ScrollBarThickness = 3,
-        ScrollBarImageTransparency = 1, -- scrollbar kept fully transparent
+        ScrollBarImageTransparency = 1, -- _syncScrollHint shows it while theres more below
         ScrollingDirection = Enum.ScrollingDirection.Y,
-        LayoutOrder = 2,
+        LayoutOrder = 3,
         ZIndex = 1,
 
         Parent = self.panel,
@@ -323,6 +362,20 @@ function Dropdown.new(tab, properties)
         Parent = self.list,
     })
 
+    self.window:ConnectFor(self, self.list:GetPropertyChangedSignal("CanvasPosition"), function()
+        self:_syncScrollHint()
+    end)
+    self.window:ConnectFor(self, self.list:GetPropertyChangedSignal("AbsoluteCanvasSize"), function()
+        self:_syncScrollHint()
+    end)
+
+    -- the card opens on a tween, so the list is still its collapsed height when _open asks. Its
+    -- window height is the other half of "is there more below", and without watching it the
+    -- scrollbar stays hidden until something else happens to trigger a sync.
+    self.window:ConnectFor(self, self.list:GetPropertyChangedSignal("AbsoluteWindowSize"), function()
+        self:_syncScrollHint()
+    end)
+
     self.listLayout = self.window:Create("UIListLayout", {
         Padding = UDim.new(0, 5),
         SortOrder = Enum.SortOrder.LayoutOrder,
@@ -331,11 +384,29 @@ function Dropdown.new(tab, properties)
         Parent = self.list,
     })
 
+    -- top as well as bottom: the list clips, and a row's stroke is drawn outside it, so the
+    -- first row lost its top border to the clip edge without this
     self.window:Create("UIPadding", {
-        PaddingBottom = UDim.new(0, 2),
+        PaddingTop = UDim.new(0, listPadding),
+        PaddingBottom = UDim.new(0, listPadding),
 
         Parent = self.list,
     })
+
+    -- Said when a search matches nothing. Without it the card is a search box over an empty
+    -- space, which reads as broken rather than as no matches.
+    self.emptyLabel = self.window:Create("TextLabel", {
+        Name = "Empty",
+        Size = UDim2.new(1, -12, 0, optionHeight),
+        BackgroundTransparency = 1,
+        Text = locale.t("No matches"),
+        TextSize = 14,
+        TextTransparency = 0.55,
+        Visible = false,
+        LayoutOrder = 1,
+
+        Parent = self.list,
+    }, { TextColor3 = "ContentColor", FontFace = "Font" })
 
     local function isOptionSelected(name)
         return table.find(self.value, name) ~= nil
@@ -385,7 +456,7 @@ function Dropdown.new(tab, properties)
 
     local function buildOption(optionName)
         local frame = self.window:Create("Frame", {
-            Size = UDim2.new(1, -12, 0, 38),
+            Size = UDim2.new(1, -12, 0, optionHeight),
             BorderSizePixel = 0,
 
             BackgroundTransparency = 1,
@@ -593,42 +664,32 @@ function Dropdown.new(tab, properties)
         end
     end)
 
-    -- Hover feedback via the overlay + title only. The card uses a gradient stroke (white
-    -- base tinted by the gradient), so tweening stroke.Color here would fight the gradient.
+    -- Hover feedback: overlay, title and stroke, the same lift Window:_wireElementHover gives
+    -- every other element, colour included.
     self.window:ConnectFor(self, self.main.MouseEnter, function()
         if self._isOpen or not self.window:_interactive() then
             return
         end
         variables.tweenService
-            :Create(
-                self.title,
-                TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-                { TextColor3 = self.window.theme.ElementTextHoverColor }
-            )
+            :Create(self.title, hoverTween, { TextColor3 = self.window.theme.ElementTextHoverColor })
             :Play()
+        variables.tweenService:Create(self.hoverOverlay, hoverTween, { BackgroundTransparency = 0.97 }):Play()
         variables.tweenService
-            :Create(
-                self.hoverOverlay,
-                TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-                { BackgroundTransparency = 0.97 }
-            )
+            :Create(self.stroke, hoverTween, {
+                Transparency = self.window.theme.ElementStrokeHoverTransparency,
+                Color = self.window.theme.ElementStrokeHover,
+            })
             :Play()
     end)
 
     self.window:ConnectFor(self, self.main.MouseLeave, function()
+        variables.tweenService:Create(self.title, hoverTween, { TextColor3 = self.window.theme.ContentColor }):Play()
+        variables.tweenService:Create(self.hoverOverlay, hoverTween, { BackgroundTransparency = 1 }):Play()
         variables.tweenService
-            :Create(
-                self.title,
-                TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-                { TextColor3 = self.window.theme.ContentColor }
-            )
-            :Play()
-        variables.tweenService
-            :Create(
-                self.hoverOverlay,
-                TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-                { BackgroundTransparency = 1 }
-            )
+            :Create(self.stroke, hoverTween, {
+                Transparency = self.window.theme.ElementStrokeTransparency,
+                Color = self.window.theme.ElementStroke,
+            })
             :Play()
     end)
 
@@ -766,6 +827,7 @@ function Dropdown:_expandSearch()
     variables.tweenService:Create(self.searchShadow, searchTween, { Transparency = 0.92 }):Play()
     variables.tweenService:Create(self.searchInput, searchTween, { TextTransparency = 0.3 }):Play()
 
+    self:_resizeToOptions() -- the bar is taller now, so the card owes it the difference
     self.searchInput:CaptureFocus()
 end
 
@@ -789,15 +851,143 @@ function Dropdown:_collapseSearch()
     variables.tweenService:Create(self.searchStroke, searchTween, { Transparency = 1 }):Play()
     variables.tweenService:Create(self.searchShadow, searchTween, { Transparency = 1 }):Play()
     variables.tweenService:Create(self.searchInput, searchTween, { TextTransparency = 1 }):Play()
+
+    self:_resizeToOptions()
 end
 
 function Dropdown:_applyFilter(query)
     query = string.lower(query or "")
+    local shown = 0
     for _, data in self._optionFrames do
-        data.frame.Visible = query == "" or string.find(string.lower(data.name), query, 1, true) ~= nil
+        local visible = query == "" or string.find(string.lower(data.name), query, 1, true) ~= nil
+        data.frame.Visible = visible
+        if visible then
+            shown += 1
+        end
     end
+
+    -- only a search that found nothing gets told so. A dropdown built with no options, or one
+    -- emptied by Refresh, is a list waiting to be filled rather than a failed search.
+    self.emptyLabel.Visible = shown == 0 and query ~= ""
     self:_updateCorners()
     self:_resizeToOptions()
+    self:_syncScrollHint()
+end
+
+-- Show the scrollbar only while there is list left to reach. Measured rather than assumed: a
+-- filter can take a list that was scrolling down to two rows that arent.
+function Dropdown:_syncScrollHint()
+    -- a list that has not been laid out yet has nothing to measure, and nothing to hide either
+    local canvasSize, windowSize, at =
+        self.list.AbsoluteCanvasSize, self.list.AbsoluteWindowSize, self.list.CanvasPosition
+    if not canvasSize or not windowSize or not at then
+        return
+    end
+
+    local more = self._isOpen and windowSize.Y > 0 and canvasSize.Y - (at.Y + windowSize.Y) > 1
+
+    variables.tweenService
+        :Create(self.list, hintTween, { ScrollBarImageTransparency = if more then scrollbarShown else 1 })
+        :Play()
+end
+
+-- Every option the search is currently letting through, which is what a bulk action applies to:
+-- selecting all of a filtered list should not quietly take the ones it is hiding as well.
+function Dropdown:_visibleOptions(): { string }
+    local names = {}
+    for _, data in self._optionFrames do
+        if data.frame.Visible then
+            table.insert(names, data.name)
+        end
+    end
+    return names
+end
+
+function Dropdown:_buildActions()
+    if not self.multiSelect then
+        return -- one choice at a time has nothing to select all of
+    end
+
+    self.actions = self.window:Create("Frame", {
+        Name = "Actions",
+        Size = UDim2.new(1, -12, 0, actionsHeight),
+        BackgroundTransparency = 1,
+        LayoutOrder = 2,
+
+        Parent = self.panel,
+    })
+
+    self.window:Create("UIListLayout", {
+        Padding = UDim.new(0, 12),
+        FillDirection = Enum.FillDirection.Horizontal,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+
+        Parent = self.actions,
+    })
+
+    local function action(label: string, order: number, apply: () -> ())
+        local button = self.window:Create("TextButton", {
+            AutomaticSize = Enum.AutomaticSize.X,
+            Size = UDim2.fromOffset(0, actionsHeight),
+            BackgroundTransparency = 1,
+            Text = locale.t(label),
+            TextSize = 13,
+            TextTransparency = 0.45, -- hovered = 0.15
+            LayoutOrder = order,
+
+            Parent = self.actions,
+        }, { TextColor3 = "ContentColor", FontFace = "Font" })
+
+        self.window:ConnectFor(self, button.MouseEnter, function()
+            variables.tweenService:Create(button, hintTween, { TextTransparency = 0.15 }):Play()
+        end)
+        self.window:ConnectFor(self, button.MouseLeave, function()
+            variables.tweenService:Create(button, hintTween, { TextTransparency = 0.45 }):Play()
+        end)
+        self.window:ConnectFor(self, button.MouseButton1Click, function()
+            apply()
+            self:_afterBulkChange()
+        end)
+
+        return button
+    end
+
+    -- Both act on what the search is showing and leave the rest of the selection alone. Taking
+    -- the visible list wholesale would drop every hidden pick, so a filter would quietly unselect
+    -- what it was hiding, which is worse than not being able to select at all.
+    action("Select all", 1, function()
+        local shown = self:_visibleOptions()
+        for _, name in shown do
+            if not table.find(self.value, name) then
+                table.insert(self.value, name)
+            end
+        end
+    end)
+    action("Clear", 2, function()
+        local shown = self:_visibleOptions()
+        for index = #self.value, 1, -1 do
+            if table.find(shown, self.value[index]) then
+                table.remove(self.value, index)
+            end
+        end
+    end)
+end
+
+-- The tail every bulk action shares: repaint the rows, say what is selected, tell the dev, save.
+function Dropdown:_afterBulkChange()
+    -- the selection the player just made is the intent now, the same as a click on a row. Without
+    -- this a later Refresh rebuilds from the old intent and undoes the whole bulk change.
+    self._desiredValue = table.clone(self.value)
+
+    for _, data in self._optionFrames do
+        self._renderOptionState(data, true)
+    end
+    self:_updateSelectedLabel()
+    self:_updateCorners()
+    self.window:_runGuarded(self, self.callback, self:_callbackValue())
+    self.window:_persist(self)
+    hapticEngine.click()
 end
 
 -- match the panel to whats visible. only while open: closed height is the header alone.
@@ -830,10 +1020,31 @@ function Dropdown:_updateCorners()
     end
 end
 
--- Open height sized to the options (header + search + paddings + rows), capped so long lists
--- scroll instead of running off the window. Short lists open just tall enough, no dead space.
--- sized from the options actually on screen, so a search filter (or an Add/Remove while
--- open) grows and shrinks the panel to fit rather than leaving dead space
+local function listHeight(count: number): number
+    return count * optionHeight + math.max(0, count - 1) * optionGap + listPadding * 2
+end
+
+-- How many rows a given slice of list fits, at least one: a card with no room to show an
+-- option is not a dropdown.
+local function rowsThatFit(space: number): number
+    return math.max(math.floor((space - listPadding * 2 + optionGap) / (optionHeight + optionGap)), 1)
+end
+
+-- The height the page can show. The window keeps its own size current with the screen, the
+-- elements frame is that less the chrome above it, and the tab page fills it - so this is the
+-- page's height without waiting on a layout pass to measure one.
+function Dropdown:_pageHeight(): number
+    local size = self.window.size
+    if not size then
+        return minPageHeight
+    end
+    return size.Y.Offset - windowChromeHeight
+end
+
+-- Open height sized to the options on screen (header + search + paddings + rows), so a search
+-- filter or an Add/Remove while open grows and shrinks the card to fit. Capped at whichever
+-- comes first: four rows, or what the page can actually show - a card taller than the page it
+-- sits on cant be scrolled into view, it just runs off both ends.
 function Dropdown:_openHeight()
     local n = 0
     for _, data in self._optionFrames do
@@ -841,8 +1052,22 @@ function Dropdown:_openHeight()
             n += 1
         end
     end
-    local rows = n * 38 + math.max(0, n - 1) * 5 + 2
-    return math.min(180, 95 + rows)
+
+    -- the search bar grows when it takes focus, so the card owes it the difference. Without
+    -- that the list is pushed down and its last row goes over the card's own edge.
+    local searchHeight = if self._searchOpen then searchExpandedHeight else searchCollapsedHeight
+    local overhead = headerHeight
+        + headerGap
+        + cardPadding
+        + searchHeight
+        + optionGap
+        + (if self.actions then actionsHeight + optionGap else 0)
+
+    local available = self:_pageHeight()
+    -- a search that matches nothing still has a line to say so, so one row is the floor
+    local rows = math.min(math.max(n, 1), maxVisibleOptions, rowsThatFit(available - overhead))
+
+    return math.min(overhead + listHeight(rows), available)
 end
 
 function Dropdown:_open()
@@ -914,6 +1139,43 @@ function Dropdown:_open()
     for _, data in self._optionFrames do
         self._renderOptionState(data, true)
     end
+
+    self:_syncScrollHint()
+    self:_bringIntoView()
+end
+
+-- A card low down a page opens into whatever is below the fold, and the options it just showed
+-- are off screen. Rather than flip it above the header, which only moves the problem to the top
+-- edge, the page comes to it: scroll just far enough that the open card ends inside the view.
+function Dropdown:_bringIntoView()
+    local page = self.tab and self.tab.tabPage
+    if not page then
+        return
+    end
+
+    -- a page that has not been laid out has no view to fit anything into yet
+    local view, at, pageAt, cardAt =
+        page.AbsoluteWindowSize, page.CanvasPosition, page.AbsolutePosition, self.main.AbsolutePosition
+    if not view or not at or not pageAt or not cardAt or view.Y <= 0 then
+        return
+    end
+
+    -- measured against the canvas, not the screen, so it does not matter where the window is
+    local top = cardAt.Y - pageAt.Y + at.Y
+    local bottom = top + self:_openHeight()
+    local overflow = bottom - (at.Y + view.Y)
+    if overflow <= 0 then
+        return -- it already ends inside the view
+    end
+
+    -- never past the card's own top. The open height is capped to the page (_openHeight), so
+    -- the card always fits once it's scrolled to, and this only ever trims the 8px of room.
+    local target = math.min(at.Y + overflow + 8, top)
+    variables.tweenService
+        :Create(page, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+            CanvasPosition = Vector2.new(at.X, target),
+        })
+        :Play()
 end
 
 function Dropdown:_close()
@@ -928,6 +1190,7 @@ function Dropdown:_close()
     end
 
     self:_collapseSearch()
+    self:_syncScrollHint()
 
     variables.tweenService
         :Create(
