@@ -95,9 +95,8 @@ jobs:
       - name: Required checks
         run: make ci
 
-      # the header below adds 2 lines, so wax offsets its line mapping to match
       - name: Bundle
-        run: make bundle BUNDLE_HEADER_LINES=2
+        run: make bundle
 
       # a header so the served file says what it is at a glance. loadstring ignores comments.
       - name: Stamp version header
@@ -108,6 +107,11 @@ jobs:
           {
             printf -- '-- Rayfield Gen2 v%s\n' "$VERSION"
             printf -- '-- loadstring(game:HttpGet("https://sirius.menu/gen2"))()\n'
+            printf -- '--\n'
+            printf -- '-- Copyright (c) 2026 Corridon Capital\n'
+            printf -- '-- This Source Code Form is subject to the terms of the Mozilla Public\n'
+            printf -- '-- License, v. 2.0. If a copy of the MPL was not distributed with this\n'
+            printf -- '-- file, You can obtain one at https://mozilla.org/MPL/2.0/.\n'
             cat build/bundled.luau
           } > build/bundled.luau.stamped
           mv build/bundled.luau.stamped build/bundled.luau

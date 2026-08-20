@@ -38,8 +38,6 @@ LUAU_LSP_REF ?= e27c8b37024818c0a3d60f341ae0aba87e6d58d1
 GLOBAL_TYPES_URL ?= https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/$(LUAU_LSP_REF)/scripts/globalTypes.d.luau
 # records which ref the local defs came from, so bumping the pin refreshes them
 GLOBAL_TYPES_STAMP ?= $(GLOBAL_TYPES).ref
-# lines prepended to the bundle after the build (the release stamps a 2 line header)
-BUNDLE_HEADER_LINES ?= 0
 COVERAGE_THRESHOLD ?= 70
 
 .PHONY: help install hooks ci check test test-verbose coverage coverage-baseline testez-model test-place format format-check lint typecheck build bundle serve sourcemap-watch dev clean
@@ -131,10 +129,12 @@ typecheck: $(GLOBAL_TYPES)
 build:
 	$(ROJO) build $(PROJECT_FILE) -o "$(PLACE_FILE)"
 
-# unminified so wax keeps its line offsets and crash reports point at real source lines
+# minified: the bundle is fetched over HttpGet on every run, and unminified is 2.3x the size.
+# wax only emits line offsets when it isn't minifying, so a crash report carries a traceback
+# naming the functions but not source lines.
 bundle:
 	$(MKDIR) "$(dir $(BUNDLE_FILE))"
-	$(LUNE) run wax bundle output="$(BUNDLE_FILE)" input="$(WAX_PROJECT)" minify=false env-name=Rayfield extra-offset-lines=$(BUNDLE_HEADER_LINES)
+	$(LUNE) run wax bundle output="$(BUNDLE_FILE)" input="$(WAX_PROJECT)" minify=true env-name=Rayfield
 
 serve:
 	$(ROJO) serve $(PROJECT_FILE)
