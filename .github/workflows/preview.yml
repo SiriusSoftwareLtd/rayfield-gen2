@@ -88,7 +88,7 @@ jobs:
           {
             printf 'Rolling preview build of Rayfield Gen2, cut from `dev`.\n\n'
             printf '    local Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2-preview"))()\n\n'
-            printf 'Built from `%s` on top of v%s. This tag moves with every green commit on dev and is not a supported release - use the stable loadstring for anything you ship.\n\n' "$SHORT" "$VERSION"
+            printf 'Built from `%s`, on the way to v%s. This tag moves with every green commit on dev and is not a supported release - use the stable loadstring for anything you ship.\n\n' "$SHORT" "$VERSION"
             printf 'Docs: https://docs.sirius.menu/rayfield-gen2\n'
           } > preview-notes.md
 
