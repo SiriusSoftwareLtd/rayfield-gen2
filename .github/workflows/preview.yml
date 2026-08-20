@@ -1,0 +1,102 @@
+name: Preview Bundle
+
+permissions: {}
+
+# dev is the preview branch, so every green commit on it becomes the preview
+# build. Nothing here can reach the stable URL: the release below is published
+# as a prerelease, and GitHub's `releases/latest` - which is what sirius.menu/gen2
+# reads - is defined as the newest release that is NOT a prerelease.
+on:
+  push:
+    branches: [dev]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/**'
+      - 'worker/**'
+  workflow_dispatch:
+
+concurrency:
+  group: preview-bundle
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    name: Build and publish the preview bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          submodules: true
+
+      - name: Setup RoKit
+        uses: CompeyDev/setup-rokit@1d9390883f7ebce19d48f5b8d006e11d387c92ab
+
+      - name: Install RoKit packages
+        run: make install
+
+      # a preview is still a shipped artifact, so it clears the same gate stable does
+      - name: Required checks
+        run: make ci
+
+      # the header below adds 2 lines, so wax offsets its line mapping to match
+      - name: Bundle
+        run: make bundle BUNDLE_HEADER_LINES=2
+
+      # the tag rolls, so the build stamps what it actually is: a bug report from
+      # a preview user has to name a commit, not just "preview"
+      - name: Stamp preview header
+        env:
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '[:space:]' < version.txt)"
+          SHORT="$(git rev-parse --short "$COMMIT")"
+          {
+            printf -- '-- Rayfield Gen2 v%s-preview (%s, %s)\n' "$VERSION" "$SHORT" "$(date -u +%Y-%m-%d)"
+            printf -- '-- loadstring(game:HttpGet("https://sirius.menu/gen2-preview"))()\n'
+            cat build/bundled.luau
+          } > build/bundled.luau.stamped
+          mv build/bundled.luau.stamped build/bundled.luau
+
+      - name: Create raw text file of bundle
+        run: cp build/bundled.luau build/bundled.txt
+
+      - name: Generate checksums
+        run: cd build && sha256sum bundled.luau bundled.txt > checksums.sha256
+
+      # Recreated rather than edited: `gh release edit` moves the release but
+      # leaves the git tag on the old commit, and a preview tag that doesn't
+      # point at the build is worse than no tag. The gap between delete and
+      # create is a few seconds, and the edge cache covers it.
+      - name: Publish the rolling preview release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          VERSION="$(tr -d '[:space:]' < version.txt)"
+          SHORT="$(git rev-parse --short "$COMMIT")"
+
+          {
+            printf 'Rolling preview build of Rayfield Gen2, cut from `dev`.\n\n'
+            printf '    local Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2-preview"))()\n\n'
+            printf 'Built from `%s` on top of v%s. This tag moves with every green commit on dev and is not a supported release - use the stable loadstring for anything you ship.\n\n' "$SHORT" "$VERSION"
+            printf 'Docs: https://docs.sirius.menu/rayfield-gen2\n'
+          } > preview-notes.md
+
+          if gh release view preview >/dev/null 2>&1; then
+            gh release delete preview --yes --cleanup-tag
+          fi
+
+          gh release create preview --prerelease --target "$COMMIT" \
+            --title "Rayfield Gen2 preview ($SHORT)" \
+            --notes-file preview-notes.md \
+            build/bundled.luau build/bundled.txt build/checksums.sha256

@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gen2-loadstring",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-01",
+
+  // Two paths, one Worker. The stable route already existed; the preview route
+  // is the same code reading a different release.
+  "routes": [
+    { "pattern": "sirius.menu/gen2", "zone_name": "sirius.menu" },
+    { "pattern": "sirius.menu/gen2-preview", "zone_name": "sirius.menu" }
+  ]
+}
