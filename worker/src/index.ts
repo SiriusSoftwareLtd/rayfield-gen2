@@ -68,10 +68,10 @@ export default {
     const cached = await cache.match(cacheKey);
     if (cached) return cached;
 
-    const upstream = await fetch(channel.asset, {
-      redirect: "follow",
-      cf: { cacheEverything: true, cacheTtl: EDGE_TTL },
-    });
+    // No `cf.cacheEverything` here. The response cache below only ever stores a success,
+    // whereas the subrequest cache stores whatever it gets - so a 404 from a preview tag that
+    // hadn't been cut yet kept answering long after the release existed. One cache, successes only.
+    const upstream = await fetch(channel.asset, { redirect: "follow" });
 
     if (!upstream.ok) {
       // Never cached: an outage that caches itself for five minutes outlives
@@ -83,6 +83,8 @@ export default {
         headers: {
           "content-type": "text/plain; charset=utf-8",
           "cache-control": "no-store",
+          // what GitHub actually said, so a failure can be diagnosed without a deploy
+          "x-rayfield-upstream": String(upstream.status),
         },
       });
     }
