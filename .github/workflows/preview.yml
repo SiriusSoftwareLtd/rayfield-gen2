@@ -64,6 +64,7 @@ jobs:
             printf -- '-- This Source Code Form is subject to the terms of the Mozilla Public\n'
             printf -- '-- License, v. 2.0. If a copy of the MPL was not distributed with this\n'
             printf -- '-- file, You can obtain one at https://mozilla.org/MPL/2.0/.\n'
+            printf -- '--\n--\n'
             cat build/bundled.luau
           } > build/bundled.luau.stamped
           mv build/bundled.luau.stamped build/bundled.luau
