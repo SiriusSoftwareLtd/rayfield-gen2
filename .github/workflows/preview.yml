@@ -9,10 +9,11 @@ permissions: {}
 on:
   push:
     branches: [dev]
+    # not .github: this workflow stamps the bundle's header, so changing it changes
+    # what ships and has to rebuild
     paths-ignore:
       - '**.md'
       - 'docs/**'
-      - '.github/**'
       - 'worker/**'
   workflow_dispatch:
 
