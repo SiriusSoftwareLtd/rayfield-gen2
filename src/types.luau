@@ -56,6 +56,18 @@ export type SectionProps = {
     icon: (string | number)?,
 }
 
+export type TextProps = {
+    name: string?, -- the title above the body; either half can be left out
+    text: string?, -- the body
+    icon: (string | number)?,
+}
+
+export type DividerProps = {
+    text: string?, -- an optional word in the middle of the rule
+    spacing: number?, -- room above and below, in pixels
+    line: boolean?, -- false draws no rule, leaving only the room
+}
+
 export type GroupProps = {
     direction: string?, -- "row" | "column" (default row); "horizontal"/"vertical" also work
 }
@@ -251,6 +263,18 @@ export type Stat = Moveable & {
 
 export type Section = Moveable & {}
 
+export type Text = Moveable & {
+    name: string, -- the title
+    text: string, -- the body
+    Set: (self: Text, text: string) -> (),
+    SetTitle: (self: Text, title: string) -> (),
+}
+
+export type Divider = Moveable & {
+    text: string, -- "" when the rule carries no word
+    Set: (self: Divider, text: string?) -> (),
+}
+
 -- Tags sit in the window's title bar and order themselves, so they aren't Moveable.
 export type Tag = {
     Set: (self: Tag, props: TagProps) -> (),
@@ -266,16 +290,18 @@ export type Popup = {
 
 -- A group lays elements along one axis and nests, so a row of columns builds a grid.
 -- A row accepts the compact elements (button/toggle/stat) + slider; a column also takes
--- dropdown and section. Input, keybind and colorpicker stay tab-level for now.
+-- dropdown, section, text and divider. Input, keybind and colorpicker stay tab-level for now.
 export type Group = Moveable & {
     CreateButton: (self: Group, props: ButtonProps) -> Button,
     CreateToggle: (self: Group, props: ToggleProps) -> Toggle,
     CreateSwitch: (self: Group, props: ToggleProps) -> Toggle,
     CreateStat: (self: Group, props: StatProps) -> Stat,
     CreateSlider: (self: Group, props: SliderProps) -> Slider,
-    -- nil on a row: only columns take dropdowns and sections
+    -- nil on a row: only columns take these
     CreateDropdown: (self: Group, props: DropdownProps) -> Dropdown?,
     CreateSection: (self: Group, props: SectionProps) -> Section?,
+    CreateText: (self: Group, props: TextProps) -> Text?,
+    CreateDivider: (self: Group, props: DividerProps?) -> Divider?,
     CreateGroup: (self: Group, props: GroupProps?) -> Group,
 }
 
@@ -293,6 +319,8 @@ export type Tab = {
     CreateColorPicker: (self: Tab, props: ColorPickerProps) -> ColorPicker,
     CreateStat: (self: Tab, props: StatProps) -> Stat,
     CreateSection: (self: Tab, props: SectionProps) -> Section,
+    CreateText: (self: Tab, props: TextProps) -> Text,
+    CreateDivider: (self: Tab, props: DividerProps?) -> Divider,
     CreateGroup: (self: Tab, props: GroupProps?) -> Group,
 }
 

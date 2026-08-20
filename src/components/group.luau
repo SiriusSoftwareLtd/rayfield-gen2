@@ -16,7 +16,8 @@ Group.__type = "Group"
 -- on window.controls through the nesting.
 --
 -- row    -> children build compact and share the width, wrapping to new rows as needed
--- column -> children build full width, stacked top to bottom
+-- column -> children build full width, stacked top to bottom, and also take the full-only
+--           elements (dropdown, section, text, divider)
 -- The public API calls these "row"/"column"; "horizontal"/"vertical" work too.
 
 local moveable = require(script.Parent.Parent.utility.moveable)
@@ -26,7 +27,7 @@ local assignOrder = require(script.Parent.Parent.utility.ordering)
 local elementPadding = 8
 
 -- these render fine side by side in a row: the compact builds (button/toggle/stat) and
--- the slider (it reflows to its narrow layout). dropdown/section stay full-only.
+-- the slider (it reflows to its narrow layout). dropdown/section/text/divider stay full-only.
 local compactCapable = {
     button = true,
     toggle = true,
@@ -177,6 +178,12 @@ function Group:CreateDropdown(properties)
 end
 function Group:CreateSection(properties)
     return self:_add("section", properties)
+end
+function Group:CreateText(properties)
+    return self:_add("text", properties)
+end
+function Group:CreateDivider(properties)
+    return self:_add("divider", properties)
 end
 
 -- a nested group: a column (for a grid) or another row inside this one

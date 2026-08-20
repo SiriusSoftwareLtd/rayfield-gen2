@@ -201,6 +201,79 @@ local rightColumn = grid:CreateGroup({ direction = "column" })
 rightColumn:CreateToggle({ name = "ESP", value = true })
 rightColumn:CreateToggle({ name = "Tracers" })
 
+-- Text ----------------------------------------------------------------------
+local text = window:CreateTab({ name = "Text", icon = 100604009889706 })
+
+text:CreateSection({ name = "Text" })
+
+-- a title and a body, the usual shape
+text:CreateText({
+    name = "Read this first",
+    text = "Text carries a title, a body, or both. Either half can be left out and the card closes up around what's left.",
+})
+
+-- title only, for a heading that isn't a section
+text:CreateText({ name = "Heading on its own" })
+
+-- body only, evenly padded with no room held for the missing title
+text:CreateText({
+    text = "Body on its own, for a note that doesn't need a heading over it.",
+})
+
+-- with an icon beside the title
+text:CreateText({
+    name = "Worth knowing",
+    text = "An icon sits to the left of the title.",
+    icon = 93364949241311,
+})
+
+local live = text:CreateText({ name = "Changes at runtime", text = "Waiting." })
+
+text:CreateButton({
+    name = "Rewrite the body",
+    callback = function()
+        live:Set("Rewritten at " .. os.date("%H:%M:%S") .. ".")
+    end,
+})
+
+text:CreateButton({
+    name = "Rewrite the title",
+    callback = function()
+        live:SetTitle("Retitled")
+    end,
+})
+
+text:CreateSection({ name = "Dividers" })
+
+text:CreateText({ text = "A plain rule, with the default room around it." })
+text:CreateDivider()
+
+text:CreateText({ text = "A rule with a word in the middle." })
+text:CreateDivider({ text = "or" })
+
+text:CreateText({ text = "More room above and below." })
+text:CreateDivider({ text = "spaced", spacing = 24 })
+
+text:CreateText({ text = "No rule at all, just the room. A spacer." })
+text:CreateDivider({ line = false, spacing = 20 })
+
+text:CreateText({ text = "The one below starts bare and gains a word." })
+local divider = text:CreateDivider()
+
+text:CreateButton({
+    name = "Give the divider a word",
+    callback = function()
+        divider:Set("added later")
+    end,
+})
+
+text:CreateButton({
+    name = "Take it back off",
+    callback = function()
+        divider:Set("")
+    end,
+})
+
 -- Language ------------------------------------------------------------------
 local language = window:CreateTab({ name = "Language", icon = 100604009889706 })
 
