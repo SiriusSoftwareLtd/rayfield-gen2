@@ -874,11 +874,12 @@ return function()
 
         describe("toast position", function()
             local originalWait = task.wait
-            local originalDelay = task.delay
+            local variables = helpers.requireUtility("variables")
+            local originalTweenCreate = variables.tweenService.Create
 
             afterEach(function()
                 task.wait = originalWait
-                task.delay = originalDelay
+                variables.tweenService.Create = originalTweenCreate
             end)
 
             local function findLayout(container)
@@ -892,7 +893,6 @@ return function()
 
             it("defaults to top with top-centre anchor and alignment", function()
                 local w = makeWindow()
-                w.hidden = false
                 w:Toast({ title = "A", duration = 1 })
                 expect(w._toastsTop).to.be.ok()
                 expect(w._toastsBottom).never.to.be.ok()
@@ -903,32 +903,47 @@ return function()
                 expect(layout.VerticalAlignment).to.equal(Enum.VerticalAlignment.Top)
             end)
 
-            it("keeps the top stack below the pill until restore finishes", function()
+            it("follows the pill after collapse and restore complete", function()
                 local w = makeWindow()
                 w:Toast({ title = "A", duration = 60 })
-                expect(w._toastsTop.Position).to.equal(UDim2.new(0.5, 0, 0, 82))
+                expect(w._toastsTop.Position).to.equal(UDim2.new(0.5, 0, 0, 12))
 
                 w.hidden = false
                 w.hasShownOnce = true
-                w:Hide()
-                expect(w._toastsTop.Position).to.equal(UDim2.new(0.5, 0, 0, 82))
 
-                local delayed = {}
-                task.delay = function(duration, callback, ...)
-                    table.insert(delayed, { duration = duration, callback = callback, args = table.pack(...) })
+                local motionCompletions = {}
+                local toastMoves = {}
+                variables.tweenService.Create = function(service, instance, info, targets)
+                    local tween = originalTweenCreate(service, instance, info, targets)
+                    if instance == w._toastsTop then
+                        table.insert(toastMoves, info)
+                    elseif instance == w.main and targets.Size and targets.Position then
+                        local completed = helpers.makeSignal()
+                        tween.Completed = completed
+                        tween.Play = function()
+                            for property, value in targets do
+                                instance[property] = value
+                            end
+                        end
+                        table.insert(motionCompletions, completed)
+                    end
+                    return tween
                 end
 
-                w.animating = false
+                w:Hide()
+                expect(w._toastsTop.Position).to.equal(UDim2.new(0.5, 0, 0, 12))
+                expect(#toastMoves).to.equal(0)
+
+                motionCompletions[1]:Fire(Enum.PlaybackState.Completed)
+                expect(w._toastsTop.Position).to.equal(UDim2.new(0.5, 0, 0, 82))
+                expect(toastMoves[1][1]).to.equal(0.2)
+
                 w:Show()
                 expect(w._toastsTop.Position).to.equal(UDim2.new(0.5, 0, 0, 82))
 
-                for _, item in delayed do
-                    if item.duration == 0.35 then
-                        item.callback(table.unpack(item.args, 1, item.args.n))
-                    end
-                end
-
+                motionCompletions[2]:Fire(Enum.PlaybackState.Completed)
                 expect(w._toastsTop.Position).to.equal(UDim2.new(0.5, 0, 0, 12))
+                expect(toastMoves[2][1]).to.equal(0.2)
             end)
 
             it("supports bottom with bottom-centre anchor and alignment", function()

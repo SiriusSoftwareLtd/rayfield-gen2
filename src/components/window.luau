@@ -40,6 +40,7 @@ local collapsedIconSize = UDim2.fromOffset(50, 50)
 local collapsedTop = UDim2.new(0.5, 0, 0, 20)
 local topToastOpenPosition = UDim2.new(0.5, 0, 0, 12)
 local topToastClosedPosition = UDim2.new(0.5, 0, 0, collapsedTop.Y.Offset + collapsedSize.Y.Offset + 12)
+local topToastMoveInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
 -- Width of the top-centre toast stack container. Toasts hug their own content and centre
 -- within it, so this just needs to be at least the toast's own max width.
@@ -112,10 +113,26 @@ local function firstColor(value)
     return if typeof(value) == "ColorSequence" then value.Keypoints[1].Value else value
 end
 
-local function setTopToastPosition(window)
-    if window._toastsTop then
-        window._toastsTop.Position = if window.hidden then topToastClosedPosition else topToastOpenPosition
+local function setTopToastPosition(window, animate)
+    local container = window._toastsTop
+    if not container then
+        return
     end
+
+    local target = if window._collapsedShown then topToastClosedPosition else topToastOpenPosition
+    if not animate or container.Position == target then
+        container.Position = target
+        return
+    end
+
+    local tween = variables.tweenService:Create(container, topToastMoveInfo, { Position = target })
+    window._topToastTween = tween
+    tween.Completed:Connect(function()
+        if window._topToastTween == tween then
+            window._topToastTween = nil
+        end
+    end)
+    tween:Play()
 end
 
 -- A subtle raised edge for a fill: lighten a dark fill, darken a light one.
@@ -679,6 +696,7 @@ function Window.new(properties)
     self.animating = false
     self._revealing = false
     self.hasShownOnce = false
+    self._collapsedShown = false
 
     -- saved settings land after the rail was built against the defaults, so let it settle again
     self:LoadSettings()
@@ -965,7 +983,7 @@ function Window:Toast(properties)
             Name = "Toasts",
             Size = UDim2.new(0, maxToastWidth, 1, -24),
             Position = if isTop
-                then if self.hidden then topToastClosedPosition else topToastOpenPosition
+                then if self._collapsedShown then topToastClosedPosition else topToastOpenPosition
                 else UDim2.new(0.5, 0, 1, -12),
             AnchorPoint = if isTop then Vector2.new(0.5, 0) else Vector2.new(0.5, 1),
             BackgroundTransparency = 1,
@@ -1023,7 +1041,6 @@ function Window:Hide()
     self.animating = true
     self._revealing = true
     self.hidden = true
-    setTopToastPosition(self)
     self.collapsedInteract.Visible = false -- re-shown once the collapse settles, below
 
     -- closing while minimised closes properly rather than leaving a stale minimised state -
@@ -1092,7 +1109,21 @@ function Window:Hide()
 
     -- collapse into the pill in one continuous move - size and position tweened together
     -- so they stay perfectly in sync throughout
-    variables.tweenService:Create(self.main, moveInfo, { Size = size, Position = home }):Play()
+    local collapse = variables.tweenService:Create(self.main, moveInfo, { Size = size, Position = home })
+    collapse.Completed:Connect(function(state)
+        if state ~= Enum.PlaybackState.Completed or not self.hidden then
+            return
+        end
+
+        -- The pill now occupies the top-centre slot. Move the stack only when the frame says
+        -- the collapse is complete, so this cannot drift from the animation that creates it.
+        self._collapsedShown = true
+        setTopToastPosition(self, true)
+        self.collapsedInteract.Visible = true
+        self.animating = false
+        self._revealing = false
+    end)
+    collapse:Play()
     variables.tweenService:Create(self.windowCorner, cornerInfo, { CornerRadius = UDim.new(1, 0) }):Play()
 
     -- once the chrome's faded, drop it and the scrolling content so nothing squashes/pokes
@@ -1105,16 +1136,6 @@ function Window:Hide()
         self:_setContentVisible(false)
 
         chrome.setCollapsedShown(self, true, faceInfo)
-    end)
-
-    -- once the move's settled the pill is done morphing: hand clicks to it
-    task.delay(0.35, function()
-        if not self.hidden then
-            return
-        end
-        self.collapsedInteract.Visible = true
-        self.animating = false
-        self._revealing = false
     end)
 end
 
@@ -1950,20 +1971,6 @@ function Window:Show()
     self.hidden = false
     self.minimised = false
 
-    -- Keep top toasts below the collapsed pill until the restore morph has finished. Moving
-    -- them immediately lets an existing toast overlap the pill while the 0.35s restore tween
-    -- is still in progress.
-    if self.hasShownOnce and self._toastsTop then
-        self._toastsTop.Position = topToastClosedPosition
-        task.delay(0.35, function()
-            if not self.hidden and not self.unloaded then
-                setTopToastPosition(self)
-            end
-        end)
-    else
-        setTopToastPosition(self)
-    end
-
     -- a ChangeTheme landed while we were collapsed; apply it before anything fades back in
     if self._themeRefreshPending then
         self._themeRefreshPending = false
@@ -1997,7 +2004,18 @@ function Window:_quickRestore()
     -- fades off, main grows + un-rounds. No chrome, no content - so you never see the topbar,
     -- tabs or bottom fade floating over a frame that isn't a window yet.
     chrome.setCollapsedShown(self, false, TweenInfo.new(0.15, Enum.EasingStyle.Quint, Enum.EasingDirection.Out))
-    variables.tweenService:Create(self.main, growInfo, { Size = self.size, Position = target }):Play()
+    local restore = variables.tweenService:Create(self.main, growInfo, { Size = self.size, Position = target })
+    restore.Completed:Connect(function(state)
+        if state ~= Enum.PlaybackState.Completed or self.hidden or self.unloaded then
+            return
+        end
+
+        -- The restored frame has cleared the pill's slot. Its own completion is the single
+        -- clock for moving the toast stack back, regardless of how this motion is implemented.
+        self._collapsedShown = false
+        setTopToastPosition(self, true)
+    end)
+    restore:Play()
     variables.tweenService:Create(self.windowCorner, cornerInfo, { CornerRadius = self.theme.CornerRoundness }):Play()
 
     -- Phase 2: once the frame actually reads as a window, fade its chrome in and stagger the
