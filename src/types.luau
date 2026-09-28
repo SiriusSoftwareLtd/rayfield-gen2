@@ -39,6 +39,7 @@ export type WindowProps = {
     locale: string?, -- pin the UI language; defaults to the player's Roblox locale
     translations: Translations?, -- language tables keyed by locale id; the easy, table-first path
     translator: Translator?, -- resolve copy yourself; falls back to the built-in tables
+    heartbeat: string?, -- a Sentivel ping URL or token, pinged while the window is up
 }
 
 export type TabProps = {

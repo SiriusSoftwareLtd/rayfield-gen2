@@ -36,6 +36,71 @@ return function()
             end
         end)
 
+        it("pings a window's heartbeat only while the window is up", function()
+            local heartbeat = helpers.requireUtility("heartbeat")
+            local originalStart = heartbeat.start
+            local started = {}
+            heartbeat.start = function(target, alive)
+                table.insert(started, { target = target, alive = alive })
+                return true
+            end
+
+            local ok, err = pcall(function()
+                variables.secureMode = false
+                window = Rayfield:CreateWindow({ name = "Plain" })
+                expect(#started).to.equal(0)
+                window:Unload()
+
+                local link = "https://www.sentivel.com/api/heartbeat/" .. string.rep("a", 64)
+                window = Rayfield:CreateWindow({ name = "Monitored", heartbeat = link })
+                expect(#started).to.equal(1)
+                expect(started[1].target).to.equal(link)
+                expect(started[1].alive()).to.equal(true)
+                window:Unload()
+                expect(started[1].alive()).to.equal(false)
+
+                -- a gui torn down from outside, as a re-executed script does to the old copy
+                window = Rayfield:CreateWindow({ name = "Monitored", heartbeat = link })
+                expect(started[2].alive()).to.equal(true)
+                window.screenGui.Parent = nil
+                expect(started[2].alive()).to.equal(false)
+                window:Unload()
+
+                -- every window prop takes either casing
+                window = Rayfield:CreateWindow({ Name = "Monitored", Heartbeat = link } :: any)
+                expect(#started).to.equal(3)
+                expect(started[3].target).to.equal(link)
+            end)
+            heartbeat.start = originalStart
+            assert(ok, err)
+        end)
+
+        it("still flags a bad heartbeat link in Studio, and survives props that aren't a table", function()
+            local log = helpers.requireUtility("log")
+            local originalWarn = log.warn
+            local warnings = {}
+            log.warn = function(message)
+                table.insert(warnings, message)
+            end
+
+            local ok, err = pcall(function()
+                variables.secureMode = false
+                window = Rayfield:CreateWindow({ name = "Heartbeat", heartbeat = string.rep("a", 64) })
+                expect(#warnings).to.equal(0)
+                window:Unload()
+
+                window = Rayfield:CreateWindow({ name = "Heartbeat", heartbeat = "https://example.com/ping" })
+                expect(#warnings).to.equal(1)
+                expect(string.find(warnings[1], "only pings Sentivel", 1, true)).to.be.ok()
+                window:Unload()
+
+                window = Rayfield:CreateWindow(true :: any)
+                expect(window).to.be.ok()
+            end)
+            log.warn = originalWarn
+            assert(ok, err)
+        end)
+
         it("creates a window through the public init module", function()
             variables.secureMode = false
 

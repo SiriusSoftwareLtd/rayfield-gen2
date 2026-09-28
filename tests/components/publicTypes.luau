@@ -56,5 +56,8 @@ return function(window: Rayfield.Window, tab: Rayfield.Tab)
     button:Unlock()
     local locked: boolean = toggle:IsLocked()
 
-    return progressValue, progressRatio, consoleBody, copied, locked
+    local props: Rayfield.WindowProps =
+        { name = "Monitored", heartbeat = "https://www.sentivel.com/api/heartbeat/token" }
+
+    return progressValue, progressRatio, consoleBody, copied, locked, props
 end
