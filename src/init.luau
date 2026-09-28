@@ -9,6 +9,7 @@ local variables = require(script.utility.variables)
 local image = require(script.utility.image)
 local locale = require(script.utility.locale)
 local constants = require(script.utility.constants)
+local heartbeat = require(script.utility.heartbeat)
 local types = require(script.types)
 
 -- re-export public types so consumers can annotate against Rayfield.Window etc
@@ -142,6 +143,19 @@ function rayfield:CreateWindow(properties: types.WindowProps): types.Window
 
     local built = result :: types.Window
     window = built
+
+    -- a Sentivel heartbeat pinged for as long as this window is up, so the monitor reads whether
+    -- anyone is running the script right now. the dev hands over a link; the loop is ours. like
+    -- every window prop, it takes either casing
+    local ping = if typeof(properties) == "table" then properties.heartbeat or (properties :: any).Heartbeat else nil
+    if ping ~= nil then
+        heartbeat.start(ping, function()
+            -- unloading ends it, and so does the gui being torn down from outside, which is what a
+            -- script that re-executes without unloading does to the old copy
+            local gui = (built :: any).screenGui
+            return not built.unloaded and (gui == nil or gui.Parent ~= nil)
+        end)
+    end
 
     if queuedNotify then
         task.spawn(queuedNotify)
