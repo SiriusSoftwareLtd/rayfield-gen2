@@ -148,5 +148,49 @@ return function()
             expect(window.name).to.equal("Secure Window")
             expect(window.hidden).to.equal(false)
         end)
+
+        it("keeps the cursor override off and locked under secure mode", function()
+            local function cursorToggle()
+                for _, element in window.rfSettings.elements do
+                    if element.name == "Unlock cursor while open" then
+                        return element
+                    end
+                end
+                return nil
+            end
+
+            variables.secureMode = false
+            window = Rayfield:CreateWindow({ name = "Plain" })
+            local plain = cursorToggle()
+            expect(plain).to.be.ok()
+            expect(plain:IsLocked()).to.equal(false)
+            expect(plain.value).to.equal(window.settings.mouseOverride)
+            window:Unload()
+
+            variables.secureMode = true
+            image.preload = function(onSettled)
+                if onSettled then
+                    onSettled(0)
+                end
+            end
+            variables.fontManager.loadFont = function(_, _asset, weight)
+                return Font.new("font://secure", weight, Enum.FontStyle.Normal)
+            end
+            window = Rayfield:CreateWindow({ name = "Secure" })
+            window.settings.mouseOverride = true
+            local secure = cursorToggle()
+            expect(secure).to.be.ok()
+            expect(secure:IsLocked()).to.equal(true)
+            expect(secure.value).to.equal(false)
+
+            -- the game locks the mouse; secure mode must leave it locked
+            local uis = variables.userInputService
+            local before = uis.MouseBehavior
+            uis.MouseBehavior = Enum.MouseBehavior.LockCenter
+            window._freeMouse()
+            local after = uis.MouseBehavior
+            uis.MouseBehavior = before
+            expect(after).to.equal(Enum.MouseBehavior.LockCenter)
+        end)
     end)
 end

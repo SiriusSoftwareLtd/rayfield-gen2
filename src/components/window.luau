@@ -1432,8 +1432,10 @@ end
 function Window:_bindMouseOverride()
     local uis = variables.userInputService
 
+    -- never under secure mode: a game watching MouseBehavior sees it snap back every time it
+    -- locks the mouse, which gives the menu away
     local function active()
-        return self.settings.mouseOverride and not self.hidden and not self.minimised
+        return self.settings.mouseOverride and not variables.secureMode and not self.hidden and not self.minimised
     end
 
     local function free()
@@ -1595,15 +1597,20 @@ function Window:_buildSettingsUI()
         end,
     })
 
-    self.rfSettings:CreateToggle({
+    local mouseOverrideToggle = self.rfSettings:CreateToggle({
         name = "Unlock cursor while open",
         description = "Unlocks the cursor while the menu is open so you can configure in FPS games that lock it.",
-        value = self.settings.mouseOverride,
+        -- secure mode keeps it off whatever was saved, so show it off. the saved choice is left
+        -- alone and comes back the next time the script runs without secure mode
+        value = self.settings.mouseOverride and not variables.secureMode,
         callback = function(state)
             self.settings.mouseOverride = state
             self:SaveSettings()
         end,
     })
+    if variables.secureMode then
+        mouseOverrideToggle:Lock("Off in secure mode, since a game can see the cursor being unlocked.")
+    end
 
     self.rfSettings:CreateToggle({
         name = "Welcome toast",
