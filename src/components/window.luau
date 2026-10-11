@@ -2733,7 +2733,10 @@ function Window:_revealCommon(element, animate)
         self:_reveal(element.iconLabel, { ImageTransparency = 0 }, animate)
     end
     if element.descriptor then
-        self:_reveal(element.descriptor.titleLabel, { TextTransparency = 0.7 }, animate)
+        -- a locked element keeps its reason at the locked strength, even when it was locked
+        -- before the window first showed
+        local transparency = if element.locked then lockedDescriptionTransparency else 0.7
+        self:_reveal(element.descriptor.titleLabel, { TextTransparency = transparency }, animate)
     end
 end
 
