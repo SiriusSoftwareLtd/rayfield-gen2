@@ -89,7 +89,8 @@ local function createBanner()
     banner.BackgroundTransparency = 1
     banner.BorderColor3 = Color3.fromRGB(0, 0, 0)
     banner.BorderSizePixel = 0
-    banner.Image = image.resolve(constants.icons.banner)
+    -- assign, not resolve: in secure mode an icon still downloading fills in once it lands
+    image.assign(banner, "Image", constants.icons.banner)
     banner.Position = UDim2.fromScale(0.5, 0.5)
     banner.Size = UDim2.fromOffset(262, 60)
     banner.Parent = ui
@@ -98,8 +99,6 @@ local function createBanner()
 end
 
 function rayfield:CreateWindow(properties: types.WindowProps): types.Window
-    local banner = createBanner()
-
     local window: types.Window? -- forward declared so the settle callback below can reach it
     -- preload can settle before the window is built; hold the notify until it is
     local queuedNotify: (() -> ())?
@@ -130,6 +129,9 @@ function rayfield:CreateWindow(properties: types.WindowProps): types.Window
             end
         end)
     end
+
+    -- after the preload, so secure mode can show the banner from the icon cache
+    local banner = createBanner()
 
     -- the banner is only torn down once the window is up, so a throw in here (bad props) would
     -- otherwise strand it in the gui container for the rest of the session
