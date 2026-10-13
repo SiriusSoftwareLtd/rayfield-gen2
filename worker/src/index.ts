@@ -15,11 +15,36 @@
 // version and commit into its header, so a report from a preview user still
 // points at an exact commit.
 
-interface Env {}
+interface Env {
+  // Gates the ?__fresh=1 cache bypass. Unset, the bypass is off entirely.
+  CACHE_BYPASS_SECRET?: string;
+}
 
 const OWNER_REPO = "SiriusSoftwareLtd/rayfield-gen2";
 const EDGE_TTL = 300;
 const CACHE_EPOCH = 2;
+
+// The header that has to accompany ?__fresh=1, carrying CACHE_BYPASS_SECRET.
+const BYPASS_HEADER = "x-cache-bypass";
+
+/**
+ * Whether this request may skip the cache. Unauthenticated, ?__fresh=1 let anyone send every
+ * request straight to GitHub - an easy way to burn our unauthenticated rate limit there and turn
+ * the loader into a 502 for everyone. Both sides are hashed first so the comparison is constant-time
+ * and fixed-length: timingSafeEqual throws on unequal lengths, which would leak the secret's length.
+ */
+async function bypassAllowed(request: Request, env: Env): Promise<boolean> {
+  const secret = env.CACHE_BYPASS_SECRET;
+  const presented = request.headers.get(BYPASS_HEADER);
+  if (!secret || presented === null) return false;
+
+  const encoder = new TextEncoder();
+  const [a, b] = await Promise.all([
+    crypto.subtle.digest("SHA-256", encoder.encode(presented)),
+    crypto.subtle.digest("SHA-256", encoder.encode(secret)),
+  ]);
+  return crypto.subtle.timingSafeEqual(a, b);
+}
 
 type Channel = {
   asset: string;
@@ -73,8 +98,10 @@ export default {
     const cache = caches.default;
 
     // ?__fresh=1 skips the read so a release can be confirmed live immediately, rather
-    // than waiting out a TTL and guessing which layer is holding the old copy.
-    const bypass = url.searchParams.get("__fresh") === "1";
+    // than waiting out a TTL and guessing which layer is holding the old copy. It only
+    // counts with the x-cache-bypass header set to CACHE_BYPASS_SECRET; without it the
+    // parameter is ignored and the request is served like any other.
+    const bypass = url.searchParams.get("__fresh") === "1" && (await bypassAllowed(request, env));
 
     const cached = bypass ? undefined : await cache.match(cacheKey);
     if (cached) return cached;
