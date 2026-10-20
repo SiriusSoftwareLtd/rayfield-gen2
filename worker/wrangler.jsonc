@@ -17,5 +17,16 @@
   "routes": [
     { "pattern": "sirius.menu/gen2*", "zone_name": "sirius.menu" },
     { "pattern": "www.sirius.menu/gen2*", "zone_name": "sirius.menu" }
-  ]
+  ],
+
+  // The stable pin (see src/index.ts and README.md). Shipping a release means setting
+  // these to the two values the Release Bundle run prints in its summary, then deploying.
+  // Set them here, not in the dashboard: a deploy replaces dashboard vars with this file's.
+  //   GEN2_TAG               the release tag /gen2 serves
+  //   GEN2_SHA256_ALLOWLIST  comma-separated SHA-256 digests of the bundles allowed out
+  // CACHE_BYPASS_SECRET is a secret, never in this file (npx wrangler secret put).
+  "vars": {
+    "GEN2_TAG": "1.2.0",
+    "GEN2_SHA256_ALLOWLIST": "cc23320be69fc577a045d30a2479b55bc9165c83c0d33d51e8bdcaf93154eb84"
+  }
 }
