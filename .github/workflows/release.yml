@@ -2,8 +2,9 @@ name: Release Bundle
 
 permissions: {}
 
-# Releasing is one action: land a new version.txt on main. That builds the bundle,
-# and only if it goes green does the release get cut. A broken build never ships.
+# Landing a new version.txt on main builds the bundle, and only if it goes green
+# does the release get cut. A broken build never ships. Players get it once the
+# pin in worker/wrangler.jsonc moves to it: the run summary prints the values.
 # Re-run by hand from the Actions tab (force = rebuild a version already out).
 on:
   push:
@@ -36,6 +37,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           ref: ${{ github.sha }}
+          persist-credentials: false
 
       # version.txt is the single source of truth. We only cut a version the first
       # time it appears, so re-pushing main never re-clobbers a build that already shipped.
@@ -84,6 +86,7 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
           submodules: true
+          persist-credentials: false
 
       - name: Setup RoKit
         uses: CompeyDev/setup-rokit@1d9390883f7ebce19d48f5b8d006e11d387c92ab
@@ -102,10 +105,12 @@ jobs:
       - name: Stamp version header
         env:
           VERSION: ${{ needs.guard.outputs.release_tag }}
+          COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
+          SHORT="$(git rev-parse --short "$COMMIT")"
           {
-            printf -- '-- Rayfield Gen2 v%s\n' "$VERSION"
+            printf -- '-- Rayfield Gen2 v%s (%s)\n' "$VERSION" "$SHORT"
             printf -- '-- loadstring(game:HttpGet("https://sirius.menu/gen2"))()\n'
             printf -- '--\n'
             printf -- '-- Copyright (c) 2026 Corridon Capital\n'
@@ -187,3 +192,21 @@ jobs:
 
           # clobber so a forced rebuild replaces the assets instead of failing
           gh release upload "$RELEASE_TAG" --clobber build/bundled.luau build/bundled.txt build/checksums.sha256
+
+      # sirius.menu/gen2 serves the tag and digest pinned in worker/wrangler.jsonc, so the
+      # release reaches players only once those move. This prints the two values to set.
+      - name: Print the worker pin
+        env:
+          RELEASE_TAG: ${{ needs.guard.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          DIGEST="$(sha256sum build/bundled.luau | cut -d' ' -f1)"
+          {
+            printf '## Ship %s to sirius.menu/gen2\n\n' "$RELEASE_TAG"
+            printf 'bundled.luau SHA-256: `%s`\n\n' "$DIGEST"
+            printf 'Set these in `worker/wrangler.jsonc`, then run `npx wrangler deploy` from `worker/`:\n\n'
+            printf '```jsonc\n'
+            printf '"GEN2_TAG": "%s",\n' "$RELEASE_TAG"
+            printf '"GEN2_SHA256_ALLOWLIST": "%s"\n' "$DIGEST"
+            printf '```\n'
+          } >> "$GITHUB_STEP_SUMMARY"

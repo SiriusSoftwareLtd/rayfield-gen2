@@ -3,9 +3,9 @@ name: Preview Bundle
 permissions: {}
 
 # dev is the preview branch, so every green commit on it becomes the preview
-# build. Nothing here can reach the stable URL: the release below is published
-# as a prerelease, and GitHub's `releases/latest` - which is what sirius.menu/gen2
-# reads - is defined as the newest release that is NOT a prerelease.
+# build. Nothing here can reach the stable URL: sirius.menu/gen2 serves only the
+# tag and digest pinned in worker/wrangler.jsonc, and the release below is a
+# prerelease on its own `preview` tag.
 on:
   push:
     branches: [dev]
@@ -22,18 +22,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  preview:
-    name: Build and publish the preview bundle
+  # Builds with read-only access. This job runs Rokit-installed binaries, the vendored
+  # wax bundler and the test suite, so it never holds a token that can write.
+  build:
+    name: Build the preview bundle
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
-      contents: write
+      contents: read
+    outputs:
+      version: ${{ steps.stamp.outputs.version }}
+      short: ${{ steps.stamp.outputs.short }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
           submodules: true
+          persist-credentials: false
 
       - name: Setup RoKit
         uses: CompeyDev/setup-rokit@1d9390883f7ebce19d48f5b8d006e11d387c92ab
@@ -51,6 +57,7 @@ jobs:
       # the tag rolls, so the build stamps what it actually is: a bug report from
       # a preview user has to name a commit, not just "preview"
       - name: Stamp preview header
+        id: stamp
         env:
           COMMIT: ${{ github.sha }}
         run: |
@@ -69,6 +76,8 @@ jobs:
             cat build/bundled.luau
           } > build/bundled.luau.stamped
           mv build/bundled.luau.stamped build/bundled.luau
+          printf 'version=%s\n' "$VERSION" >> "$GITHUB_OUTPUT"
+          printf 'short=%s\n' "$SHORT" >> "$GITHUB_OUTPUT"
 
       - name: Create raw text file of bundle
         run: cp build/bundled.luau build/bundled.txt
@@ -76,20 +85,50 @@ jobs:
       - name: Generate checksums
         run: cd build && sha256sum bundled.luau bundled.txt > checksums.sha256
 
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: preview-bundle
+          path: |
+            build/bundled.luau
+            build/bundled.txt
+            build/checksums.sha256
+          if-no-files-found: error
+          retention-days: 1
+
+  # The only job that can write. It checks nothing out and runs nothing from the
+  # repository: it downloads the built files and publishes them.
+  publish:
+    name: Publish the preview release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Download bundle artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: preview-bundle
+          path: build
+
+      - name: Verify bundle checksums
+        run: cd build && sha256sum --check checksums.sha256
+
       # Recreated rather than edited: `gh release edit` moves the release but
       # leaves the git tag on the old commit, and a preview tag that doesn't
       # point at the build is worse than no tag. The gap between delete and
-      # create is a few seconds, and the edge cache covers it.
+      # create is a few seconds, and the Worker serves its last copy through it.
       - name: Publish the rolling preview release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           COMMIT: ${{ github.sha }}
+          VERSION: ${{ needs.build.outputs.version }}
+          SHORT: ${{ needs.build.outputs.short }}
         run: |
           set -euo pipefail
-
-          VERSION="$(tr -d '[:space:]' < version.txt)"
-          SHORT="$(git rev-parse --short "$COMMIT")"
 
           {
             printf 'Rolling preview build of Rayfield Gen2, cut from `dev`.\n\n'
