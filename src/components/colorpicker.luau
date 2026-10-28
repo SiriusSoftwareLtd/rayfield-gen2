@@ -897,6 +897,7 @@ function ColorPicker:_endDrag()
         self._dragConnection = nil
     end
 
+    self.window:_siaUsed(self, "set")
     self.window:_persist(self)
 end
 

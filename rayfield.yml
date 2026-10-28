@@ -87,3 +87,22 @@ globals:
     args:
     - required: false
       type: '...'
+# SIA (src/utility/sia.luau) finds the executor's HTTP and identity functions.
+  request:
+    args:
+    - required: false
+      type: '...'
+  http_request:
+    args:
+    - required: false
+      type: '...'
+  identifyexecutor:
+    args:
+    - required: false
+      type: '...'
+  syn:
+    any: true
+  fluxus:
+    any: true
+  http:
+    any: true

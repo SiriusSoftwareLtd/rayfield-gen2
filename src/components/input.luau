@@ -201,6 +201,7 @@ function Input.new(tab, properties)
         if self.input.Text == self.value then
             return -- unchanged: dont re-fire the devs callback for a stray click
         end
+        self.window:_siaUsed(self, "submit")
         self:_commit(self.input.Text)
     end)
 
