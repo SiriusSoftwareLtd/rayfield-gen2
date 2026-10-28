@@ -9,6 +9,7 @@ local variables = require(script.utility.variables)
 local image = require(script.utility.image)
 local locale = require(script.utility.locale)
 local constants = require(script.utility.constants)
+local heartbeat = require(script.utility.heartbeat)
 local types = require(script.types)
 
 -- re-export public types so consumers can annotate against Rayfield.Window etc
@@ -88,7 +89,8 @@ local function createBanner()
     banner.BackgroundTransparency = 1
     banner.BorderColor3 = Color3.fromRGB(0, 0, 0)
     banner.BorderSizePixel = 0
-    banner.Image = image.resolve(constants.icons.banner)
+    -- assign, not resolve: in secure mode an icon still downloading fills in once it lands
+    image.assign(banner, "Image", constants.icons.banner)
     banner.Position = UDim2.fromScale(0.5, 0.5)
     banner.Size = UDim2.fromOffset(262, 60)
     banner.Parent = ui
@@ -97,8 +99,6 @@ local function createBanner()
 end
 
 function rayfield:CreateWindow(properties: types.WindowProps): types.Window
-    local banner = createBanner()
-
     local window: types.Window? -- forward declared so the settle callback below can reach it
     -- preload can settle before the window is built; hold the notify until it is
     local queuedNotify: (() -> ())?
@@ -130,6 +130,9 @@ function rayfield:CreateWindow(properties: types.WindowProps): types.Window
         end)
     end
 
+    -- after the preload, so secure mode can show the banner from the icon cache
+    local banner = createBanner()
+
     -- the banner is only torn down once the window is up, so a throw in here (bad props) would
     -- otherwise strand it in the gui container for the rest of the session
     local made, result = pcall(function()
@@ -142,6 +145,19 @@ function rayfield:CreateWindow(properties: types.WindowProps): types.Window
 
     local built = result :: types.Window
     window = built
+
+    -- a Sentivel heartbeat pinged for as long as this window is up, so the monitor reads whether
+    -- anyone is running the script right now. the dev hands over a link; the loop is ours. like
+    -- every window prop, it takes either casing
+    local ping = if typeof(properties) == "table" then properties.heartbeat or (properties :: any).Heartbeat else nil
+    if ping ~= nil then
+        heartbeat.start(ping, function()
+            -- unloading ends it, and so does the gui being torn down from outside, which is what a
+            -- script that re-executes without unloading does to the old copy
+            local gui = (built :: any).screenGui
+            return not built.unloaded and (gui == nil or gui.Parent ~= nil)
+        end)
+    end
 
     if queuedNotify then
         task.spawn(queuedNotify)

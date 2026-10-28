@@ -586,6 +586,8 @@ function Slider:_endDrag()
         self._dragConnection = nil
     end
 
+    local span = self.range[2] - self.range[1]
+    self.window:_siaUsed(self, "set", if span > 0 then (self.value - self.range[1]) / span else 0)
     self.window:_persist(self)
 end
 

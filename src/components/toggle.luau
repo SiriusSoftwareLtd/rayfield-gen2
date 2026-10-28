@@ -150,6 +150,7 @@ function Toggle:_performToggle()
     hapticEngine.click()
     self.value = not self.value
     self:_animateIndicator()
+    self.window:_siaUsed(self, if self.value then "on" else "off", self.value)
 
     self.window:_runGuarded(self, self.callback, self.value)
     self.window:_persist(self)

@@ -233,6 +233,7 @@ function Keybind.new(tab, properties)
         end
         if self:_matches(input) then
             if self.hold then
+                self.window:_siaUsed(self, "press")
                 self:_beginHold(input)
             else
                 self.window:_runGuarded(self, self.callback, self.value)
@@ -359,6 +360,7 @@ end
 
 -- commit a new binding from the user: store, relabel, notify + autosave
 function Keybind:_bind(key)
+    self.window:_siaUsed(self, "bind")
     self.value = key
     self:_stopRecording()
     self.window:_runGuarded(self, self.onChanged, key)

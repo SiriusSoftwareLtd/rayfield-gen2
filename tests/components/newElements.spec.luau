@@ -401,6 +401,18 @@ return function()
                 expect(button.descriptor.titleLabel.Text).to.equal("Go to the boss.")
             end)
 
+            it("keeps the reason dimmed to the locked strength through a reveal", function()
+                local button = makeTab():CreateButton({ name = "Teleport", description = "Go to the boss." })
+                button:Lock("Needs a premium key")
+                button:_setShown(false, false)
+                button:_setShown(true, false)
+                expect(math.abs(button.descriptor.titleLabel.TextTransparency - 0.55) < 1e-3).to.equal(true)
+
+                button:Unlock()
+                button:_setShown(true, false)
+                expect(math.abs(button.descriptor.titleLabel.TextTransparency - 0.7) < 1e-3).to.equal(true)
+            end)
+
             it("leaves the element visible rather than covering it up", function()
                 local toggle = makeTab():CreateToggle({ name = "Auto Farm", forgetState = true })
                 toggle:Lock()

@@ -21,6 +21,7 @@ type SettingsWindow = {
         welcomeToast: boolean,
         haptics: boolean,
         showProfile: boolean,
+        usageAnalytics: boolean,
     },
 }
 
@@ -31,6 +32,7 @@ type DecodedSettings = {
     welcomeToast: unknown?,
     haptics: unknown?,
     showProfile: unknown?,
+    usageAnalytics: unknown?,
 }
 
 function persistenceSettings.getSettingsPath(): (string, string)
@@ -50,6 +52,7 @@ function persistenceSettings.saveSettings(window: SettingsWindow): boolean
         welcomeToast = window.settings.welcomeToast,
         haptics = window.settings.haptics,
         showProfile = window.settings.showProfile,
+        usageAnalytics = window.settings.usageAnalytics,
     }
 
     local ok, encoded = pcall(variables.httpService.JSONEncode, variables.httpService, data)
@@ -140,6 +143,9 @@ function persistenceSettings.loadSettings(window: SettingsWindow): boolean
 
     if type(settings.showProfile) == "boolean" then
         window.settings.showProfile = settings.showProfile
+    end
+    if type(settings.usageAnalytics) == "boolean" then
+        window.settings.usageAnalytics = settings.usageAnalytics
     end
 
     return true

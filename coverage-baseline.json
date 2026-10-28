@@ -1,11 +1,11 @@
 {
   "scope": "src",
-  "measuredDate": "2026-08-31",
+  "measuredDate": "2026-09-28",
   "command": "make coverage-baseline",
   "threshold": 70.00,
-  "lineCoverage": 85.16,
-  "coveredLines": 5579,
-  "coverableLines": 6551,
+  "lineCoverage": 85.34,
+  "coveredLines": 5672,
+  "coverableLines": 6646,
   "notes": [
     "Generated reports are written to coverage/coverage.txt and coverage/coverage-summary.json.",
     "The enforced Lune coverage scope is discovered dynamically from src by default.",
@@ -183,9 +183,9 @@
     },
     {
       "path": "src/init.luau",
-      "lineCoverage": 84.06,
-      "coveredLines": 58,
-      "coverableLines": 69
+      "lineCoverage": 85.33,
+      "coveredLines": 64,
+      "coverableLines": 75
     },
     {
       "path": "src/themes/amethyst.luau",
@@ -288,6 +288,12 @@
       "lineCoverage": 100.00,
       "coveredLines": 11,
       "coverableLines": 11
+    },
+    {
+      "path": "src/utility/heartbeat.luau",
+      "lineCoverage": 97.75,
+      "coveredLines": 87,
+      "coverableLines": 89
     },
     {
       "path": "src/utility/image.luau",

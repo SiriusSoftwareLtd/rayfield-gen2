@@ -629,6 +629,13 @@ function Dropdown.new(tab, properties)
 
                 updateSelectedLabel()
 
+                local position = table.find(self.options, optionName)
+                self.window:_siaUsed(
+                    self,
+                    "pick",
+                    if position and #self.options > 1 then (position - 1) / (#self.options - 1) else 0
+                )
+
                 self.window:_runGuarded(self, self.callback, self:_callbackValue())
                 self.window:_persist(self)
 

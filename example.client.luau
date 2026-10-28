@@ -27,6 +27,9 @@ local translations = {
 
 local window = Rayfield:CreateWindow({
     name = "Example",
+    -- Uptime monitoring: pings your Sentivel heartbeat while the window is open. Skipped in Studio.
+    -- See https://docs.sirius.menu/rayfield-gen2/heartbeat
+    -- heartbeat = "https://www.sentivel.com/api/heartbeat/<your token>",
     subtitle = "Rayfield Gen2",
     translations = translations,
     sidebarLayout = true, -- flip this for tabs across the top instead of down the left
