@@ -563,20 +563,17 @@ function SIA:_flush(final)
         for id, e in self._elements do
             local onSeconds = e.onSeconds + (if e.onSince then now - e.onSince else 0)
             if e.uses > 0 or e.seen or self._seq == 0 then
-                table.insert(
-                    totals,
-                    {
-                        id,
-                        e.type,
-                        e.tab,
-                        e.category,
-                        e.uses,
-                        math.floor(onSeconds),
-                        e.value,
-                        if e.seen then 1 else 0,
-                        e.rage,
-                    }
-                )
+                table.insert(totals, {
+                    id,
+                    e.type,
+                    e.tab,
+                    e.category,
+                    e.uses,
+                    math.floor(onSeconds),
+                    e.value,
+                    if e.seen then 1 else 0,
+                    e.rage,
+                })
             end
             if final and self._detail then
                 table.insert(kept, { id, e.value })
