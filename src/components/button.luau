@@ -50,6 +50,7 @@ end
 
 -- callback + red error-flash, shared by both layouts
 function Button:_runCallback()
+    self.window:_siaUsed(self, "press")
     self.window:_runGuarded(self, self.callback)
 end
 

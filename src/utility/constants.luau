@@ -12,6 +12,13 @@ local constants = {}
 -- brand font asset (themes reference this too)
 constants.fontAsset = "rbxassetid://12187365364"
 
+-- This build's version, as in version.txt (bump both together).
+constants.version = "1.2.1"
+
+-- SIA's product token for Rayfield. Public by design: it names the product, it proves
+-- nothing, and the collector checks everything it is sent.
+constants.siaToken = "sia_rayfield_bd0f30653a58a75bac2987e3"
+
 -- the input/keybind fields hug their text, tweening width instead of AutomaticSize so it animates
 constants.pillResizeInfo = TweenInfo.new(0.4, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
 

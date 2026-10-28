@@ -302,6 +302,7 @@ function Window.new(properties)
         welcomeToast = true, -- the "signed in as" toast on first open for a new/changed account
         haptics = true, -- buzzes on presses and notifications; silent where the device has none
         showProfile = true, -- the player chip at the base of the sidebar rail
+        usageAnalytics = true, -- SIA: anonymous counts of what is used (utility/sia)
     }
 
     -- Rayfield Gen2 Screen
@@ -700,6 +701,7 @@ function Window.new(properties)
     end
     hapticEngine.setContainer(self.screenGui) -- effects live with the interface, not the workspace
     hapticEngine.setEnabled(self.settings.haptics) -- honour a saved off before any interaction
+    self:_siaStart(properties)
     chrome.buildCollapsedFace(self)
     self:_bindKeybind()
     self:_bindMouseOverride()
@@ -875,6 +877,63 @@ function Window:CreateTag(properties)
     return newTag
 end
 
+-- SIA (utility/sia): anonymous counts of what players use. Off when the player
+-- turned it off here, set getgenv().RAYFIELD_ANALYTICS = false, or in Studio. Every call is
+-- a no-op without it, and none of them can slow or break the window.
+function Window:_siaStart(properties)
+    if not self.settings.usageAnalytics or variables.runService:IsStudio() then
+        return
+    end
+    local optedOut = false
+    pcall(function()
+        optedOut = getgenv().RAYFIELD_ANALYTICS == false
+    end)
+    if optedOut then
+        return
+    end
+    local ok, sia = pcall(function()
+        return require(script.Parent.Parent.utility.sia).new({
+            token = constants.siaToken,
+            lib = "gen2",
+            libVersion = constants.version,
+            script = {
+                name = properties and properties.name,
+                id = properties and properties.scriptId,
+                token = properties and properties.scriptToken,
+            },
+        })
+    end)
+    if ok then
+        self._sia = sia
+        sia:window("open")
+    end
+end
+
+local SIA_VALUE = { [true] = 1, [false] = 0 }
+
+-- The element's tab position, for its place in the layout.
+function Window:_siaElement(element, kind)
+    if not self._sia then
+        return
+    end
+    local tabIndex = table.find(self.tabs, element.tab) or 0
+    element._sia = self._sia:element(kind, element.name, tabIndex)
+    element._siaKind = kind
+    self:_siaState(element)
+end
+
+-- A player did something with an element (never a script's own Set). value: 0..1 where the
+-- element has one (a toggle's state, a slider's share of its range).
+function Window:_siaUsed(element, action, value)
+    if not self._sia or not element._sia then
+        return
+    end
+    if type(value) == "boolean" then
+        value = SIA_VALUE[value]
+    end
+    self._sia:used(element._sia, action, value)
+end
+
 -- Register a saveable control under its flag. Keeps flags unique so two same-named
 -- elements dont clobber each other's saved value. Updates control.flag to the key we
 -- actually stored under and returns it.
@@ -923,9 +982,27 @@ end
 -- Autosave a control's value after an interactive or programmatic change, when the window is
 -- set to autoSave and the control opts into persistence. Every Set/commit path funnels here so
 -- persistence stays uniform across elements.
+-- A control's current value as SIA keeps it: what the player left it at, whoever set it.
+function Window:_siaState(control)
+    if not self._sia or not control._sia then
+        return
+    end
+    local kind, v = control._siaKind, nil
+    if kind == "toggle" then
+        v = if control.value then 1 else 0
+    elseif kind == "slider" and control.range then
+        local span = control.range[2] - control.range[1]
+        v = if span > 0 then (control.value - control.range[1]) / span else 0
+    end
+    if v then
+        self._sia:state(control._sia, v)
+    end
+end
+
 function Window:_persist(control)
     -- _loading: a config restore fires every control's callback, but must not autosave back over
     -- the file it's reading (or storm Save once per control)
+    self:_siaState(control)
     if control.flag and not control.forgetState and self.configuration.autoSave and not self._loading then
         task.spawn(self.Save, self)
     end
@@ -1053,6 +1130,9 @@ function Window:Hide()
     -- restore position and teleport the window there on the next Show
     if self.animating or self.hidden then
         return
+    end
+    if self._sia then
+        self._sia:window("minimise")
     end
 
     -- drop out of search first so we grow back into the normal tab view on next show. tabList
@@ -1185,6 +1265,9 @@ end
 function Window:ToggleMinimise()
     if self.animating or self.hidden then
         return
+    end
+    if self._sia then
+        self._sia:window(if self.minimised then "restore" else "minimise")
     end
 
     -- minimising drops out of search back to the tab view first, so it grows back normally
@@ -1633,6 +1716,21 @@ function Window:_buildSettingsUI()
         end,
     })
 
+    self.rfSettings:CreateToggle({
+        name = "Usage analytics",
+        description = "Sends anonymous counts of which parts of this window are used, so it can be "
+            .. "made better. Never your name, what you type or your messages. sirius.menu/privacy",
+        value = self.settings.usageAnalytics,
+        callback = function(state)
+            self.settings.usageAnalytics = state
+            if not state and self._sia then
+                self._sia:disable()
+                self._sia = nil
+            end
+            self:SaveSettings()
+        end,
+    })
+
     self.rfSettings:CreateSection({ name = "Window" })
 
     -- only the sidebar layout has somewhere to put a profile, so only it offers the switch
@@ -1999,6 +2097,10 @@ function Window:Show()
     end
     self.animating = true
     self._revealing = true
+    if self._sia then
+        self._sia:window(if self._siaShown then "restore" else "open")
+    end
+    self._siaShown = true
 
     -- autoLoad reflects the saved config once, on first open. Re-loading on every show would
     -- wipe any changes the user made and closed without saving. a load that throws must not
@@ -2555,6 +2657,7 @@ function Window:_runGuarded(element, fn, ...)
     -- a locked element fires nothing. This is the one place every element's callback goes
     -- through, so locking here is what makes the lock real rather than cosmetic.
     if element.locked then
+        self:_siaUsed(element, "dead")
         return
     end
 
@@ -2563,6 +2666,9 @@ function Window:_runGuarded(element, fn, ...)
         local ok, err = pcall(function()
             return fn(table.unpack(args, 1, args.n))
         end)
+        if not ok and self._sia then
+            self._sia:error(element._sia)
+        end
         if ok or element._errored then
             return
         end
@@ -2913,6 +3019,9 @@ end
 
 function Window:Unload()
     self.unloaded = true
+    if self._sia then
+        self._sia:window("close")
+    end
     -- drop our effects and release the gui they hung on, but leave the enabled flag alone -
     -- another window may still be open and haptics arent ours to switch off for it
     hapticEngine.teardown()

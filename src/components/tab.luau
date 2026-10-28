@@ -182,6 +182,9 @@ function Tab:_spinGradients()
 end
 
 function Tab:Select(noAnimation)
+    if self.window._sia then
+        self.window._sia:tab(table.find(self.window.tabs, self) or 0)
+    end
     -- selecting a tab (e.g. via the settings action) leaves search: bring the strip back,
     -- but let the navigation below pick the page.
     if self.window._searching then
@@ -226,8 +229,11 @@ end
 
 -- shared tail for every CreateX: track it, order it, and reveal it if the window is
 -- already open. without this, elements added after Window:Show stay fully transparent.
-function Tab:_register(element)
+function Tab:_register(element, kind)
     table.insert(self.elements, element)
+    if kind then
+        self.window:_siaElement(element, kind)
+    end
     assignOrder(element, #self.elements * 10)
     self.window:_restoreLate(element)
 
@@ -240,12 +246,12 @@ end
 
 -- Button
 function Tab:CreateButton(properties)
-    return self:_register(require(script.Parent.button).new(self, properties))
+    return self:_register(require(script.Parent.button).new(self, properties), "button")
 end
 
 -- Switch/Toggle
 function Tab:CreateToggle(properties)
-    return self:_register(require(script.Parent.toggle).new(self, properties))
+    return self:_register(require(script.Parent.toggle).new(self, properties), "toggle")
 end
 
 function Tab:CreateSwitch(properties)
@@ -284,27 +290,27 @@ end
 
 -- Slider
 function Tab:CreateSlider(properties)
-    return self:_register(require(script.Parent.slider).new(self, properties))
+    return self:_register(require(script.Parent.slider).new(self, properties), "slider")
 end
 
 -- Dropdown
 function Tab:CreateDropdown(properties)
-    return self:_register(require(script.Parent.dropdown).new(self, properties))
+    return self:_register(require(script.Parent.dropdown).new(self, properties), "dropdown")
 end
 
 -- Input
 function Tab:CreateInput(properties)
-    return self:_register(require(script.Parent.input).new(self, properties))
+    return self:_register(require(script.Parent.input).new(self, properties), "input")
 end
 
 -- Keybind
 function Tab:CreateKeybind(properties)
-    return self:_register(require(script.Parent.keybind).new(self, properties))
+    return self:_register(require(script.Parent.keybind).new(self, properties), "keybind")
 end
 
 -- Color picker
 function Tab:CreateColorPicker(properties)
-    return self:_register(require(script.Parent.colorpicker).new(self, properties))
+    return self:_register(require(script.Parent.colorpicker).new(self, properties), "colorpicker")
 end
 
 -- Group (layout container). A row that wraps by default; pass direction="column" for a
