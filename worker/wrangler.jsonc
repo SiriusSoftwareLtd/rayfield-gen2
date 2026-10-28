@@ -26,7 +26,7 @@
   //   GEN2_SHA256_ALLOWLIST  comma-separated SHA-256 digests of the bundles allowed out
   // CACHE_BYPASS_SECRET is a secret, never in this file (npx wrangler secret put).
   "vars": {
-    "GEN2_TAG": "1.2.0",
-    "GEN2_SHA256_ALLOWLIST": "cc23320be69fc577a045d30a2479b55bc9165c83c0d33d51e8bdcaf93154eb84"
+    "GEN2_TAG": "1.2.1",
+    "GEN2_SHA256_ALLOWLIST": "0d8356177dfe354191f478b28df7bc10a4b064ac66bfdf11e49798ac13ce0c34"
   }
 }
