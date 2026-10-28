@@ -260,7 +260,11 @@ end
 
 -- Section
 function Tab:CreateSection(properties)
-    return self:_register(require(script.Parent.section).new(self, properties))
+    local section = self:_register(require(script.Parent.section).new(self, properties))
+    if self.window._sia then
+        self.window._sia:section(self.window:_siaTab(self), properties and (properties.name or properties.Name))
+    end
+    return section
 end
 
 -- Text (a title, a body, or both)

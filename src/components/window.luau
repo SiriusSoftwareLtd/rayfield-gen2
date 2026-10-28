@@ -899,6 +899,7 @@ function Window:_siaStart(properties)
             token = constants.siaToken,
             lib = "gen2",
             libVersion = constants.version,
+            subtitle = properties and (properties.subtitle or properties.Subtitle),
             theme = if typeof(properties and properties.theme) == "string"
                 then properties.theme
                 elseif properties and properties.theme ~= nil then "custom"
@@ -919,13 +920,23 @@ end
 local SIA_VALUE = { [true] = 1, [false] = 0 }
 
 -- The element's tab position, for its place in the layout.
+-- A tab's place for SIA: Rayfield's own settings page is tab 0, the script's tabs follow.
+function Window:_siaTab(tab)
+    if tab == self.rfSettings then
+        return 0
+    end
+    return table.find(self.tabs, tab) or 0
+end
+
 function Window:_siaElement(element, kind)
     if not self._sia then
         return
     end
-    local tabIndex = table.find(self.tabs, element.tab) or 0
-    element._sia = self._sia:element(kind, element.name, tabIndex)
+    element._sia = self._sia:element(kind, element.name, self:_siaTab(element.tab))
     element._siaKind = kind
+    if element.description then
+        self._sia:describe(element._sia, element.description)
+    end
     self:_siaState(element)
 end
 
