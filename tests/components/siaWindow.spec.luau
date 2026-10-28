@@ -135,6 +135,24 @@ return function()
             expect(#sent).to.equal(0)
         end)
 
+        it("sends tab names and element labels once", function()
+            makeWindow()
+            local tab = window:CreateTab({ name = "Farming" })
+            window._sia:tabName(#window.tabs, tab.name)
+            local toggle = tab:CreateToggle({ name = "Auto Farm", callback = function() end })
+            local b = batch()
+            local names, labels = {}, {}
+            for _, t in b.tn or {} do
+                names[t[2]] = true
+            end
+            for _, l in b.lb or {} do
+                labels[l[1]] = l[2]
+            end
+            expect(names.Farming).to.equal(true)
+            expect(labels[toggle._sia]).to.equal("Auto Farm")
+            expect(batch().lb).to.equal(nil)
+        end)
+
         it("closes the run when the window unloads", function()
             makeWindow()
             window:Unload()
