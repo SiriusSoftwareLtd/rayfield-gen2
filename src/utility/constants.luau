@@ -13,7 +13,7 @@ local constants = {}
 constants.fontAsset = "rbxassetid://12187365364"
 
 -- This build's version, as in version.txt (bump both together).
-constants.version = "1.2.1"
+constants.version = "1.2.2"
 
 -- SIA's product token for Rayfield. Public by design: it names the product, it proves
 -- nothing, and the collector checks everything it is sent.

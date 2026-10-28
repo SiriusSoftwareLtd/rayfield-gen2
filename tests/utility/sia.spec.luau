@@ -36,7 +36,7 @@ return function()
     end
 
     describe("utility.sia", function()
-        it("gives an element a short, stable id and a category, never its label", function()
+        it("gives an element a short, stable id and a category, and sends its label once", function()
             local sia, sent = client()
             local farm = sia:element("toggle", "Auto Farm Coins", 1)
             expect(farm).to.be.ok()
@@ -44,7 +44,8 @@ return function()
             expect(sia:element("toggle", "Auto Farm Coins", 1)).to.equal(farm)
             local batch = flushed(sia, sent, false)
             expect(row(batch, farm)[4]).to.equal("autofarm")
-            expect(string.find(HttpService:JSONEncode(batch), "Auto Farm", 1, true)).never.to.be.ok()
+            expect(batch.lb[1][2]).to.equal("Auto Farm Coins")
+            expect(flushed(sia, sent, false).lb).to.equal(nil)
         end)
 
         it("sorts labels into categories", function()

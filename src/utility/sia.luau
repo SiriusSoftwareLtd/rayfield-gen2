@@ -21,6 +21,7 @@
 	A library (Rayfield Gen1, Gen2) drives it through:
 		local sia = SIA.new({ token, lib, libVersion, script = { id, token, name } })
 		local id = sia:element(kind, label, tab)   -- an element exists
+		sia:tabName(tab, name)                     -- a tab's name
 		sia:used(id, action, value)                -- it was used (value 0..1 where it has one)
 		sia:state(id, value)                       -- its current value (toggles: 1 on, 0 off)
 		sia:tab(tab)                               -- a tab was shown: its elements were seen
@@ -168,8 +169,8 @@ local function device()
 end
 
 -- ── Kick reasons, made safe here (names and numbers out) ──────────────────────
-local function kickTemplate(message)
-    local text = tostring(message or "")
+-- Player names in the server, longest first, swapped for <player>.
+local function withoutNames(text)
     pcall(function()
         local names = {}
         for _, p in Players:GetPlayers() do
@@ -185,6 +186,22 @@ local function kickTemplate(message)
             end
         end
     end)
+    return text
+end
+
+-- An element or tab name as sent: the script's own words, with rich text tags, player names
+-- and numbers taken out, so a label like "Welcome, Name" or "Coins: 1200" carries nothing personal.
+local function cleanLabel(label)
+    local text = string.gsub(tostring(label or ""), "<[^>]*>", "")
+    text = withoutNames(text)
+    text = string.gsub(text, "%d+", "#")
+    text = string.gsub(text, "%s+", " ")
+    text = string.match(text, "^%s*(.-)%s*$") or ""
+    return string.sub(text, 1, 60)
+end
+
+local function kickTemplate(message)
+    local text = withoutNames(tostring(message or ""))
     text = string.gsub(text, "%d+", "#")
     text = string.gsub(text, "%s+", " ")
     text = string.sub(text, 1, 160)
@@ -231,6 +248,8 @@ function SIA.new(opts)
     local self = setmetatable({}, SIA)
     self._token = opts.token
     self._lib = { tostring(opts.lib or "other"), tostring(opts.libVersion or "") }
+    self._theme = if opts.theme ~= nil then string.sub(tostring(opts.theme), 1, 32) else nil
+    self._tabs = {} -- tab index -> { name, sent }
     self._script = opts.script or {}
     self._run = randomHex(16)
     self._seq = 0
@@ -372,6 +391,8 @@ function SIA:element(kind, label, tab)
                 type = tostring(kind),
                 tab = tonumber(tab) or 0,
                 category = categoryOf(label),
+                label = label,
+                labelSent = false,
                 uses = 0,
                 onSince = nil,
                 onSeconds = 0,
@@ -431,6 +452,16 @@ function SIA:state(id, value)
             end
         end
         e.value = v
+    end)
+end
+
+-- A tab's name, sent once like element labels.
+function SIA:tabName(tab, name)
+    pcall(function()
+        local i = tonumber(tab)
+        if i and not self._tabs[i] then
+            self._tabs[i] = { name = name, sent = false }
+        end
     end)
 end
 
@@ -562,7 +593,8 @@ function SIA:_flush(final)
         local totals, kept = {}, {}
         for id, e in self._elements do
             local onSeconds = e.onSeconds + (if e.onSince then now - e.onSince else 0)
-            if e.uses > 0 or e.seen or self._seq == 0 then
+            -- An element new since the last batch goes too, so its label arrives with its type and tab.
+            if e.uses > 0 or e.seen or self._seq == 0 or not e.labelSent then
                 table.insert(totals, {
                     id,
                     e.type,
@@ -582,6 +614,20 @@ function SIA:_flush(final)
             e.uses, e.rage, e.onSeconds = 0, 0, 0
             if e.onSince then
                 e.onSince = now
+            end
+        end
+        -- Labels and tab names go once each, in the first batch that has them.
+        local labels, tabNames = {}, {}
+        for id, e in self._elements do
+            if not e.labelSent and #labels < 300 then
+                e.labelSent = true
+                table.insert(labels, { id, cleanLabel(e.label) })
+            end
+        end
+        for i, t in self._tabs do
+            if not t.sent then
+                t.sent = true
+                table.insert(tabNames, { i, cleanLabel(t.name) })
             end
         end
         local events = {}
@@ -630,6 +676,9 @@ function SIA:_flush(final)
             ks = if self._key[1] == 1 then self._key else nil,
             h = { self._errors, self._fps or 0 },
             ev = if #events > 0 then events else nil,
+            lb = if #labels > 0 then labels else nil,
+            tn = if #tabNames > 0 then tabNames else nil,
+            th = if self._seq == 0 then self._theme else nil,
         }
         self._seq += 1
         self._ordered = {}
