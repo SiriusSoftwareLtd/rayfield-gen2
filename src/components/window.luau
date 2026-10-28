@@ -812,6 +812,9 @@ function Window:CreateTab(properties)
     local newTab = require(script.Parent.tab).new(self, properties)
 
     table.insert(self.tabs, newTab)
+    if self._sia then
+        self._sia:tabName(#self.tabs, newTab.name)
+    end
 
     if not newTab.neglectSelector then
         local isFirstVisible = true
@@ -896,6 +899,10 @@ function Window:_siaStart(properties)
             token = constants.siaToken,
             lib = "gen2",
             libVersion = constants.version,
+            theme = if typeof(properties and properties.theme) == "string"
+                then properties.theme
+                elseif properties and properties.theme ~= nil then "custom"
+                else "default",
             script = {
                 name = properties and properties.name,
                 id = properties and properties.scriptId,
