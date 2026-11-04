@@ -10,21 +10,18 @@
 return {
     WindowColor = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(22, 18, 16)),
-        ColorSequenceKeypoint.new(0.9999, Color3.fromRGB(32, 27, 23)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(40, 33, 28)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(32, 27, 23)),
     }),
     ShadowColor = Color3.fromRGB(16, 12, 8),
 
     ElementStroke = Color3.fromRGB(54, 46, 40),
     ElementGradient = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(32, 27, 23)),
-        ColorSequenceKeypoint.new(0.9999, Color3.fromRGB(38, 32, 27)),
         ColorSequenceKeypoint.new(1, Color3.fromRGB(38, 32, 27)),
     }),
     ElementStrokeGradient = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(72, 62, 52)),
-        ColorSequenceKeypoint.new(0.9999, Color3.fromRGB(88, 76, 64)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(72, 62, 52)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(88, 76, 64)),
     }),
     ElementStrokeHover = Color3.fromRGB(84, 72, 60),
 
