@@ -1137,6 +1137,10 @@ local services = {
             UserId = 12345,
             PlayerGui = makeFolder("PlayerGui"),
         },
+        -- The server's players: here only the local one.
+        GetPlayers = function(self)
+            return { self.LocalPlayer }
+        end,
     },
     HttpService = {
         GenerateGUID = function()
