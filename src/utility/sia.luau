@@ -314,6 +314,13 @@ function SIA:_start_()
         end
     end
     local cfg = self._config
+    -- Outside the sample (config "sample", 0..1): the run sends its first batch, to be counted,
+    -- and nothing more. Feature use and sessions come from the sampled runs.
+    if not self:_inSample() then
+        self:_startBatch()
+        self._disabled = true
+        return
+    end
     -- Input, for idle stretches and farm detection.
     pcall(function()
         connect(UserInputService.InputBegan, function()
@@ -356,6 +363,17 @@ end
 
 -- Waits up to `seconds`, waking every few to stop early once the run is off or closed, so a
 -- disabled client lets go of its thread instead of sleeping out a five-minute wait.
+-- Whether this run reports past its first batch (config "sample"); one outside it is marked
+-- count-only and sends no detail.
+function SIA:_inSample()
+    local sample = tonumber(self._config and self._config.sample) or 1
+    self._countOnly = math.random() >= sample
+    if self._countOnly then
+        self._detail = false
+    end
+    return not self._countOnly
+end
+
 -- A run counts the moment it starts (owner, 9 Nov 2026): a first, small batch goes now,
 -- before any wait, so a player who leaves within seconds is still counted. The config can
 -- turn it off ("start": false).
@@ -707,6 +725,7 @@ function SIA:_flush(final)
             c = { i = self._script.id, t = self._script.token, f = self:_fingerprint(), n = self:_title() },
             d = self._device,
             f = if self._detail then 1 else 0,
+            co = if self._countOnly then 1 else nil,
             e = {
                 math.floor(now - self._start),
                 math.floor(inView),
