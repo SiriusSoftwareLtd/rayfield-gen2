@@ -48,6 +48,42 @@ return function()
             expect(flushed(sia, sent, false).lb).to.equal(nil)
         end)
 
+        it("counts a run as it starts: a batch goes before any wait, unless the config turns it off", function()
+            local sia, sent = client({ on = true, detail = 1 })
+            sia:_startBatch()
+            task.wait()
+            expect(#sent).to.equal(1)
+            expect(sent[1].q).to.equal(0)
+            local off, offSent = client({ on = true, detail = 1, start = false })
+            off:_startBatch()
+            task.wait()
+            expect(#offSent).to.equal(0)
+        end)
+
+        it("takes the player's name out of the window title before sending it", function()
+            local sent = {}
+            local sia = SIA.new({
+                token = "sia_test_token_000000000000",
+                lib = "gen2",
+                libVersion = "test",
+                script = { name = "Speed Legends | SpecUser" },
+                config = { on = true, detail = 1 },
+                manual = true,
+                request = function(req)
+                    table.insert(sent, HttpService:JSONDecode(req.Body))
+                    return { StatusCode = 200, Body = '{"ok":true}' }
+                end,
+            })
+            expect(flushed(sia, sent, false).c.n).to.equal("Speed Legends | <player>")
+        end)
+
+        it("sends the window title as the script's name", function()
+            local sia, sent = client()
+            sia:element("toggle", "Auto Farm Coins", 1)
+            expect(flushed(sia, sent, false).c.n).to.equal("Spec Hub")
+            expect(sia:_title()).to.equal("Spec Hub")
+        end)
+
         it("sorts labels into categories", function()
             expect(SIA._categoryOf("Silent Aim")).to.equal("silentaim")
             expect(SIA._categoryOf("Player ESP")).to.equal("esp")

@@ -13,8 +13,8 @@
 	SIA client core (docs/design.md, The client module).
 
 	Counts what a script's players do, in memory, and sends it in small
-	batches: one after the first minute, then every five minutes, and one
-	when the window closes or the player teleports. Nothing here may slow the
+	batches: one as the run starts, one shortly after, then every five
+	minutes, and one when the window closes or the player teleports. Nothing here may slow the
 	script or break it: every call is pcall-wrapped and never yields the
 	caller's thread, and a failed send is dropped, never retried.
 
@@ -33,9 +33,10 @@
 		sia:track(name)                            -- the author's own event
 		sia:disable()                              -- the player turned it off
 
-	Never sent: names, display names, typed text, labels (only a category
-	worked out here), kick messages (only a template with names and numbers
-	taken out). The Roblox user id goes over HTTPS and is turned into an
+	Never sent: player names, display names or typed text. The window title,
+	element labels and tab names go with player names, rich text and numbers
+	taken out (numbers stay in the title), and kick messages only as a
+	template. The Roblox user id goes over HTTPS and is turned into an
 	anonymous id on the server, which never stores the number.
 ]]
 
@@ -344,6 +345,7 @@ function SIA:_start_()
         end)
     end)
     self:_watchKicks()
+    self:_startBatch()
     self:_waitFor(tonumber(cfg.firstBatch) or 60)
     while not self._disabled and not self._session.closed do
         self:_sampleFrames()
@@ -354,6 +356,15 @@ end
 
 -- Waits up to `seconds`, waking every few to stop early once the run is off or closed, so a
 -- disabled client lets go of its thread instead of sleeping out a five-minute wait.
+-- A run counts the moment it starts (owner, 9 Nov 2026): a first, small batch goes now,
+-- before any wait, so a player who leaves within seconds is still counted. The config can
+-- turn it off ("start": false).
+function SIA:_startBatch()
+    if self._config and self._config.start ~= false then
+        self:_flush(false)
+    end
+end
+
 function SIA:_waitFor(seconds)
     local left = seconds
     while left > 0 and not self._disabled and not self._session.closed do
@@ -598,10 +609,16 @@ function SIA:_watchKicks()
 end
 
 -- ── Sending ─────────────────────────────────────────────────────────────────────
+-- The window's title, with player names taken out: some scripts put the player's name in it
+-- ("Speed Legends V1 | Name"), which would make it personal and split one script per player.
+function SIA:_title()
+    return withoutNames(tostring(self._script.name or ""))
+end
+
 function SIA:_fingerprint()
     local ids = table.clone(self._order)
     table.sort(ids)
-    return hash16(tostring(self._script.name or "") .. "|" .. table.concat(ids, ","))
+    return hash16(self:_title() .. "|" .. table.concat(ids, ","))
 end
 
 function SIA:_flush(final)
@@ -687,7 +704,7 @@ function SIA:_flush(final)
             g = g,
             x = { ex, exv },
             l = self._lib,
-            c = { i = self._script.id, t = self._script.token, f = self:_fingerprint(), n = self._script.name },
+            c = { i = self._script.id, t = self._script.token, f = self:_fingerprint(), n = self:_title() },
             d = self._device,
             f = if self._detail then 1 else 0,
             e = {
