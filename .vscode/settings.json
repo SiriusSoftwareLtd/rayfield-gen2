@@ -1,8 +1,4 @@
 {
-    "robloxLsp.diagnostics.globals": [
-        "gethui",
-        "cloneref"
-    ],
     "cSpell.words": [
         "appendfile",
         "Avant",
