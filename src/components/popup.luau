@@ -42,9 +42,11 @@ local contentSize = 15
 local headerIconSize = 16
 local headerIconGap = 12 -- icon to title-column
 local maxContentHeight = 300 -- content region scrolls past this
--- the content scrolls, so it clips its children; this inset keeps box strokes off the edge
+-- a scrolling region clips its children; this inset keeps box strokes off the edge. The region
+-- reaches the same distance into the card's side padding, so its contents still line up with
+-- the title.
 local contentInset = 4
-local contentWidth = innerWidth - contentInset * 2
+local contentWidth = innerWidth
 
 -- Box (changelog card) metrics.
 local boxSidePad = 16
@@ -374,14 +376,24 @@ function Popup:_buildContent()
     end
 
     local window = self.window
-    local measured = if self.boxes and #self.boxes > 0 then self:_measureBoxes() else self:_measureText()
+    local hasBoxes = self.boxes and #self.boxes > 0
+    local measured = if hasBoxes then self:_measureBoxes() else self:_measureText()
+
+    -- A paragraph that fits is a plain label at the header's width. Only a region that has to
+    -- scroll goes in a ScrollingFrame: that clips, so a label sized off its canvas can run past
+    -- the visible edge and lose the end of each line.
+    if not hasBoxes and measured <= maxContentHeight then
+        self:_buildParagraph(self.card, UDim2.new(1, 0, 0, measured)).LayoutOrder = 2
+        return measured
+    end
+
     local viewHeight = math.min(measured, maxContentHeight) + contentInset * 2
 
     local content = window:Create("ScrollingFrame", {
         Name = "Content",
         BackgroundTransparency = 1,
         BorderSizePixel = 0,
-        Size = UDim2.new(1, 0, 0, viewHeight),
+        Size = UDim2.new(1, contentInset * 2, 0, viewHeight),
         CanvasSize = UDim2.new(0, 0, 0, 0),
         AutomaticCanvasSize = Enum.AutomaticSize.Y,
         ScrollBarThickness = 4,
@@ -405,7 +417,7 @@ function Popup:_buildContent()
         Parent = content,
     })
 
-    if self.boxes and #self.boxes > 0 then
+    if hasBoxes then
         window:Create("UIListLayout", {
             FillDirection = Enum.FillDirection.Vertical,
             HorizontalAlignment = Enum.HorizontalAlignment.Center,
@@ -418,26 +430,31 @@ function Popup:_buildContent()
             self:_buildBox(content, box, index)
         end
     else
-        self:_fade(
-            window:Create("TextLabel", {
-                Text = locale.t(self.content),
-                Size = UDim2.new(1, 0, 0, measured),
-                BackgroundTransparency = 1,
-                TextSize = contentSize,
-                TextXAlignment = Enum.TextXAlignment.Left,
-                TextYAlignment = Enum.TextYAlignment.Top,
-                TextWrapped = true,
-
-                TextTransparency = 1, -- shown = 0.5
-
-                Parent = content,
-            }, { TextColor3 = "ContentColor", FontFace = "Font" }),
-            "TextTransparency",
-            0.5
-        )
+        -- fixed width, the same one it was measured at, rather than a share of the canvas
+        self:_buildParagraph(content, UDim2.fromOffset(contentWidth, measured))
     end
 
     return viewHeight
+end
+
+function Popup:_buildParagraph(parent, size)
+    return self:_fade(
+        self.window:Create("TextLabel", {
+            Text = locale.t(self.content),
+            Size = size,
+            BackgroundTransparency = 1,
+            TextSize = contentSize,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextYAlignment = Enum.TextYAlignment.Top,
+            TextWrapped = true,
+
+            TextTransparency = 1, -- shown = 0.5
+
+            Parent = parent,
+        }, { TextColor3 = "ContentColor", FontFace = "Font" }),
+        "TextTransparency",
+        0.5
+    )
 end
 
 -- One changelog box: a card in the element-panel style (gradient stroke sheen), icon optional,

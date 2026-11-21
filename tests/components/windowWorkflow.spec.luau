@@ -602,6 +602,64 @@ return function()
             expect(w:Popup({ title = "Late" })).never.to.be.ok()
         end)
 
+        describe("popup content", function()
+            local variables = helpers.requireUtility("variables")
+            local originalGetTextBoundsAsync
+
+            beforeEach(function()
+                originalGetTextBoundsAsync = variables.textService.GetTextBoundsAsync
+            end)
+
+            afterEach(function()
+                variables.textService.GetTextBoundsAsync = originalGetTextBoundsAsync
+            end)
+
+            local function childOfClass(parent, className)
+                for _, child in parent:GetChildren() do
+                    if child.ClassName == className then
+                        return child
+                    end
+                end
+                return nil
+            end
+
+            local function openWithParagraph(height)
+                variables.textService.GetTextBoundsAsync = function(_, params)
+                    return { X = params.Width, Y = height }
+                end
+                local w = makeWindow()
+                return w:Popup({ title = "Unload Cloud?", content = "This will unload the ui." })
+            end
+
+            it("puts a paragraph that fits straight on the card, at the header's width", function()
+                local popup = openWithParagraph(40)
+
+                expect(childOfClass(popup.card, "ScrollingFrame")).never.to.be.ok()
+                local paragraph = childOfClass(popup.card, "TextLabel")
+                expect(paragraph).to.be.ok()
+                expect(paragraph.Size.X.Scale).to.equal(1)
+                expect(paragraph.Size.X.Offset).to.equal(0)
+                expect(paragraph.Size.Y.Offset).to.equal(40)
+                popup:Close()
+            end)
+
+            it("scrolls a long paragraph in a region that keeps the text in line with the title", function()
+                local popup = openWithParagraph(500)
+
+                local region = childOfClass(popup.card, "ScrollingFrame")
+                expect(region).to.be.ok()
+                expect(region.Size.X.Scale).to.equal(1)
+                expect(region.Size.X.Offset).to.equal(8) -- reaches 4px into each side's padding
+                local padding = childOfClass(region, "UIPadding")
+                expect(padding.PaddingLeft.Offset).to.equal(4)
+
+                local paragraph = childOfClass(region, "TextLabel")
+                expect(paragraph.Size.X.Scale).to.equal(0)
+                expect(paragraph.Size.X.Offset).to.equal(356) -- the card's inner width
+                popup:Close()
+            end)
+        end)
+
         it("clears keybind recording when its tab is removed and keeps the toggle key alive", function()
             local w = makeWindow()
             w:Show()
