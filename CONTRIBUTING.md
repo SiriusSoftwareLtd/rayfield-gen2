@@ -21,6 +21,8 @@ On Windows, inspect `%USERPROFILE%\.rokit\tool-storage` when troubleshooting the
 
 An older Rojo Studio plugin may not be able to connect to the 7.7.0 server.
 
+In VS Code, install the extensions recommended in `.vscode/extensions.json`: luau-lsp, StyLua, Selene, Rojo and Code Spell Checker. They use the Rokit-pinned tools. Don't use Roblox LSP alongside luau-lsp; the two language servers conflict. Other editors work too, since the CLI tools need no editor.
+
 ## Set up a clean checkout
 
 ```bash

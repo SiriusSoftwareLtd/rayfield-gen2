@@ -1,0 +1,12 @@
+{
+    "recommendations": [
+        "JohnnyMorganz.luau-lsp",
+        "JohnnyMorganz.stylua",
+        "Kampfkarren.selene-vscode",
+        "evaera.vscode-rojo",
+        "streetsidesoftware.code-spell-checker"
+    ],
+    "unwantedRecommendations": [
+        "Nightrains.robloxlsp"
+    ]
+}
